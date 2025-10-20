@@ -1,0 +1,115 @@
+.schedule-calendar {
+    width: 90%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.schedule-calendar th,
+.schedule-calendar td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+    vertical-align: center;
+    height: 50px;
+    width: 1000px;
+}
+
+.schedule-calendar th {
+    background-color: #008080;
+    color: white;
+}
+
+.time-slot {
+    background-color: #f0f0f0;
+    font-weight: bold;
+}
+
+.empty-slot {
+    background-color: #ffffff;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.empty-slot:hover {
+    background-color: #e0e0e0;
+}
+
+.original-slot {
+    background-color: #ffff99;
+    cursor: pointer;
+}
+
+.rerun-slot {
+    background-color: #99ccff;
+    cursor: pointer;
+}
+
+.program-form,
+.schedule-form {
+    display: none;
+    position: absolute;
+    top: 00%;
+    left: 50%;
+    transform: translate(-50%);
+    background: white;
+    padding: 40px;
+    border: 2px solid #008080;
+    border-radius: 10px;
+    z-index: 1000;
+    color: black;
+    overflow: auto;
+    box-sizing: border-box;
+
+}
+
+.form-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.form-group {
+    margin: 10px 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.form-buttons {
+    margin-top: 15px;
+    text-align: right;
+}
+
+.form-buttons button {
+    margin-left: 10px;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.save-btn {
+    background-color: #008080;
+    color: white;
+}
+
+.cancel-btn {
+    background-color: #ccc;
+    color: black;
+}

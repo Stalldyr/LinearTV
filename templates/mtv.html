@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Tilbake{% endblock title %}
+
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+<h1>MTV</h1>
+
+<p>
+    Nyt en kontinuerlig strøm av klassiske musikkvideoer fra MTVs gullalder på 90-tallet og tidlig 2000-tall.
+    <br>Obs! Under arbeid
+</p>
+
+<div class="video-container">
+    <iframe 
+        src="https://www.youtube.com/embed/videoseries?list=PLDw7_qlUaVw3zvuoS9P_Kk7g9YuzRKBjQ&autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1"
+        width="480"
+        height="480"
+        frameborder="0"
+        allowfullscreen
+        id="mtvPlayer">
+    </iframe>
+    <div class="tv-overlay" onclick="return false;"></div>
+</div>
+{% endblock content %}

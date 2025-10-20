@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="no">
+  <head>
+    <title>NostalgicTV Admin</title>
+    <meta charset="UTF-8">
+    <meta name="description" content="Administrative panel for managing NostalgicTV broadcasting schedule">
+    <meta name="keywords">
+  </head>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/admin.css') }}" />
+
+  <body>
+    <h1>Sendeskjema Admin</h1>
+
+    <button id="addProgram">Legg til eller endre program</button>
+
+    <table class="schedule-calendar">
+    </table>
+
+    <!-- Program Form Overlay -->
+    <div class="form-overlay" id="formOverlay" onclick="closeScheduleForm()"></div>
+
+    <!-- Schedule Form -->
+    <div class="schedule-form" id="scheduleForm">
+      <h3>Legg til program</h3>
+      <form id="scheduleFormData">
+        <div class="form-group">
+          <label>Program:</label>
+          <select id="scheduledProgramTitle" onchange="updateDurationLabel()">
+            <option selected value>[Ledig]</option>
+            {% for e in series_data %}
+              <option id="{{ e.id }}" data-duration="{{ e.duration }}" data-rerun="{{ e.is_rerun }}">{{ e.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" id="durationGroup">
+          <label id="duration"></label>
+        </div>
+
+        <div class="form-group" id="rerunGroup">
+          <label>Reprise:</label>
+          <input type="checkbox" id="isRerun" />
+        </div>
+
+        <div class="form-buttons">
+          <button type="button" class="cancel-btn" onclick="closeScheduleForm()">Avbryt</button>
+          <button type="button" class="save-btn" onclick="saveSchedule()">Lagre</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Series Form -->
+    <div class="program-form" id="programForm">
+      <h3>Legg til nytt program</h3>
+      <form id="programFormData">
+        <div class="form-group">
+          <label>Velg program:</label>
+          <select id="programTitleSelect" onclick="updateSeriesForm()">
+            <option selected>--Nytt program--</option>
+            {% for e in series_data %}
+              <option id="{{ e.id }}">{{ e.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tittel:</label>
+          <input type="text" id="programTitle" required/>
+        </div>
+
+        <div class="form-group">
+          <label>Kilde:</label>
+          <select id="programSource">
+            <option label="NRK">NRK</option>
+            <option label="TV2">TV2</option>
+            <option label="YouTube">YouTube</option>
+            <option label="Lokalt">Local</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>URL:</label>
+          <input type="text" id="programUrl"/>
+        </div>
+
+        <div class="form-group">
+          <label>Startsesong:</label>
+          <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
+        </div>
+
+        <div class="form-group">
+          <label>Startepisode:</label>
+          <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
+        </div>
+
+        <div class="form-group">
+          <label>Beskrivelse:</label>
+          <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Utgivelsesår:</label>
+          <input type="text" id="programYear" placeholder="e.g 2001"/>
+        </div>
+
+        <div class="form-group">
+          <label>Lengde:</label>
+          <select id="programDuration">
+            <option label="30 minutter">30</option>
+            <option label="60 minutter">60</option>
+            <option label="90 minutter">90</option>
+            <option label="120 minutter">120</option>
+            <option label="150 minutter">150</option>
+          </select>
+        </div>
+
+        <div  class="form-group">
+          <label>Sjanger:</label>
+          <select id="programGenre">
+            <option label="Drama">Drama</option>
+            <option label="Komedie">Comedy</option>
+            <option label="Reality">Reality</option>
+            <option label="Underholdning">Entertainment</option>
+            <option label="Dokumentar">Documentary</option>
+          </select>        
+        </div>
+
+        <div  class="form-group">
+          <label>TMDB-id:</label>
+            <input type="text" id="programTmdbId">
+        </div>
+
+        <div class="form-group">
+          <label>Omvendt spilleliste:</label>
+          <input type="checkbox" id="programIsReverse">
+        </div>
+
+        <div class="form-buttons">
+          <button type="button" class="cancel-btn" onclick="closeProgramForm()">Avbryt</button>
+          <button type="button" class="save-btn" onclick="saveProgram()">Lagre</button>
+        </div>
+      </form>
+    </div>
+
+  </body>
+
+  <script>
+    const scheduleData = {{schedule_data | tojson | safe}};
+    const seriesData = {{series_data | tojson | safe}};
+  </script>
+  <script src="{{ url_for('static', filename='scripts/admin.js') }}"></script>
+
+</html>

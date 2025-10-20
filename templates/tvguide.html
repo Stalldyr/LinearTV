@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Tilbake{% endblock title %}
+
+{% block head %}
+<style>
+    #schedule {
+        width: 100%;
+        border-collapse: collapse;
+        color: #1d6875;
+        table-layout: fixed;
+    }
+    #schedule th, #schedule td {
+        border: 1px solid #aab5b8;
+        padding: 8px;
+    }
+    #schedule th:first-child,
+    #schedule td:first-child {
+        width: 40px;
+    }
+
+    #schedule th {
+        background-color: #add6e0;
+        text-align: center;
+        font-size: 1.2em;
+    }
+    #schedule td {
+        text-align: center;
+        background-color: aliceblue;
+        font-size: small;
+        vertical-align: middle;
+        min-height: 60px; 
+        height: 60px;
+        overflow-wrap: break-word;
+    }
+
+    
+    #schedule td strong {
+        font-size: 1.1em;
+    }
+    #schedule td span {
+        font-size: 0.9em;
+        color: gray;
+    }
+
+    #schedule td tr {
+        min-height: 40px; 
+        height: 40px;
+    }
+
+    #schedule td[rowspan] {
+        height: auto; /* La den beregnes basert på antall rader */
+    }
+
+    /* Time slot celler */
+    .time-slot.empty {
+        color: #999;
+    }
+
+    .time-slot.filled {
+        background-color: #f9f9f9;
+    }
+
+    /* Programinformasjon */
+    .show-status {
+        font-size: small;
+        color: gray;
+    }
+
+    .show-time {
+        font-size: x-small;
+        color: gray;
+    }
+    
+</style>
+{% endblock head %}
+
+{% block content %}
+<h1>tv-guide</h1>
+<table id="schedule">
+</table>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+function incrementTime(time) {
+    let [hours, minutes] = time.split(':').map(Number);
+    minutes += 30;
+    if (minutes >= 60) {
+        minutes = 0;
+        hours += 1;
+    }
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function calculateTimeSlots(startTime, endTime) {
+    const slots = [];
+    for (let time = startTime; time <= endTime; time = incrementTime(time)) {
+        slots.push(time);
+    }
+    return slots;
+}
+fetch('/api/schedule')
+    .then(response => response.json())
+    .then(schedule => {
+        const startTime = schedule.reduce((earliest, entry) => {
+            return entry.start_time < earliest ? entry.start_time : earliest;
+        }, "23:59");
+        const endTime = schedule.reduce((latest, entry) => {
+            return entry.end_time > latest ? entry.end_time : latest;
+        }, "00:00");
+
+        const timeSlots = calculateTimeSlots(startTime, endTime);
+        
+        // Organiser data per dag og tid
+        const scheduleByDay = {};
+        for (let day = 1; day <= 7; day++) {
+            scheduleByDay[day] = {};
+        }
+        
+        schedule.forEach(entry => {
+            const day = entry.day_of_week;
+            const start = entry.start_time;
+            scheduleByDay[day][start] = entry;
+        });
+
+        const table = document.getElementById('schedule');
+        table.innerHTML = '';
+        
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+            <th>Tid</th>
+            <th>Mandag</th>
+            <th>Tirsdag</th>
+            <th>Onsdag</th>
+            <th>Torsdag</th>
+            <th>Fredag</th>
+            <th>Lørdag</th>
+            <th>Søndag</th>
+        `;
+        table.appendChild(headerRow);
+
+        // Hold styr på hvilke celler som skal hoppes over
+        const skipCells = {};
+        for (let day = 1; day <= 7; day++) {
+            skipCells[day] = {};
+        }
+
+        timeSlots.forEach(time => {
+            const row = document.createElement('tr');
+            const timeCell = document.createElement('td');
+            timeCell.innerText = time;
+            row.appendChild(timeCell);
+
+            for (let day = 1; day <= 7; day++) {
+                // Hopp over celle hvis den er del av et sammenslått program
+                if (skipCells[day][time]) {
+                    continue;
+                }
+
+                const cell = document.createElement('td');
+                const entry = scheduleByDay[day][time];
+
+                if (entry) {
+                    const rowSpan = entry.blocks;
+                    cell.rowSpan = rowSpan;
+                    cell.innerHTML = `
+                        <strong>${entry.show_name}</strong><br>
+                        <span class="show-status">${entry.is_rerun ? 'Reprise' : 'Ny'}</span><br>
+                    `;
+                    cell.className = 'time-slot filled';
+                    
+                    // Marker celler som skal hoppes over
+                    let currentTime = time;
+                    for (let i = 1; i < rowSpan; i++) {
+                        currentTime = incrementTime(currentTime);
+                        skipCells[day][currentTime] = true;
+                    }
+                } else {
+                    cell.innerText = '---';
+                    cell.className = 'time-slot empty';
+                }
+
+                cell.className = 'time-slot';
+                row.appendChild(cell);
+            }
+
+            table.appendChild(row);
+        });
+    });
+</script>
+
+
+{% endblock scripts %}
+

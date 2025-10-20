@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Tilbake{% endblock title %}
+
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+
+<div class="indexmain">
+    <h1>Velkommen</h1>
+
+    <p>Dette er en side for å gjenoppleve 90-tallet og tidlig 2000-tall (med hovedfokus på tidlig 2000-tall i denne instansen).</p>
+    <p>
+        Kommende funksjoner:
+        <ul>
+            <li>Egen MTV-kanal</li>
+            <li>Chat-funksjon hvor man kan diskutere TV-programmer</li>
+            <li>Tidsrelevante lenker</li>
+            <li>Info, musikk og annen stæsj</li>
+        </ul>
+    </p>
+    <p>
+        De neste ukene så vil det samme sendeskjema gå på repeat, men nye programmer vil bli lagt til etterhvert.
+    </p>
+    
+    <div id="webamp" class="webamp-container">
+    <!-- Webamp will render into this div -->
+    <!-- The height of this div should be at least 100vh to ensure Webamp is fully visible -->
+    <!-- You can adjust the width and height as needed -->
+    <!-- Webamp will attempt to center itself within this div -->
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block scripts %}
+
+<script type="module">
+import Webamp from "https://unpkg.com/webamp@^2/butterchurn";
+const webamp = new Webamp({
+windowLayout: 
+    {
+        main: {
+            position: { top: 0, left: 50 },
+            closed: false,
+        },
+        milkdrop: {
+            position: { top: 115, left: 0 },
+            size: { extraHeight: 6, extraWidth: 2 },
+            closed: false,
+        }
+    },
+initialTracks: [
+    {
+        metaData: {
+            artist: "TLC",
+            title: "No Scrubs",
+        },
+        url: "static/sound/TLC_no_scrubs.mp3",
+        duration: 222,
+    }
+],
+enableDoubleSizeMode: false,
+
+initialSkin: {
+    url: "/static/webampskins/Winamp5_Classified_v5.5.wsz",
+},
+
+});
+
+webamp.renderWhenReady(document.getElementById("webamp"))
+
+</script>
+
+{% endblock scripts %}

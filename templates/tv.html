@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Tilbake{% endblock title %}
+
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+<h1 class="mainheader">TV-STREAM</h1>
+
+<video id="tvPlayer" controls autoplay>
+    <source type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+
+<div id="info">
+    <h2 id="programTitle"></h2>
+    <p id="programTime"></p>
+    <p id="programDescription"></p>
+    <p id="nextProgram"></p>
+</div>
+
+<div id="dailySchedule">
+
+</div>
+
+{% endblock content %}
+
+{% block scripts %}
+<script>
+    let currentProgram = null;
+
+    function updateProgram() {
+        const tvPlayer = document.getElementById('tvPlayer');
+
+        fetch('/api/current')
+            .then(response => response.json())
+            .then(program => {
+                if (JSON.stringify(program) !== JSON.stringify(currentProgram)) {
+                    console.log("Program changed!", program);
+                    currentProgram = program;
+                    
+                    const player = document.getElementById('tvPlayer');
+                    if (program.status === "off_air" || program.status === "no_program" || program.status === "unavailable") {
+                        document.getElementById('programTitle').innerText = program.show_name;
+                        document.getElementById('programTime').innerText = "";
+                        document.getElementById('programDescription').innerText = program.description;
+                    } else {
+                        player.src = `/video/${program.directory}/${program.filename}`;
+                        document.getElementById('programTitle').innerText = program.show_name;
+                        document.getElementById('programTime').innerText = `${program.start_time}`;
+                        if (program.episode_description){
+                            document.getElementById('programDescription').innerText = program.episode_description;
+                        } else {
+                            document.getElementById('programDescription').innerText = program.series_description;
+                        }   
+                    }
+                }
+            });
+    }
+
+    setInterval(updateProgram, 1000)
+    
+</script>
+
+{% endblock scripts %}
