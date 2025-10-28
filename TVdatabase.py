@@ -506,8 +506,10 @@ class TVDatabase:
 
         return self._execute_query(query)
 
-    def get_current_program(self, time=datetime.now(), daily=False):
+    def get_current_program(self, daily=False):
         schedule = self.get_air_schedule()
+
+        time = datetime.now()
 
         current_time = time.time()
         current_day = int(time.strftime('%w'))
@@ -521,10 +523,10 @@ class TVDatabase:
                 start_hour, start_min = map(int, program['start_time'].split(':'))
                 start_time = time_class(start_hour, start_min)
                 
-                # Calculate end time
-                start_datetime = datetime.combine(time.date(), start_time)
-                end_datetime = start_datetime + timedelta(minutes=30*program['blocks'])
-                end_time = end_datetime.time()
+                end_time = datetime.strptime(program['end_time'], "%H:%M").time() if program['end_time'] else None
+                if not end_time:
+                    duration_minutes = program['duration'] if program['duration'] else 30
+                    end_time = _calculate_end_time(program['start_time'], duration_minutes)
 
                 # Normal program within same day
                 if start_time <= current_time < end_time:
@@ -535,6 +537,7 @@ class TVDatabase:
 
     #TABLE OPERATIONS
 
+    #Cell operations
     def get_most_recent_id(self, table):
         table_id = self._execute_query(f'''
             SELECT id 
@@ -545,6 +548,25 @@ class TVDatabase:
 
         return table_id[0][0]
     
+    def get_cell(self, table, record_id, column):
+        result = self._execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
+        return result[0] if result else None
+
+    def edit_cell(self, table, id, column, new_value):
+        self._execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
+        print(f"Oppdatert {table} ID {id}: satt {column} til {new_value}")
+    
+    def check_if_id_exists(self,table, key):
+        query = f'''
+            SELECT COUNT(*)
+            FROM {table}
+            WHERE id = ?;
+        '''
+
+        return self._execute_query(query,(key,),output=tuple)[0][0]
+    
+
+    #Column operations
     def add_column(self, table, col, type=None):
         self._execute_query(f"""ALTER TABLE {table} ADD COLUMN {col} {type};""")
 
@@ -554,16 +576,8 @@ class TVDatabase:
     def drop_column(self,table,col):
         self._execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
 
-    def get_cell(self, table, record_id, column):
-        result = self._execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
-        return result[0] if result else None
 
-    def edit_cell(self, table, id, column, new_value):
-        self._execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
-        print(f"Oppdatert {table} ID {id}: satt {column} til {new_value}")
-
-
-
+    #Row operations
     def get_row_by_id(self, table, row_id):
         result = self._execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
         return result[0] if result else None
@@ -630,14 +644,6 @@ class TVDatabase:
         '''
         self._execute_query(query, params)
 
-    def check_if_id_exists(self,table, key):
-        query = f'''
-            SELECT COUNT(*)
-            FROM {table}
-            WHERE id = ?;
-        '''
-
-        return self._execute_query(query,(key,),output=tuple)[0][0]
 
 
 def create_valid_filename(title):

@@ -1,14 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Tilbake{% endblock title %}
-
 {% block head %}
 {% endblock head %}
 
 {% block content %}
 <h1 class="mainheader">TV-STREAM</h1>
 
-<video id="tvPlayer" controls autoplay>
+<video id="tvPlayer" width="75%" height="auto" controls autoplay>
     <source type="video/mp4">
     Your browser does not support the video tag.
 </video>
@@ -36,6 +34,7 @@
         fetch('/api/current')
             .then(response => response.json())
             .then(program => {
+                console.log("Fetched program:", program);
                 if (JSON.stringify(program) !== JSON.stringify(currentProgram)) {
                     console.log("Program changed!", program);
                     currentProgram = program;
@@ -48,12 +47,12 @@
                     } else {
                         player.src = `/video/${program.directory}/${program.filename}`;
                         document.getElementById('programTitle').innerText = program.show_name;
-                        document.getElementById('programTime').innerText = `${program.start_time}`;
+                        document.getElementById('programTime').innerText = `${program.start_time} - ${program.end_time}`;
                         if (program.episode_description){
                             document.getElementById('programDescription').innerText = program.episode_description;
                         } else {
                             document.getElementById('programDescription').innerText = program.series_description;
-                        }   
+                        }
                     }
                 }
             });

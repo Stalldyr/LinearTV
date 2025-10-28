@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 
-{% block title %}Tilbake{% endblock title %}
-
 {% block head %}
 <style>
     #schedule {
@@ -95,7 +93,7 @@ function incrementTime(time) {
 
 function calculateTimeSlots(startTime, endTime) {
     const slots = [];
-    for (let time = startTime; time <= endTime; time = incrementTime(time)) {
+    for (let time = startTime; time < endTime; time = incrementTime(time)) {
         slots.push(time);
     }
     return slots;

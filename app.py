@@ -10,12 +10,12 @@ import schedule
 
 app = Flask(__name__)
 
-tv_stream = TVStreamManager() 
+tv_stream = TVStreamManager()
 tv_db = TVDatabase()
 tv_dl = TVDownloader()
 
-schedule.every().day.at("18:00").do(tv_stream.start_monitoring)
-schedule.every().day.at("00:00").do(tv_stream.stop_monitoring)
+tv_stream.start_monitoring()
+
 schedule.every().monday.at("10:00").do(tv_dl.prepare_weekly_schedule)
 
 #Index page
@@ -53,7 +53,10 @@ def info():
 def links():
     return render_template('links.html')
 
-
+@app.route('/irc/')
+@app.route('/irc/<path:path>')
+def serve_kiwiirc(path='index.html'):
+    return send_from_directory('/opt/kiwiirc/dist', path)
 
 # ============ ADMIN PAGES ============
 auth = HTTPBasicAuth()

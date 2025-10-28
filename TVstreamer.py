@@ -7,13 +7,7 @@ class TVStreamManager:
         self.current_stream = None
         self.monitoring = False
 
-        if time:
-            self.tv_db = TVDatabase(test_time=time)
-            self.time = time
-        else:
-            self.tv_db = TVDatabase()
-            self.time = datetime.now()
-
+        self.tv_db = TVDatabase()
 
     def get_current_status(self):
         if self.current_stream:
@@ -26,7 +20,7 @@ class TVStreamManager:
         
         
     def get_current_program(self):
-        current_hour = int(self.time.strftime("%H"))
+        current_hour = int(datetime.now().strftime("%H"))
     
         if current_hour < 18:
             self.current_stream = None
