@@ -57,10 +57,44 @@ def links():
     return render_template('links.html')
 
 # KiwiIRC page
-@app.route('/irc/')
-@app.route('/irc/<path:path>')
-def serve_kiwiirc(path='index.html'):
-    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
+#@app.route('/irc/')
+#@app.route('/irc/<path:path>')
+#def serve_kiwiirc(path='index.html'):
+#    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
+
+@app.route('/irc')
+def irc_client():
+    config = {
+        'server': {
+            'url': 'wss://irc.libera.chat:6697',
+            'nick': 'gjest',
+            'autoconnect': True
+        }
+    }
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>IRC Klient</title>
+        <script>
+            window.gamjaConfig = {config};
+        </script>
+        <script src="/gamja.js"></script>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body>
+        <div id="gamja"></div>
+    </body>
+    </html>
+    """
+    return render_template(html)
+
+#Gamja page
+@app.route('/gamja/')
+@app.route('/gamja/<path:path>')
+def serve_gamja(path='index.html'):
+    return send_from_directory(os.path.join(BASE_DIR, 'gamja'), path)
 
 # ============ ADMIN PAGES ============
 auth = HTTPBasicAuth()
