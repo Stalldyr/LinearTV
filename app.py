@@ -94,7 +94,7 @@ def irc_client():
 @app.route('/gamja/')
 @app.route('/gamja/<path:path>')
 def serve_gamja(path='index.html'):
-    return send_from_directory(os.path.join(BASE_DIR, 'gamja'), path)
+    return send_from_directory(os.path.join(BASE_DIR, 'gamja/dist'), path)
 
 # ============ ADMIN PAGES ============
 auth = HTTPBasicAuth()
