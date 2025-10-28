@@ -7,8 +7,11 @@ from TVdownloader import TVDownloader
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
 import schedule
+import os
 
 app = Flask(__name__)
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
@@ -53,10 +56,11 @@ def info():
 def links():
     return render_template('links.html')
 
+# KiwiIRC page
 @app.route('/irc/')
 @app.route('/irc/<path:path>')
 def serve_kiwiirc(path='index.html'):
-    return send_from_directory('/opt/kiwiirc/dist', path)
+    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
 
 # ============ ADMIN PAGES ============
 auth = HTTPBasicAuth()
