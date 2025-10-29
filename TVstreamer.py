@@ -25,7 +25,6 @@ class TVStreamManager:
         current_hour = int(time.strftime("%H"))
     
         if current_hour < 18:
-            self.current_stream = None
             return {
                 "status": "off_air",
                 "show_name": "Ingen sending",
@@ -36,7 +35,6 @@ class TVStreamManager:
         program = self.tv_db.get_current_program(time=time)
 
         if not program:
-            self.current_stream = None
             return {
                 "status": "no_program",
                 "show_name": "Ingen program",
@@ -45,15 +43,12 @@ class TVStreamManager:
             }
         
         if program.get('status') != 'available':
-            self.current_stream = None
             return {
                 "status": "unavailable",
                 "show_name": program.get('show_name', 'Ukjent program'),
                 "description": "Programmet er ikke tilgjengelig for avspilling",
                 "filepath": None
             }
-
-        self.current_stream = program
 
         self.log_air_date(program)
 
@@ -82,10 +77,10 @@ class TVStreamManager:
     def _monitor_streams(self):
         while self.monitoring:
             current_time = self.test_time if self.test_time else datetime.now()
-            current_program = self.monitor_current_program(time=current_time)
+            self.current_stream = self.monitor_current_program(time=current_time)
             
-            if current_program:
-                print(f"Monitoring: {current_program['show_name']} at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            if self.current_stream:
+                print(f"Monitoring: {self.current_stream['show_name']} at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             else:
                 print("No current program to monitor.")
 

@@ -13,13 +13,9 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-test_time = None
-
-tv_stream = TVStreamManager(time=test_time)
+tv_stream = TVStreamManager()
 tv_db = TVDatabase()
 tv_dl = TVDownloader()
-
-tv_stream.start_monitoring()
 
 #Index page
 @app.route('/')
@@ -141,11 +137,7 @@ def serve_video(directory, filename):
 
 @app.route('/api/current')
 def current_program():
-    program = tv_stream.current_stream
-    if program:
-        return jsonify(program)
-    else:
-        return jsonify({"error": "No program currently streaming"}), 404
+    return jsonify(tv_stream.current_stream)
     
 @app.route('/api/next')
 def next_program():
@@ -171,7 +163,12 @@ def get_time():
     return [time.strftime("%H")]
 
 if __name__ == '__main__':
-    if sys.argv[1]:
+    if len(sys.argv)>1:
         test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
 
+    tv_stream = TVStreamManager(time=test_time)
+    tv_stream.start_monitoring()
+
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+tv_stream.start_monitoring()
