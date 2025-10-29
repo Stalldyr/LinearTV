@@ -8,12 +8,17 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
 import schedule
 import os
+import sys
+
+test_time = None
+if sys.argv[1]:
+    test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-tv_stream = TVStreamManager(time=datetime.strptime("2025-10-29 20:33", "%Y-%m-%d %H:%M"))
+tv_stream = TVStreamManager(time=test_time)
 tv_db = TVDatabase()
 tv_dl = TVDownloader()
 
@@ -169,3 +174,6 @@ def status():
 def get_time():
     time = datetime.now().time()
     return [time.strftime("%H")]
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
