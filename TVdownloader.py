@@ -241,12 +241,12 @@ class TVDownloader:
                 if not episode_data["season_number"]:
                     episode_data["season_number"] = series["season"]
 
-                existing = self.tv_db.get_episode_by_details(series_id, episode_data["season_number"], episode_data["episode_number"])
+                existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
 
                 if existing:
                     continue
 
-                self.tv_db.insert_row("episodes", data=episode_data, series_id = series_id, status = "pending", download_date = None)
+                self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
         else:
             print("No metadata available")
