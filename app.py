@@ -6,25 +6,20 @@ from TVdatabase import TVDatabase
 from TVdownloader import TVDownloader
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
-import schedule
 import os
 import sys
-
-test_time = None
-if sys.argv[1]:
-    test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+test_time = None
 
 tv_stream = TVStreamManager(time=test_time)
 tv_db = TVDatabase()
 tv_dl = TVDownloader()
 
 tv_stream.start_monitoring()
-
-schedule.every().monday.at("10:00").do(tv_dl.prepare_weekly_schedule)
 
 #Index page
 @app.route('/')
@@ -176,4 +171,7 @@ def get_time():
     return [time.strftime("%H")]
 
 if __name__ == '__main__':
+    if sys.argv[1]:
+        test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
+
     app.run(host='0.0.0.0', port=5000, debug=True)
