@@ -138,7 +138,8 @@ class TVDownloader:
     def prepare_weekly_schedule(self):
         self.cleanup_obsolete_episodes()
         self.update_deletion_status()
-        #self.verify_available_episodes()
+        self.create_pending_episodes()
+        self.verify_available_episodes()
         self.download_weekly_schedule()
 
     def cleanup_obsolete_episodes(self):
@@ -172,6 +173,13 @@ class TVDownloader:
             self.tv_db.update_episode_keeping_status(episode['id'], False)
 
 
+    def create_pending_episodes(self):
+        series_list = self.tv_db.get_all_series()
+
+        for series in series_list:
+            self.create_pending_episodes(series)
+
+
     def verify_available_episodes(self):
         available_episodes = self.tv_db.get_available_episodes()
 
@@ -188,8 +196,6 @@ class TVDownloader:
 
         for entry in schedule:
             total_episodes = self.get_season_metadata(entry)
-            self.create_pending_episodes(entry["series_id"])
-
             pending_episodes = self.tv_db.get_pending_episodes(entry["series_id"], entry["episode"], entry["count"])
             
             file_ids = []
@@ -208,9 +214,7 @@ class TVDownloader:
 
             self.link_episodes_to_schedule(entry, file_ids)
 
-    def create_pending_episodes(self,series_id):
-        series = self.tv_db.get_row_by_id("series", series_id)
-
+    def create_pending_episodes(self,series):
         if series["source_url"]:
             yt_dlp_data = self.get_ytdlp_season_metadata(series["season"], series["directory"])
 
@@ -220,12 +224,12 @@ class TVDownloader:
                 if not episode_data["season_number"]:
                     episode_data["season_number"] = series["season"]
 
-                existing = self.tv_db.get_episode_by_details(series_id, episode_data["season_number"], episode_data["episode_number"])
+                existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
 
                 if existing:
                     continue
 
-                self.tv_db.insert_row("episodes", data=episode_data, series_id = series_id, status = "pending", download_date = None)
+                self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
 
         elif series["tmdb_id"]:
@@ -391,9 +395,9 @@ class TVDownloader:
             }
 
 
-
-
-
+if __name__ == "__main__":
+    tvdl = TVDownloader()
+    tvdl.prepare_weekly_schedule()
 
 
 
