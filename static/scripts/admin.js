@@ -127,8 +127,6 @@ function updateSeriesForm() {
     const programId = selectedOption.getAttribute('id');
     const program = seriesData.find(e => e.id == programId);
 
-    console.log(program)
-
     if (program) {
         document.getElementById('programTitle').value = program.name;
         document.getElementById('programSource').value = program.source;
@@ -150,7 +148,6 @@ function updateScheduleTable(name, isRerun, startTime, blocks, day) {
     const allRows = document.querySelectorAll('.schedule-calendar tr');
     const rows = Array.from(allRows).slice(1);
     const rowIndex = timeSlots.indexOf(startTime);
-    console.log("Blocks:", blocks);
     const colIndex = day;
 
     if (rowIndex >= 0 && colIndex > 0 && rowIndex < rows.length) {
@@ -211,8 +208,6 @@ function saveProgram() {
     const programSelect = document.getElementById('programTitleSelect');
     const selectedOption = programSelect.options[programSelect.selectedIndex];
     const programId = selectedOption.getAttribute('id');
-
-    console.log(document.getElementById('programSource').value);
 
     const data = {
         id: programId ? programId : null,

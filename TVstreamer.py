@@ -7,6 +7,8 @@ class TVStreamManager:
         self.current_stream = None
         self.monitoring = False
 
+        self.test_time = time
+
         self.tv_db = TVDatabase()
 
     def get_current_status(self):
@@ -19,8 +21,8 @@ class TVStreamManager:
             return {"status": "idle"}
         
         
-    def get_current_program(self):
-        current_hour = int(datetime.now().strftime("%H"))
+    def monitor_current_program(self, time = datetime.now()):
+        current_hour = int(time.strftime("%H"))
     
         if current_hour < 18:
             self.current_stream = None
@@ -31,7 +33,7 @@ class TVStreamManager:
                 "filepath": None
             }
 
-        program = self.tv_db.get_current_program()
+        program = self.tv_db.get_current_program(time=time)
 
         if not program:
             self.current_stream = None
@@ -52,11 +54,19 @@ class TVStreamManager:
             }
 
         self.current_stream = program
+
+        self.log_air_date(program)
+
         return program
     
     def get_next_program(self):
         next_program = self.tv_db.get_next_program()
         return next_program
+    
+    def log_air_date(self, program):
+        if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
+            self.tv_db.edit_cell("episodes", program["file_id"], "last_aired", datetime.now().date())
+
     
     def start_monitoring(self):
         #Checks the current program and update the status
@@ -71,9 +81,9 @@ class TVStreamManager:
             
     def _monitor_streams(self):
         while self.monitoring:
-            current_program = self.get_current_program()
-            current_time = datetime.now()
- 
+            current_time = self.test_time if self.test_time else datetime.now()
+            current_program = self.monitor_current_program(time=current_time)
+            
             if current_program:
                 print(f"Monitoring: {current_program['show_name']} at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             else:

@@ -135,8 +135,9 @@ class TVDatabase:
                 filename TEXT,
                 download_date DATE DEFAULT CURRENT_DATE,
                 file_size INTEGER,
-                status TEXT,                -- 'pending', 'available', 'deleted', 'archived'
+                status TEXT,                -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
                 last_aired DATE
+                keep_next_week BOOLEAN DEFAULT 0
             )
         ''')
         
@@ -147,8 +148,7 @@ class TVDatabase:
     def save_schedule_entry(self, data):
         """Save new entry in the weekly schedule"""
 
-        data["end_time"] = _calculate_end_time(data["start_time"], data["duration"])
-        data.pop("duration", None)
+        print(data['start_time'])
 
         try: 
             existing = self._execute_query('''
@@ -164,18 +164,28 @@ class TVDatabase:
                         WHERE day_of_week = ? AND start_time = ?
                     ''', (data['day_of_week'], data['start_time']))
 
+                    print(f"Slettet program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
+
                 else:
                     #Oppdater eksisterende oppføring
                     conditions = {
-                        "day_of_week": data.pop("day_of_week"), 
-                        "start_time": data.pop("start_time")
+                        "day_of_week": data["day_of_week"], 
+                        "start_time": data["start_time"]
                     }
+
+                    data["end_time"] = _calculate_end_time(data["start_time"], data["duration"])
+                    data.pop("duration", None)
+
                     self.edit_row_by_conditions("weekly_schedule", conditions, **data)
+
+                    print(f"Endret program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
             else:
                 # Legg til nytt program
+                data["end_time"] = _calculate_end_time(data["start_time"], data["duration"])
+                data.pop("duration", None)
                 self.insert_row("weekly_schedule", data)
 
-            print(f"Lagret program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
+                print(f"Lagret program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
             
             return jsonify({"status": "success"})
             
@@ -395,7 +405,7 @@ class TVDatabase:
             SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE e.status IN ('pending', 'failed', 'missing', 'downloading', 'available') AND e.series_id = ? AND e.episode_number BETWEEN ? AND ?
+            WHERE e.status IN ('pending', 'failed', 'missing', 'downloading') AND e.series_id = ? AND e.episode_number BETWEEN ? AND ?
             ORDER BY e.season_number, e.episode_number
         '''
 
@@ -412,15 +422,46 @@ class TVDatabase:
 
         return self._execute_query(query)
     
-    # I TVdatabase.py
+    def get_obsolete_episodes(self):
+        query = '''
+            SELECT e.*, s.directory FROM episodes as e
+            Join series as s ON e.series_id = s.id
+            WHERE keep_next_week = 0 AND status = 'available'
+        '''
 
+        #  AND last_aired <= DATE('now', '-7 days')
+        
+        return self._execute_query(query)
+    
+    def update_episode_keeping_status(self, episode_id, keep:bool):
+        self.edit_cell("episodes", episode_id, "keep_next_week", keep)
+
+        if keep:
+            print(f"Episode ID {episode_id} markert for bevaring.")
+        else:
+            print(f"Episode ID {episode_id} markert for sletting.")
+
+
+    def get_kept_episodes(self):
+        query = '''
+            SELECT * FROM episodes
+            WHERE keep_next_week = 1 AND status = 'available'
+        '''
+
+        return self._execute_query(query)
+
+        #if keep -> !keep 
+        #if offset -> keep
+        #if last_aired & !keep -> delete files
+
+
+    
     def link_available_episodes_to_schedule(self, series_id):
         """
         Kobler alle tilgjengelige episoder til sendeskjemaet for en serie.
         Tar hensyn til repriser og episodenummer.
         """
         
-        # 1. Hent sendeskjema for denne serien (sortert etter dag og tid)
         schedule = self._execute_query('''
             SELECT id, is_rerun, day_of_week, start_time
             FROM weekly_schedule
@@ -432,11 +473,9 @@ class TVDatabase:
             print(f"Ingen sendeskjema funnet for serie {series_id}")
             return
         
-        # 2. Separer originaler og repriser
         originals = [s for s in schedule if s['is_rerun'] == 0]
         reruns = [s for s in schedule if s['is_rerun'] == 1]
         
-        # 3. Hent tilgjengelige episoder (sortert etter episode_number)
         available_episodes = self._execute_query('''
             SELECT id, episode_number
             FROM episodes
@@ -448,14 +487,12 @@ class TVDatabase:
             print(f"Ingen tilgjengelige episoder funnet for serie {series_id}")
             return
         
-        # 4. Koble originaler til episoder
         for idx, original in enumerate(originals):
             if idx < len(available_episodes):
                 episode_id = available_episodes[idx]['id']
                 self.update_download_links(original['id'], episode_id)
                 print(f"Koblet original sending (dag {original['day_of_week']}, {original['start_time']}) til episode {available_episodes[idx]['episode_number']}")
         
-        # 5. Koble repriser til samme episoder
         for idx, rerun in enumerate(reruns):
             if idx < len(available_episodes):
                 episode_id = available_episodes[idx]['id']
@@ -501,15 +538,13 @@ class TVDatabase:
     def get_air_schedule(self):
         query = '''
             SELECT t1.*, s.duration, s.directory, s.description as series_description FROM series s
-            LEFT JOIN (SELECT ws.*, e.filename, e.episode_number, e.description as episode_description, e.status FROM weekly_schedule as ws RIGHT JOIN episodes e ON ws.file_id = e.id) as t1 ON t1.series_id = s.id
+            LEFT JOIN (SELECT ws.*, e.filename, e.episode_number, e.description as episode_description, e.last_aired, e.status FROM weekly_schedule as ws RIGHT JOIN episodes e ON ws.file_id = e.id) as t1 ON t1.series_id = s.id
         '''
 
         return self._execute_query(query)
 
-    def get_current_program(self, daily=False):
+    def get_current_program(self, time = datetime.now(), daily=False):
         schedule = self.get_air_schedule()
-
-        time = datetime.now()
 
         current_time = time.time()
         current_day = int(time.strftime('%w'))
@@ -658,3 +693,6 @@ def _calculate_end_time(start_time, duration_minutes):
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
+
+
+    print(tvdb.get_obsolete_episodes())

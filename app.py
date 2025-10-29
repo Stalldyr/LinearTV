@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, Response, send_file, send_from_directory, request
+from flask import Flask, jsonify, render_template, render_template_string, Response, send_file, send_from_directory, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from datetime import datetime, timedelta
 from TVstreamer import TVStreamManager
@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-tv_stream = TVStreamManager()
+tv_stream = TVStreamManager(time=datetime.strptime("2025-10-29 20:33", "%Y-%m-%d %H:%M"))
 tv_db = TVDatabase()
 tv_dl = TVDownloader()
 
@@ -57,10 +57,10 @@ def links():
     return render_template('links.html')
 
 # KiwiIRC page
-#@app.route('/irc/')
-#@app.route('/irc/<path:path>')
-#def serve_kiwiirc(path='index.html'):
-#    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
+@app.route('/irc/')
+@app.route('/irc/<path:path>')
+def serve_kiwiirc(path='index.html'):
+    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
 
 @app.route('/irc')
 def irc_client():
@@ -88,13 +88,13 @@ def irc_client():
     </body>
     </html>
     """
-    return render_template(html)
+    return render_template_string(html)
 
 #Gamja page
 @app.route('/gamja/')
 @app.route('/gamja/<path:path>')
 def serve_gamja(path='index.html'):
-    return send_from_directory(os.path.join(BASE_DIR, 'gamja/dist'), path)
+    return send_from_directory(os.path.join(BASE_DIR, 'gamja'), path)
 
 # ============ ADMIN PAGES ============
 auth = HTTPBasicAuth()
@@ -141,7 +141,7 @@ def serve_video(directory, filename):
 
 @app.route('/api/current')
 def current_program():
-    program = tv_stream.get_current_program()
+    program = tv_stream.current_stream
     if program:
         return jsonify(program)
     else:

@@ -135,20 +135,55 @@ class TVDownloader:
     
     #PREPARATION
         
-    def prepare_weekly_schedulddde(self,logging = False):
-        schedule = self.tv_db.get_weekly_download_schedule()
-
-        if logging:
-            with open(f'logs/schedule_log_{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.txt', 'w') as log_file:
-                sys.stdout = log_file  # Redirect print statements to log file
-
-                self.prepare_weekly_schedule(schedule)
-
-        else:
-            self.prepare_weekly_schedule(schedule)
-
-
     def prepare_weekly_schedule(self):
+        self.cleanup_obsolete_episodes()
+        self.update_deletion_status()
+        #self.verify_available_episodes()
+        self.download_weekly_schedule()
+
+    def cleanup_obsolete_episodes(self):
+        obsolete_episodes = self.tv_db.get_obsolete_episodes()
+
+        for episode in obsolete_episodes:
+            if not episode['last_aired']:
+                continue
+            
+            self.tv_db.increment_episode(episode['series_id'])
+
+            print(episode)
+
+            file_path = os.path.join(self.download_path, episode['directory'], episode['filename'])
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"Slettet fil: {file_path}")
+                else:
+                    print(f"Filen finnes ikke: {file_path}")
+                
+                self.tv_db.update_episode_status(episode['id'], 'deleted')
+            except Exception as e:
+                print(f"Feil ved sletting av fil {file_path}: {e}")
+
+    def update_deletion_status(self):
+        kept_files = self.tv_db.get_kept_episodes()
+
+        for episode in kept_files:
+            print(episode)
+            self.tv_db.update_episode_keeping_status(episode['id'], False)
+
+
+    def verify_available_episodes(self):
+        available_episodes = self.tv_db.get_available_episodes()
+
+        for episode in available_episodes:
+            success = self._verify_local_file(episode['directory'], episode['filename'])
+
+            if not success:
+                print(f"Fil mangler: {episode['filename']}")
+                self.tv_db.update_episode_status(episode['id'], 'missing')
+
+
+    def download_weekly_schedule(self):
         schedule = self.tv_db.get_weekly_download_schedule()
 
         for entry in schedule:
@@ -168,7 +203,6 @@ class TVDownloader:
 
                 if success:
                     file_ids.append(episode_id)
-                    #self.tv_db.increment_episode(ep)
 
                 time.sleep(1)
 
@@ -227,6 +261,7 @@ class TVDownloader:
 
         if offset:
             self.tv_db.update_download_links(program_schedule[0]["id"], program_schedule[-1]["file_id"])
+            self.tv_db.update_episode_keeping_status(program_schedule[-1]["file_id"], True)
 
         for idx, file_id in enumerate(file_ids):
             if idx < len(originals):
@@ -274,7 +309,7 @@ class TVDownloader:
                     "file_size": os.path.getsize(filepath), 
                 }   
         
-                self.tv_db.edit_row("episodes", episode["id"], **file_info)
+                self.tv_db.edit_row_by_id("episodes", episode["id"], **file_info)
                 self.tv_db.update_episode_status(episode["id"], "available")
 
             else:
