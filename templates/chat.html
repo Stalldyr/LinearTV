@@ -3,14 +3,23 @@
 {% block title %}Tilbake{% endblock title %}
 
 {% block head %}
+
 {% endblock head %}
 
 {% block content %}
 <h1>CHAT</h1>
-<p>Her kommer chat-funksjon</p>
-<iframe src={{ url_for('serve_kiwiirc') }} style="border:0; width:100%; height:450px;"></iframe>
 
+<p>Her finner du en IRC-kanal dedikert til å diskutere TV-serier og annet</p>
 
-<iframe src="https://kiwiirc.com/client/irc.libera.chat/?&theme=basic#TV" style="border:0; width:100%; height:450px;"></iframe>
-<!-- resten av innholdet -->
+<p>For å logge på ta kontakt med meg for bruker/passord. Man trenger kun å logge inn én gang per enhet.<br>
+Man kan også evt. bytte passord i etterkant, men jeg vil på ingen måte anbefale å bruke passord du bruker andre steder ettersom jeg er usikker på sikkerheten til denne løsningen.</p>
+
+<p>Du kan også bruke en IRC-klient av ditt eget ønske (hvor man ikke trenger brukernavn/passord av meg), men være obs på at da har man ikke tilgang til chat-historikken. <br>
+For egen klient, logg inn på server 151.240.121.248 port 6667</p>
+
+<iframe src="http://127.0.0.1:9000/" style="border:0; width:100%; height:500px;"></iframe>
+
 {% endblock content %}
+
+{% block scripts %}
+{% endblock scripts %}

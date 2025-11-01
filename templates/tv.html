@@ -41,6 +41,7 @@
                     
                     const player = document.getElementById('tvPlayer');
                     if (program.status === "off_air" || program.status === "no_program" || program.status === "unavailable") {
+                        player.src = ``;
                         document.getElementById('programTitle').innerText = program.show_name;
                         document.getElementById('programTime').innerText = "";
                         document.getElementById('programDescription').innerText = program.description;

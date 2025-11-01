@@ -8,10 +8,15 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
 import os
 import sys
+import helper
+import chat
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+socketio = SocketIO(app, cors_allowed_origins="*")
+chat.register_socket_events(socketio)
 
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
@@ -53,38 +58,10 @@ def links():
     return render_template('links.html')
 
 # KiwiIRC page
-@app.route('/irc/')
-@app.route('/irc/<path:path>')
-def serve_kiwiirc(path='index.html'):
-    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
-
-@app.route('/irc')
-def irc_client():
-    config = {
-        'server': {
-            'url': 'wss://irc.libera.chat:6697',
-            'nick': 'gjest',
-            'autoconnect': True
-        }
-    }
-    
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>IRC Klient</title>
-        <script>
-            window.gamjaConfig = {config};
-        </script>
-        <script src="/gamja.js"></script>
-        <link rel="stylesheet" href="/style.css">
-    </head>
-    <body>
-        <div id="gamja"></div>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+#@app.route('/irc/')
+#@app.route('/irc/<path:path>')
+#def serve_kiwiirc(path='index.html'):
+#    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
 
 #Gamja page
 @app.route('/gamja/')
@@ -108,6 +85,10 @@ def verify_password(username, password):
 def admin():  
     schedule_data = tv_db.get_weekly_schedule()
     series_data = tv_db.get_all_series()
+
+    for series in series_data:
+        series['blocks'] = helper._calculate_blocks(series['duration'])
+
     return render_template('admin.html', schedule_data=schedule_data, series_data=series_data)
 
 # Oppdater save_program ruten
@@ -162,13 +143,20 @@ def get_time():
     time = datetime.now().time()
     return [time.strftime("%H")]
 
+
+#Chat
+
+
+
+
 if __name__ == '__main__':
+    test_time = None
     if len(sys.argv)>1:
         test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
 
     tv_stream = TVStreamManager(time=test_time)
     tv_stream.start_monitoring()
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
 
 tv_stream.start_monitoring()

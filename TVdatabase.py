@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import slugify
 from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
+import helper
 
 class TVDatabase:
     def __init__(self, db_path = 'data/tv.db', test_time=None):
@@ -90,22 +91,7 @@ class TVDatabase:
 
     def setup_database(self):
         os.makedirs('data', exist_ok=True)
-        
-        self._execute_query('''
-            CREATE TABLE IF NOT EXISTS weekly_schedule (
-                id INTEGER PRIMARY KEY,
-                day_of_week INTEGER NOT NULL,  -- 1=mandag, 7=søndag
-                start_time TIME NOT NULL,      -- "19:30"
-                end_time TIME
-                show_name TEXT NOT NULL,       -- "Hotel Cæsar"
-                duration INTEGER NOT NULL,     -- 30 minutter
-                channel TEXT,                  -- "TV2"
-                series_id INTEGER,             -- Link til series tabell
-                FOREIGN KEY (series_id) REFERENCES series (id)
-                FOREIGN KEY (file_id) REFERENCES episodes (id)
-            )
-        ''')
-        
+                
         # Lag series tabell (episode-tracking)
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS series (
@@ -133,11 +119,42 @@ class TVDatabase:
                 description TEXT,
                 duration INTEGER,
                 filename TEXT,
-                download_date DATE DEFAULT CURRENT_DATE,
+                download_date DATE,
                 file_size INTEGER,
                 status TEXT,                -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
                 last_aired DATE
                 keep_next_week BOOLEAN DEFAULT 0
+            )
+        ''')
+
+        self._execute_query('''
+            CREATE TABLE IF NOT EXISTS films (
+                id INTEGER PRIMARY KEY,
+                yt_dlp_id TEXT,               -- ID fra youtube-dl/yt-dlp
+                title TEXT,
+                description TEXT,
+                duration INTEGER,
+                filename TEXT,
+                download_date DATE,
+                file_size INTEGER,
+                status TEXT,                -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
+                last_aired DATE
+                keep_next_week BOOLEAN DEFAULT 0
+            )
+        ''')
+
+        self._execute_query('''
+            CREATE TABLE IF NOT EXISTS weekly_schedule (
+                id INTEGER PRIMARY KEY,
+                day_of_week INTEGER NOT NULL,  -- 1=mandag, 7=søndag
+                start_time TIME NOT NULL,      -- "19:30"
+                end_time TIME
+                show_name TEXT NOT NULL,       -- "Hotel Cæsar"
+                duration INTEGER NOT NULL,     -- 30 minutter
+                channel TEXT,                  -- "TV2"
+                series_id INTEGER,             -- Link til series tabell
+                FOREIGN KEY (series_id) REFERENCES series (id)
+                FOREIGN KEY (file_id) REFERENCES episodes (id)
             )
         ''')
         
@@ -147,8 +164,6 @@ class TVDatabase:
     
     def save_schedule_entry(self, data):
         """Save new entry in the weekly schedule"""
-
-        print(data['start_time'])
 
         try: 
             existing = self._execute_query('''
@@ -173,7 +188,8 @@ class TVDatabase:
                         "start_time": data["start_time"]
                     }
 
-                    data["end_time"] = _calculate_end_time(data["start_time"], data["duration"])
+                    data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
+                    data["blocks"] = helper._calculate_blocks(data["duration"])
                     data.pop("duration", None)
 
                     self.edit_row_by_conditions("weekly_schedule", conditions, **data)
@@ -181,7 +197,8 @@ class TVDatabase:
                     print(f"Endret program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
             else:
                 # Legg til nytt program
-                data["end_time"] = _calculate_end_time(data["start_time"], data["duration"])
+                data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
+                data["blocks"] = helper._calculate_blocks(data["duration"])
                 data.pop("duration", None)
                 self.insert_row("weekly_schedule", data)
 
@@ -198,7 +215,7 @@ class TVDatabase:
 
         tv_dl = TVdownloader.TVDownloader()
 
-        directory = create_valid_filename(data['name'])
+        directory = helper._create_valid_filename(data['name'])
         if not os.path.exists(f'downloads/{directory}'):
             os.makedirs(f'downloads/{directory}')
         
@@ -253,7 +270,7 @@ class TVDatabase:
         
     def update_series(self,data):
         
-        directory = create_valid_filename(data['name'])
+        directory = helper._create_valid_filename(data['name'])
         if not os.path.exists(f'downloads/{directory}'):
             os.makedirs(f'downloads/{directory}')
 
@@ -280,16 +297,7 @@ class TVDatabase:
         return self._execute_query(query)
 
     #WEEKLY SCHEDULE
-    
-    def get_weekly_schedule_and_files(self):
-        query = '''
-            SELECT ws.*, e.directory FROM weekly_schedule as ws
-            LEFT JOIN ws.
-            ORDER BY day_of_week, start_time
-        '''
 
-        return self._execute_query(query)
-        
     def get_daily_schedule(self):
         now = datetime.now()
 
@@ -323,6 +331,15 @@ class TVDatabase:
         '''
 
         return self._execute_query(query,(id,))
+    
+    def get_scheduled_series(self):
+        query = '''
+            SELECT DISTINCT s.* FROM series as s
+            INNER JOIN weekly_schedule ws ON s.id = ws.series_id
+            ORDER BY s.name
+        '''
+
+        return self._execute_query(query)
 
 
     #DOWNLOADS
@@ -561,7 +578,7 @@ class TVDatabase:
                 end_time = datetime.strptime(program['end_time'], "%H:%M").time() if program['end_time'] else None
                 if not end_time:
                     duration_minutes = program['duration'] if program['duration'] else 30
-                    end_time = _calculate_end_time(program['start_time'], duration_minutes)
+                    end_time = helper._calculate_end_time(program['start_time'], duration_minutes)
 
                 # Normal program within same day
                 if start_time <= current_time < end_time:
@@ -681,18 +698,7 @@ class TVDatabase:
 
 
 
-def create_valid_filename(title):
-    return slugify.slugify(title)
-
-def _calculate_end_time(start_time, duration_minutes):
-    start_hour, start_minute = map(int, start_time.split(':'))
-    start_datetime = datetime.combine(datetime.today(), time_class(start_hour, start_minute))
-    end_datetime = start_datetime + timedelta(minutes=duration_minutes)
-    return end_datetime.time().strftime('%H:%M')
 
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
-
-
-    print(tvdb.get_obsolete_episodes())

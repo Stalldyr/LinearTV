@@ -136,7 +136,7 @@ function updateSeriesForm() {
         document.getElementById('programYear').value = program.year;
         document.getElementById('programGenre').value = program.genre;
         document.getElementById('programDescription').value = program.description;
-        document.getElementById('programDuration').label = program.duration;
+        document.getElementById('programDuration').value = program.duration;
         document.getElementById('programTmdbId').value = program.tmdb_id;
         document.getElementById('programIsReverse').checked = program.reverse_order;
     } else {
@@ -168,13 +168,14 @@ function updateScheduleTable(name, isRerun, startTime, blocks, day) {
 }
 
 function saveSchedule() {
+
+    console.log()
     const data = {
         day_of_week: currentDay,
         start_time: currentTime,
         series_id: document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].getAttribute('id'),
         show_name: document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].text,
         is_rerun: document.getElementById('isRerun').checked,
-        /*blocks: Math.ceil(parseInt(document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].getAttribute('data-duration')) / 30) Change to end time?*/
         duration: parseInt(document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].getAttribute('data-duration'))
     };
 
