@@ -154,7 +154,7 @@ class TVDatabase:
                 channel TEXT,                  -- "TV2"
                 series_id INTEGER,             -- Link til series tabell
                 FOREIGN KEY (series_id) REFERENCES series (id)
-                FOREIGN KEY (file_id) REFERENCES episodes (id)
+                FOREIGN KEY (episode_id) REFERENCES episodes (id)
             )
         ''')
         
@@ -247,7 +247,8 @@ class TVDatabase:
         data.update(
             {
                 "source_url": url,
-                "directory": directory
+                "directory": directory,
+                "total_episodes": total_episodes
             }
         )
 
@@ -301,6 +302,7 @@ class TVDatabase:
     def get_daily_schedule(self):
         now = datetime.now()
 
+        #put this in helper function
         current_day = int(now.strftime('%w'))
 
         if current_day == 0:
@@ -322,15 +324,25 @@ class TVDatabase:
         '''
 
         return self._execute_query(query)
+    
+    def get_weekly_schedule_with_episode(self):
+        query = '''
+            SELECT ws.show_name, ws.day_of_week, ws.start_time, ws.is_rerun, e.episode_number, e.filename, e.keep_next_week FROM weekly_schedule AS ws
+            JOIN episodes e ON e.id = ws.episode_id  
+            ORDER BY ws.day_of_week, ws.start_time
+        '''
+        
+        return self._execute_query(query)
+        
 
-    def get_program_schedule(self, id):
+    def get_program_schedule(self, series_id):
         query = '''
             SELECT * FROM weekly_schedule
             WHERE series_id = ?
             ORDER BY day_of_week, start_time
         '''
 
-        return self._execute_query(query,(id,))
+        return self._execute_query(query,(series_id,))
     
     def get_scheduled_series(self):
         query = '''
@@ -372,14 +384,25 @@ class TVDatabase:
         
         print(f"Serie ID {series_id}: Episode nummer inkrementert.")
 
-    def update_download_links(self, id, file_id):
+    def decrement_episode(self, series_id):
         query = '''
-            UPDATE weekly_schedule
-            SET file_id = ?
+            UPDATE series
+            SET episode = episode - 1
             WHERE id = ?
         '''
 
-        self._execute_query(query,(file_id,id))
+        self._execute_query(query,(series_id,))
+        
+        print(f"Serie ID {series_id}: Episode nummer dekrementert.")
+
+    def update_download_links(self, id, episode_id):
+        query = '''
+            UPDATE weekly_schedule
+            SET episode_id = ?
+            WHERE id = ?
+        '''
+
+        self._execute_query(query,(episode_id,id))
     
 
 
@@ -417,12 +440,17 @@ class TVDatabase:
         self.insert_row("episodes", episode_data)
         return self.get_most_recent_id("episodes")
     
-    def get_pending_episodes(self, series_id, episode, count):
-        query = '''
+    def get_pending_episodes(self, series_id, episode, count, strict = False):
+        if strict:
+            conditions = "'pending'"
+        else:
+            conditions = "'pending', 'failed', 'missing', 'downloading', 'deleted'"
+
+        query = f'''
             SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE e.status IN ('pending', 'failed', 'missing', 'downloading') AND e.series_id = ? AND e.episode_number BETWEEN ? AND ?
+            WHERE e.status IN ({conditions}) AND e.series_id = ? AND e.episode_number BETWEEN ? AND ?
             ORDER BY e.season_number, e.episode_number
         '''
 
@@ -438,6 +466,26 @@ class TVDatabase:
         '''
 
         return self._execute_query(query)
+    
+    def get_nonavailable_episodes(self):
+        query = '''
+            SELECT e.*, s.name as series_name, s.source_url, s.directory
+            FROM episodes e
+            JOIN series s ON e.series_id = s.id
+            WHERE e.status != 'available'
+            ORDER BY e.series_id, e.season_number, e.episode_number
+        '''
+
+        return self._execute_query(query)
+    
+    def get_available_episodes_by_id(self, series_id):
+        query = '''
+            SELECT * FROM episodes
+            WHERE status = 'available' AND series_id = ?
+            ORDER BY series_id, season_number, episode_number
+        '''
+
+        return self._execute_query(query, (series_id,))
     
     def get_obsolete_episodes(self):
         query = '''
@@ -458,7 +506,6 @@ class TVDatabase:
         else:
             print(f"Episode ID {episode_id} markert for sletting.")
 
-
     def get_kept_episodes(self):
         query = '''
             SELECT * FROM episodes
@@ -466,57 +513,6 @@ class TVDatabase:
         '''
 
         return self._execute_query(query)
-
-        #if keep -> !keep 
-        #if offset -> keep
-        #if last_aired & !keep -> delete files
-
-
-    
-    def link_available_episodes_to_schedule(self, series_id):
-        """
-        Kobler alle tilgjengelige episoder til sendeskjemaet for en serie.
-        Tar hensyn til repriser og episodenummer.
-        """
-        
-        schedule = self._execute_query('''
-            SELECT id, is_rerun, day_of_week, start_time
-            FROM weekly_schedule
-            WHERE series_id = ?
-            ORDER BY day_of_week, start_time
-        ''', (series_id,))
-        
-        if not schedule:
-            print(f"Ingen sendeskjema funnet for serie {series_id}")
-            return
-        
-        originals = [s for s in schedule if s['is_rerun'] == 0]
-        reruns = [s for s in schedule if s['is_rerun'] == 1]
-        
-        available_episodes = self._execute_query('''
-            SELECT id, episode_number
-            FROM episodes
-            WHERE series_id = ? AND status = 'available'
-            ORDER BY season_number, episode_number
-        ''', (series_id,))
-        
-        if not available_episodes:
-            print(f"Ingen tilgjengelige episoder funnet for serie {series_id}")
-            return
-        
-        for idx, original in enumerate(originals):
-            if idx < len(available_episodes):
-                episode_id = available_episodes[idx]['id']
-                self.update_download_links(original['id'], episode_id)
-                print(f"Koblet original sending (dag {original['day_of_week']}, {original['start_time']}) til episode {available_episodes[idx]['episode_number']}")
-        
-        for idx, rerun in enumerate(reruns):
-            if idx < len(available_episodes):
-                episode_id = available_episodes[idx]['id']
-                self.update_download_links(rerun['id'], episode_id)
-                print(f"Koblet reprise (dag {rerun['day_of_week']}, {rerun['start_time']}) til episode {available_episodes[idx]['episode_number']}")
-        
-        print(f"Ferdig med å koble episoder for serie {series_id}")
     
     def get_episode_by_details(self, series_id, season, episode):
         """
@@ -555,7 +551,7 @@ class TVDatabase:
     def get_air_schedule(self):
         query = '''
             SELECT t1.*, s.duration, s.directory, s.description as series_description FROM series s
-            LEFT JOIN (SELECT ws.*, e.filename, e.episode_number, e.description as episode_description, e.last_aired, e.status FROM weekly_schedule as ws RIGHT JOIN episodes e ON ws.file_id = e.id) as t1 ON t1.series_id = s.id
+            LEFT JOIN (SELECT ws.*, e.filename, e.episode_number, e.description as episode_description, e.last_aired, e.status FROM weekly_schedule as ws RIGHT JOIN episodes e ON ws.episode_id = e.id) as t1 ON t1.series_id = s.id
         '''
 
         return self._execute_query(query)
@@ -628,6 +624,8 @@ class TVDatabase:
     def drop_column(self,table,col):
         self._execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
 
+    def update_column(self, table, col, value):
+        self._execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
 
     #Row operations
     def get_row_by_id(self, table, row_id):
@@ -702,3 +700,5 @@ class TVDatabase:
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
+
+    tvdb.update_column("weekly_schedule", "episode_id", None)

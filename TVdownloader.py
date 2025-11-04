@@ -1,11 +1,10 @@
 from TVdatabase import TVDatabase
 import yt_dlp
-import time
 import json
 from datetime import datetime
 import os
-import sys
 import tmdbsimple as tmdb
+import helper
 
 class TVDownloader:
     def __init__(self, path="downloads"):
@@ -133,152 +132,9 @@ class TVDownloader:
 
             return
     
-    #PREPARATION
-        
-    def prepare_weekly_schedule(self):
-        self.cleanup_obsolete_episodes()
-        self.update_deletion_status()
-        self.create_pending_episodes()
-        self.verify_available_episodes()
-        self.download_weekly_schedule()
+    #DOWNLOAD
 
-    def cleanup_obsolete_episodes(self):
-        obsolete_episodes = self.tv_db.get_obsolete_episodes()
-
-        for episode in obsolete_episodes:
-            if not episode['last_aired']:
-                continue
-            
-            self.tv_db.increment_episode(episode['series_id'])
-
-            print(episode)
-
-            file_path = os.path.join(self.download_path, episode['directory'], episode['filename'])
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"Slettet fil: {file_path}")
-                else:
-                    print(f"Filen finnes ikke: {file_path}")
-                
-                self.tv_db.update_episode_status(episode['id'], 'deleted')
-            except Exception as e:
-                print(f"Feil ved sletting av fil {file_path}: {e}")
-
-    def update_deletion_status(self):
-        kept_files = self.tv_db.get_kept_episodes()
-
-        for episode in kept_files:
-            print(episode)
-            self.tv_db.update_episode_keeping_status(episode['id'], False)
-
-
-    def create_pending_episodes(self):
-        series_list = self.tv_db.get_all_series()
-
-        for series in series_list:
-            self.create_pending_episodes(series)
-
-
-    def verify_available_episodes(self):
-        available_episodes = self.tv_db.get_available_episodes()
-
-        for episode in available_episodes:
-            success = self._verify_local_file(episode['directory'], episode['filename'])
-
-            if not success:
-                print(f"Fil mangler: {episode['filename']}")
-                self.tv_db.update_episode_status(episode['id'], 'missing')
-
-
-    def download_weekly_schedule(self):
-        schedule = self.tv_db.get_weekly_download_schedule()
-
-        for entry in schedule:
-            total_episodes = self.get_season_metadata(entry)
-            pending_episodes = self.tv_db.get_pending_episodes(entry["series_id"], entry["episode"], entry["count"])
-            
-            file_ids = []
-            start_episode = entry["episode"]
-
-            for idx, pending_episode in enumerate(pending_episodes):
-                episode_id = pending_episode["id"]
-                episode_num = start_episode + idx
-
-                success = self.download_episode(entry, pending_episode, episode_num, total_episodes)
-
-                if success:
-                    file_ids.append(episode_id)
-
-                time.sleep(1)
-
-            self.link_episodes_to_schedule(entry, file_ids)
-
-    def create_pending_episodes(self,series):
-        if series["source_url"]:
-            yt_dlp_data = self.get_ytdlp_season_metadata(series["season"], series["directory"])
-
-            for entry in yt_dlp_data["entries"]:
-                episode_data = self.get_ytdlp_epsiode_info(entry)
-
-                if not episode_data["season_number"]:
-                    episode_data["season_number"] = series["season"]
-
-                existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
-
-                if existing:
-                    continue
-
-                self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
-
-
-        elif series["tmdb_id"]:
-            tmdb_data = self.get_tmdb_season_metadata(series["season"], series["directory"], series["tmdb_id"])
-
-            for entry in tmdb_data["episodes"]:
-                episode_data = self.get_tmdb_episode_info(entry)
-
-                if not episode_data["season_number"]:
-                    episode_data["season_number"] = series["season"]
-
-                existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
-
-                if existing:
-                    continue
-
-                self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
-
-        else:
-            print("No metadata available")
-
-    
-    def link_episodes_to_schedule(self, entry, file_ids):
-        program_schedule = self.tv_db.get_program_schedule(entry["series_id"])
-
-        if not program_schedule:
-            return
-
-        #Checks if rerun comes before the new episode in the weekly schedule
-        offset = program_schedule[0]["is_rerun"]
-        originals = [s for s in program_schedule if s["is_rerun"] == 0]
-        reruns = [s for s in program_schedule if s["is_rerun"] == 1]
-
-        if offset:
-            self.tv_db.update_download_links(program_schedule[0]["id"], program_schedule[-1]["file_id"])
-            self.tv_db.update_episode_keeping_status(program_schedule[-1]["file_id"], True)
-
-        for idx, file_id in enumerate(file_ids):
-            if idx < len(originals):
-                self.tv_db.update_download_links(originals[idx]["id"], file_id)
-            
-            if not offset and reruns and idx < len(reruns):
-                self.tv_db.update_download_links(reruns[idx]["id"], file_id)
-
-        if offset and len(reruns) > 1:
-            for i in range(1, min(len(file_ids) + 1, len(reruns))):
-                self.tv_db.update_download_links(reruns[i]["id"], file_ids[i-1])
-
-    def download_episode(self, entry, episode, episode_num, total_episodes):        
+    def download_episode(self, entry, episode, episode_num, total_episodes):
         self.tv_db.update_episode_status(episode["id"], "downloading")
         
         # Calculate playlist index
@@ -287,10 +143,11 @@ class TVDownloader:
         else:
             playlist_idx = episode_num
 
-        download_folder = f"{self.download_path}/{entry['directory']}"
         filename = f"{entry['directory']}_s{entry['season']:02d}e{episode_num:02d}.mp4"
 
-        success = self._verify_local_file(download_folder, filename)
+        filepath = helper._get_file_path(self.download_path, entry['directory'], filename)
+        success = helper._verify_local_file(filepath)
+
         if success:
             print(f"Lokal fil funnet for {filename}, hopper over nedlasting.")
         else:
@@ -304,9 +161,7 @@ class TVDownloader:
 
         if success:
             # Oppdater med full info
-            filepath = os.path.join(download_folder, filename)
-
-            if os.path.exists(filepath):
+            if helper._verify_local_file(filepath):
                 file_info = {
                     "filename": filename,
                     "download_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
@@ -351,16 +206,7 @@ class TVDownloader:
                 print(f"Error downloading from {url}: {e}")
                 return False
             
-
-
     #LOCAL FILES
-
-    def _verify_local_file(self, download_folder, filename):
-        filepath = os.path.join(download_folder, filename)
-        if os.path.exists(filepath):
-            return True
-        print(f"Lokal fil ikke funnet: {filepath}")
-        return False
     
     def update_local_files(self, entry):
         download_folder = f"{self.download_path}/{entry['directory']}"
@@ -393,11 +239,5 @@ class TVDownloader:
                 "download_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
                 "file_size": os.path.getsize(filepath), 
             }
-
-
-if __name__ == "__main__":
-    tvdl = TVDownloader()
-    tvdl.prepare_weekly_schedule()
-
 
 

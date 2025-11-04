@@ -99,6 +99,8 @@ def save_schedule():
 
     print(f"Mottatt data for lagring: {data}")
 
+    #tv_dl.prepare_weekly_schedule()
+
     return tv_db.save_schedule_entry(data)
     
 @app.route('/admin/add_program', methods=['POST'])
@@ -142,12 +144,6 @@ def status():
 def get_time():
     time = datetime.now().time()
     return [time.strftime("%H")]
-
-
-#Chat
-
-
-
 
 if __name__ == '__main__':
     test_time = None

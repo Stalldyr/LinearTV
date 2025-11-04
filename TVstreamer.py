@@ -50,17 +50,18 @@ class TVStreamManager:
                 "filepath": None
             }
 
-        self.log_air_date(program)
+        self.update_air_date(program)
 
         return program
     
     def get_next_program(self):
+        #Delete??
         next_program = self.tv_db.get_next_program()
         return next_program
     
-    def log_air_date(self, program):
+    def update_air_date(self, program):
         if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
-            self.tv_db.edit_cell("episodes", program["file_id"], "last_aired", datetime.now().date())
+            self.tv_db.edit_cell("episodes", program["episode_id"], "last_aired", datetime.now().date())
 
     
     def start_monitoring(self):
