@@ -19,6 +19,9 @@ class TVDatabase:
         if not os.path.exists(self.db_path):
             self.setup_database()
 
+
+    #EXECUTE QUERY
+
     @contextmanager
     def get_connection(self, row_factory):
         """
@@ -89,6 +92,9 @@ class TVDatabase:
             else:
                 return result
 
+
+    #SETUP
+
     def setup_database(self):
         os.makedirs('data', exist_ok=True)
                 
@@ -96,23 +102,29 @@ class TVDatabase:
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS series (
                 id INTEGER PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,           -- "Hotel Cæsar"
+                name TEXT UNIQUE NOT NULL,          
                 season INTEGER DEFAULT 1,       
-                episode INTEGER DEFAULT 1,           -- Neste episode å laste ned
-                source TEXT,                         -- "Youtube" eller "TV2 Play"
+                episode INTEGER DEFAULT 1,          
+                source TEXT,                         
                 source_url TEXT,                     -- "https://play.tv2.no/programmer/serier/hotel-caesar/sesong-{season}"
                 directory TEXT,                      -- "hotel_caesar_s{season}E{episode}"
-                total_episodes INTEGER,              -- Hvor mange episoder finnes totalt (valgfri)
-                description TEXT                     -- Beskrivelse av serien
+                total_episodes INTEGER,              
+                description TEXT,
+                duration INT,
+                reverse_order BOOLEAN,                    
+                genre TEXT,
+                year INT,
+                tmdb_id INT
             )
         ''')
         
-        # Lag episodes tabell (denne ukas nedlastede filer)
+        # Lag episodes tabell (denne ukas nedlastede filer) series_id INTEGER REFERENCES series(id)
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS episodes (
                 id INTEGER PRIMARY KEY,
                 series_id INTEGER REFERENCES series(id),
                 yt_dlp_id TEXT,               -- ID fra youtube-dl/yt-dlp
+                tmdb_id INT,
                 season_number INTEGER,
                 episode_number INTEGER,
                 title TEXT,
@@ -121,24 +133,9 @@ class TVDatabase:
                 filename TEXT,
                 download_date DATE,
                 file_size INTEGER,
-                status TEXT,                -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
-                last_aired DATE
-                keep_next_week BOOLEAN DEFAULT 0
-            )
-        ''')
-
-        self._execute_query('''
-            CREATE TABLE IF NOT EXISTS films (
-                id INTEGER PRIMARY KEY,
-                yt_dlp_id TEXT,               -- ID fra youtube-dl/yt-dlp
-                title TEXT,
-                description TEXT,
-                duration INTEGER,
-                filename TEXT,
-                download_date DATE,
-                file_size INTEGER,
-                status TEXT,                -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
-                last_aired DATE
+                status TEXT DEFAULT 'pending',    -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
+                last_aired DATE,
+                views INT, 
                 keep_next_week BOOLEAN DEFAULT 0
             )
         ''')
@@ -146,19 +143,34 @@ class TVDatabase:
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS weekly_schedule (
                 id INTEGER PRIMARY KEY,
+                series_id INTEGER REFERENCES series(id),
+                episode_id INTEGER REFERENCES episodes(id),
+                show_name TEXT NOT NULL,       -- "Hotel Cæsar"
                 day_of_week INTEGER NOT NULL,  -- 1=mandag, 7=søndag
                 start_time TIME NOT NULL,      -- "19:30"
-                end_time TIME
-                show_name TEXT NOT NULL,       -- "Hotel Cæsar"
-                duration INTEGER NOT NULL,     -- 30 minutter
-                channel TEXT,                  -- "TV2"
-                series_id INTEGER,             -- Link til series tabell
-                FOREIGN KEY (series_id) REFERENCES series (id)
-                FOREIGN KEY (episode_id) REFERENCES episodes (id)
+                end_time TIME,
+                blocks INT,
+                is_rerun BOOLEAN DEFAULT 0
             )
         ''')
         
         print("Databasetabeller opprettet!")
+
+    def reset_database(self):
+        '''
+            Cleans the database while keeping the series and schedule intact
+        '''
+
+        self.update_column("episodes", "file_size", None)
+        self.update_column("episodes", "filename", None)
+        self.update_column("episodes", "download_date", None)
+        self.update_column("episodes", "status", "pending")
+        self.update_column("episodes", "last_aired", None)
+        self.update_column("episodes", "views", 0)
+        self.update_column("episodes", "tmdb_id", None)
+        self.update_column("episodes", "keep_next_week", False)
+
+        self.update_column("weekly_schedule", "episode_id", None)
         
     #SERIES TABLE OPERATIONS
     
@@ -666,7 +678,6 @@ class TVDatabase:
         
         query = f"UPDATE {table} SET {', '.join(fields)} WHERE {' AND '.join(conditions_list)}"
         self._execute_query(query,values)
-    
 
     def insert_row(self, table, data:dict={}, **kwargs):
         fields = ', '.join(list(data.keys()) + list(kwargs.keys()))
@@ -695,10 +706,7 @@ class TVDatabase:
         self._execute_query(query, params)
 
 
-
-
-
 if __name__ == "__main__":
     tvdb = TVDatabase()
 
-    tvdb.update_column("weekly_schedule", "episode_id", None)
+    tvdb._execute_query("UPDATE sqlite_sequence SET seq = 0 WHERE name = 'weekly_schedule';")
