@@ -151,7 +151,7 @@ function updateProgramForm() {
         document.getElementById('programDuration').value = program.duration;
         document.getElementById('programTmdbId').value = program.tmdb_id;
         
-        if (program.type == "series"){
+        if (programType == "series"){
             document.getElementById('programSeason').value = program.season;
             document.getElementById('programEpisode').value = program.episode;
             document.getElementById('programIsReverse').checked = program.reverse_order;
@@ -199,6 +199,8 @@ function updateScheduleType() {
             option = document.createElement('option');
             option.id = m.id;
             option.text = m.name;
+            option.setAttribute('data-duration', m.duration);
+            option.setAttribute('data-rerun', m.is_rerun);
             scheduleSelect.appendChild(option);
         })
         document.getElementById("rerunGroup").style.display = "none";
@@ -209,10 +211,14 @@ function updateScheduleType() {
             option = document.createElement('option');
             option.id = m.id;
             option.text = m.name;
+            option.setAttribute('data-duration', m.duration);
+            option.setAttribute('data-rerun', m.is_rerun);
             scheduleSelect.appendChild(option);
         })
         document.getElementById("rerunGroup").style.display = "block";
     }
+
+    updateDurationLabel()
 }
 
 function updateDurationLabel() {
@@ -256,7 +262,6 @@ function updateScheduleTable(name, isRerun, startTime, blocks, day) {
 //Saves schedule to database
 function saveSchedule() {
     const data = {
-        content_type: document.getElementById(),
         day_of_week: currentDay,
         start_time: currentTime,
         series_id: document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('id'),
@@ -312,12 +317,11 @@ function saveProgram() {
 
     if (data.type == "series") {
         //Må fikses slik at den legger til
-        const data2 =
-        {
+        data.push({
             season: document.getElementById('programSeason').value,
             episode: document.getElementById('programEpisode').value,
             reverse_order: document.getElementById('programIsReverse').checked
-        }
+        })
     }
 
     fetch('/admin/add_program', {

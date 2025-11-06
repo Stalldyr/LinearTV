@@ -145,7 +145,7 @@ class TVDatabase:
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS movies (
                 id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
+                name TEXT NOT NULL,
                 tmdb_id INT,
                 yt_dlp_id TEXT,
                 description TEXT,
@@ -259,9 +259,9 @@ class TVDatabase:
             os.makedirs(f'downloads/{directory}')
         
         if data['source_url']:
-            url = data['source_url'].format(season=data['season'])
+            #url = data['source_url'].format(season=data['season'])
             try:
-                tv_dl.get_ytdlp_season_metadata(directory, video_url=url)
+                tv_dl.get_ytdlp_season_metadata(directory, video_url=data['source_url'])
                 
             except Exception as e:
                 print(f"Feil ved henting av ytdlp metadata: {e}")

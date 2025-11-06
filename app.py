@@ -27,10 +27,11 @@ def index():
 @app.route('/tv')
 def tv():
     episode_info = tv_stream.current_stream
-    episode_id = episode_info["id"]
+    episode_id = episode_info.get("id", None)
     ip_address = request.remote_addr
 
-    TVtracker.log_view(episode_id,ip_address)
+    if episode_id:
+        TVtracker.log_view(episode_id,ip_address)
 
     return render_template('tv.html')
 
@@ -58,12 +59,6 @@ def info():
 @app.route('/links')
 def links():
     return render_template('links.html')
-
-# KiwiIRC page
-#@app.route('/irc/')
-#@app.route('/irc/<path:path>')
-#def serve_kiwiirc(path='index.html'):
-#    return send_from_directory(os.path.join(BASE_DIR, 'kiwiirc/dist'), path)
 
 #Gamja page
 @app.route('/gamja/')
@@ -152,10 +147,11 @@ def get_time():
 @app.route('/api/traffic', methods=['POST'])
 def get_traffic():
     seconds = request.get_json()["seconds"]
-    episode_id = tv_stream.current_stream["id"]
+    episode_id = tv_stream.current_stream.get("id", None)
     ip_address = request.remote_addr
 
-    TVtracker.update_time(seconds, episode_id, ip_address)
+    if episode_id:
+        TVtracker.update_time(seconds, episode_id, ip_address)
     
     return {'status': 'ok'}
 
