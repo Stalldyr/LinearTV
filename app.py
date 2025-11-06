@@ -1,5 +1,4 @@
-from flask import Flask, jsonify, render_template, render_template_string, Response, send_file, send_from_directory, request
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import Flask, jsonify, render_template, send_from_directory, request
 from datetime import datetime, timedelta
 from TVstreamer import TVStreamManager
 from TVdatabase import TVDatabase
@@ -9,14 +8,11 @@ from werkzeug.security import check_password_hash
 import os
 import sys
 import helper
-import chat
+import TVtracker
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-
-socketio = SocketIO(app, cors_allowed_origins="*")
-chat.register_socket_events(socketio)
 
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
@@ -30,6 +26,12 @@ def index():
 #TV streaming page
 @app.route('/tv')
 def tv():
+    episode_info = tv_stream.current_stream
+    episode_id = episode_info["id"]
+    ip_address = request.remote_addr
+
+    TVtracker.log_view(episode_id,ip_address)
+
     return render_template('tv.html')
 
 #TV streaming page
@@ -145,6 +147,20 @@ def status():
 def get_time():
     time = datetime.now().time()
     return [time.strftime("%H")]
+
+
+@app.route('/api/traffic', methods=['POST'])
+def get_traffic():
+    seconds = request.get_json()["seconds"]
+    episode_id = tv_stream.current_stream["id"]
+    ip_address = request.remote_addr
+
+    TVtracker.update_time(seconds, episode_id, ip_address)
+    
+    return {'status': 'ok'}
+    #TVtracker2.log_view(episode_id, request.remote_addr)
+
+
 
 if __name__ == '__main__':
     test_time = None

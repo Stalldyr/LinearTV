@@ -27,7 +27,7 @@ class TVStreamManager:
         if current_hour < 18:
             return {
                 "status": "off_air",
-                "show_name": "Ingen sending",
+                "name": "Ingen sending",
                 "description": "Sendingen starter kl. 18:00",
                 "filepath": None
             }
@@ -37,7 +37,7 @@ class TVStreamManager:
         if not program:
             return {
                 "status": "no_program",
-                "show_name": "Ingen program",
+                "name": "Ingen program",
                 "description": "Ingen program på dette tidspunktet",
                 "filepath": None
             }
@@ -45,7 +45,7 @@ class TVStreamManager:
         if program.get('status') != 'available':
             return {
                 "status": "unavailable",
-                "show_name": program.get('show_name', 'Ukjent program'),
+                "name": program.get('name', 'Ukjent program'),
                 "description": "Programmet er ikke tilgjengelig for avspilling",
                 "filepath": None
             }
@@ -81,7 +81,7 @@ class TVStreamManager:
             self.current_stream = self.monitor_current_program(time=current_time)
             
             if self.current_stream:
-                print(f"Monitoring: {self.current_stream['show_name']} at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Monitoring: {self.current_stream['name']} at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             else:
                 print("No current program to monitor.")
 

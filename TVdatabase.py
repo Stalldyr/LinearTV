@@ -8,6 +8,11 @@ from datetime import datetime, timedelta, time as time_class
 import helper
 
 class TVDatabase:
+    STATUS_PENDING = 'pending'
+    STATUS_AVAILABLE = 'available'
+    STATUS_DELETED = 'deleted'
+
+
     def __init__(self, db_path = 'data/tv.db', test_time=None):
 
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))

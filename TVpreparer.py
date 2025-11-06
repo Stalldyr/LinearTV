@@ -33,7 +33,7 @@ class TVPreparer():
             except Exception as e:
                 print(f"Feil ved sletting av fil {file_path}: {e}")
 
-    def update_deletion_status(self):
+    def update_keeping_status(self):
         kept_files = self.tv_db.get_kept_episodes()
 
         for episode in kept_files:
@@ -160,7 +160,9 @@ if __name__ == "__main__":
 
         if operation == "delete":
             prep.cleanup_obsolete_episodes()
-            prep.update_deletion_status()
+
+        if operation == "keep":
+            prep.update_keeping_status()
 
         elif operation == "pending":
             prep.create_pending_episodes()
@@ -176,7 +178,7 @@ if __name__ == "__main__":
 
         elif operation == "all":
             prep.cleanup_obsolete_episodes()
-            prep.update_deletion_status()
+            prep.update_keeping_status()
             prep.create_pending_episodes()
             prep.download_weekly_schedule()
             prep.verify_available_episodes()

@@ -163,7 +163,7 @@ fetch('/api/schedule')
                     const rowSpan = entry.blocks;
                     cell.rowSpan = rowSpan;
                     cell.innerHTML = `
-                        <strong>${entry.show_name}</strong><br>
+                        <strong>${entry.name}</strong><br>
                         <span class="show-status">${entry.is_rerun ? 'Reprise' : 'Ny'}</span><br>
                     `;
                     cell.className = 'time-slot filled';
