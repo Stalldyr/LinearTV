@@ -12,7 +12,6 @@ class TVDatabase:
     STATUS_AVAILABLE = 'available'
     STATUS_DELETED = 'deleted'
 
-
     def __init__(self, db_path = 'data/tv.db', test_time=None):
 
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -730,3 +729,5 @@ class TVDatabase:
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
+
+    tvdb.setup_database()

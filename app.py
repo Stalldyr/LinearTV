@@ -158,9 +158,6 @@ def get_traffic():
     TVtracker.update_time(seconds, episode_id, ip_address)
     
     return {'status': 'ok'}
-    #TVtracker2.log_view(episode_id, request.remote_addr)
-
-
 
 if __name__ == '__main__':
     test_time = None
