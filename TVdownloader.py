@@ -228,7 +228,6 @@ class TVDownloader:
             file_info = self.get_file_info(entry["series_id"], entry['directory'], file, episode_num)
             self.tv_db.add_new_episode("episodes", file_info)
 
-
     def get_file_info(self, directory, filename):
         seriespath = os.path.join(self.download_path, directory)
         filepath = os.path.join(seriespath,filename)

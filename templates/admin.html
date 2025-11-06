@@ -21,11 +21,17 @@
 
     <!-- Schedule Form -->
     <div class="schedule-form" id="scheduleForm">
-      <h3>Legg til program</h3>
+      <h3>Velg program</h3>
+
+      <input type="radio" name="programType" id="scheduleOption0" value="series" onclick="updateScheduleType()" checked>
+      <label for="scheduleOption0">Serie</label>
+      <input type="radio" name="programType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">
+      <label for="scheduleOption1">Film</label>
+      
       <form id="scheduleFormData">
         <div class="form-group">
           <label>Program:</label>
-          <select id="scheduledProgramTitle" onchange="updateDurationLabel()">
+          <select id="scheduleTitleSelect" onchange="updateDurationLabel()">
             <option selected value>[Ledig]</option>
             {% for e in series_data %}
               <option id="{{ e.id }}" data-duration="{{ e.duration }}" data-rerun="{{ e.is_rerun }}">{{ e.name }}</option>
@@ -49,14 +55,21 @@
       </form>
     </div>
 
-    <!-- Series Form -->
+    <!-- Program Form -->
     <div class="program-form" id="programForm">
       <h3>Legg til nytt program</h3>
+
+      <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
+      <label for="programOption0">Serie</label>
+
+      <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
+      <label for="programOption1">Film</label>
+
       <form id="programFormData">
         <div class="form-group">
-          <label>Velg program:</label>
-          <select id="programTitleSelect" onclick="updateSeriesForm()">
-            <option selected>--Nytt program--</option>
+          <label id="programTitleSelectLabel">Velg serie:</label>
+          <select id="programTitleSelect" onclick="updateProgramForm()">
+            <option selected>--Ny serie--</option>
             {% for e in series_data %}
               <option id="{{ e.id }}">{{ e.name }}</option>
             {% endfor %}
@@ -84,12 +97,12 @@
         </div>
 
         <div class="form-group">
-          <label>Startsesong:</label>
+          <label id="programSeasonLabel">Startsesong:</label>
           <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
         </div>
 
         <div class="form-group">
-          <label>Startepisode:</label>
+          <label id="programEpisodeLabel">Startepisode:</label>
           <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
         </div>
 
@@ -131,7 +144,7 @@
         </div>
 
         <div class="form-group">
-          <label>Omvendt spilleliste:</label>
+          <label id="programIsReverseLabel">Omvendt spilleliste:</label>
           <input type="checkbox" id="programIsReverse">
         </div>
 
@@ -147,6 +160,7 @@
   <script>
     const scheduleData = {{schedule_data | tojson | safe}};
     const seriesData = {{series_data | tojson | safe}};
+    const movieData = {{movie_data | tojson | safe}};
   </script>
   <script src="{{ url_for('static', filename='scripts/admin.js') }}"></script>
 

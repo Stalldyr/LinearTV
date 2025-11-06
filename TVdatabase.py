@@ -98,11 +98,11 @@ class TVDatabase:
     def setup_database(self):
         os.makedirs('data', exist_ok=True)
                 
-        # Lag series tabell (episode-tracking)
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS series (
                 id INTEGER PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,          
+                name TEXT UNIQUE NOT NULL,
+                tmdb_id INT,          
                 season INTEGER DEFAULT 1,       
                 episode INTEGER DEFAULT 1,          
                 source TEXT,                         
@@ -113,17 +113,15 @@ class TVDatabase:
                 duration INT,
                 reverse_order BOOLEAN,                    
                 genre TEXT,
-                year INT,
-                tmdb_id INT
+                year INT
             )
         ''')
         
-        # Lag episodes tabell (denne ukas nedlastede filer) series_id INTEGER REFERENCES series(id)
         self._execute_query('''
             CREATE TABLE IF NOT EXISTS episodes (
                 id INTEGER PRIMARY KEY,
                 series_id INTEGER REFERENCES series(id),
-                yt_dlp_id TEXT,               -- ID fra youtube-dl/yt-dlp
+                yt_dlp_id TEXT,                    -- ID fra youtube-dl/yt-dlp
                 tmdb_id INT,
                 season_number INTEGER,
                 episode_number INTEGER,
@@ -141,11 +139,35 @@ class TVDatabase:
         ''')
 
         self._execute_query('''
+            CREATE TABLE IF NOT EXISTS movies (
+                id INTEGER PRIMARY KEY,
+                title TEXT NOT NULL,
+                tmdb_id INT,
+                yt_dlp_id TEXT,
+                description TEXT,
+                duration INTEGER,
+                year INT,
+                genre TEXT,
+                directory TEXT,
+                filename TEXT,
+                download_date DATE,
+                file_size INTEGER,
+                status TEXT DEFAULT 'pending',
+                last_aired DATE,
+                views INT,
+                source TEXT,
+                source_url TEXT
+            )                                    
+        ''')
+
+        self._execute_query('''
             CREATE TABLE IF NOT EXISTS weekly_schedule (
                 id INTEGER PRIMARY KEY,
+                content_type TEXT NOT NULL,
                 series_id INTEGER REFERENCES series(id),
                 episode_id INTEGER REFERENCES episodes(id),
-                show_name TEXT NOT NULL,       -- "Hotel Cæsar"
+                movie_id INTEGER REFERENCES movies(id),
+                name TEXT NOT NULL,       -- "Hotel Cæsar"
                 day_of_week INTEGER NOT NULL,  -- 1=mandag, 7=søndag
                 start_time TIME NOT NULL,      -- "19:30"
                 end_time TIME,
@@ -177,21 +199,21 @@ class TVDatabase:
     def save_schedule_entry(self, data):
         """Save new entry in the weekly schedule"""
 
-        try: 
+        try:
             existing = self._execute_query('''
                 SELECT id FROM weekly_schedule 
                 WHERE day_of_week = ? AND start_time = ?
             ''', (data['day_of_week'], data['start_time']))
 
             if existing:
-                if data["show_name"] == "[Ledig]":
+                if data["name"] == "[Ledig]":
                     #Sletter oppføring
                     self._execute_query('''
                         DELETE FROM weekly_schedule
                         WHERE day_of_week = ? AND start_time = ?
                     ''', (data['day_of_week'], data['start_time']))
 
-                    print(f"Slettet program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
+                    print(f"Slettet program: {data['name']} på {data['day_of_week']} {data['start_time']}")
 
                 else:
                     #Oppdater eksisterende oppføring
@@ -206,7 +228,7 @@ class TVDatabase:
 
                     self.edit_row_by_conditions("weekly_schedule", conditions, **data)
 
-                    print(f"Endret program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
+                    print(f"Endret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
             else:
                 # Legg til nytt program
                 data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
@@ -214,7 +236,7 @@ class TVDatabase:
                 data.pop("duration", None)
                 self.insert_row("weekly_schedule", data)
 
-                print(f"Lagret program: {data['show_name']} på {data['day_of_week']} {data['start_time']}")
+                print(f"Lagret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
             
             return jsonify({"status": "success"})
             
@@ -222,23 +244,16 @@ class TVDatabase:
             print(f"Feil ved lagring: {e}")
             return jsonify({"status": "error", "message": str(e)})
         
-    def save_series(self,data):
-        import TVdownloader
+    def add_program(self,data):
+        data_type = data.pop("type")
 
+        import TVdownloader
         tv_dl = TVdownloader.TVDownloader()
 
         directory = helper._create_valid_filename(data['name'])
         if not os.path.exists(f'downloads/{directory}'):
             os.makedirs(f'downloads/{directory}')
         
-        data.update(
-            {
-                "directory": directory
-            }
-        )
-
-        url = None
-        total_episodes = None
         if data['source_url']:
             url = data['source_url'].format(season=data['season'])
             try:
@@ -254,25 +269,29 @@ class TVDatabase:
             except Exception as e:
                 print(f"Feil ved henting av tmdb metadata: {e}")
 
-        total_episodes = tv_dl.get_season_metadata(data)
-
         data.update(
             {
-                "source_url": url,
-                "directory": directory,
-                "total_episodes": total_episodes
+                "directory": directory
             }
         )
+        
+        if data_type == "series":
+            total_episodes = tv_dl.get_season_metadata(data)
+            data.update(
+                {
+                    "total_episodes": total_episodes
+                }
+            )
 
         try:
-            if data["id"] and self.check_if_id_exists("series", data["id"]):
+            if data["id"] and self.check_if_id_exists(data_type, data["id"]):
                 new_id = data.pop("id")
-                self.update_row("series", data, id = new_id)
+                self.update_row(data_type, data, id = new_id)
                 print(f"Oppdatert program: {data['name']}")
 
             else:
                 data.pop("id", None)
-                self.insert_row("series", data)
+                self.insert_row(data_type, data)
                 print(f"Lagt til nytt program: {data['name']}")
             
             return jsonify({"status": "success"})
@@ -280,144 +299,11 @@ class TVDatabase:
         except Exception as e:
             print(f"Feil ved lagring: {e}")
             return jsonify({"status": "error", "message": str(e)})
-        
-    def update_series(self,data):
-        
-        directory = helper._create_valid_filename(data['name'])
-        if not os.path.exists(f'downloads/{directory}'):
-            os.makedirs(f'downloads/{directory}')
-
-        
-
-    def check_if_rerun_before_new(self, series_id):
-        query = '''
-            SELECT day_of_week, start_time, is_rerun
-            FROM weekly_schedule 
-            WHERE series_id = ?
-            ORDER BY day_of_week, start_time
-        '''
-        
-        airings = self._execute_query(query, (series_id,))
-        
-        if len(airings) < 2:
-            return False  
-        
-        first_airing = airings[0]
-        return first_airing["is_rerun"] == 1
-    
+            
     def get_all_series(self):
         query = 'SELECT * FROM series ORDER BY name'
         return self._execute_query(query)
-
-    #WEEKLY SCHEDULE
-
-    def get_daily_schedule(self):
-        now = datetime.now()
-
-        #put this in helper function
-        current_day = int(now.strftime('%w'))
-
-        if current_day == 0:
-            current_day = 7
-
-        query = '''
-            SELECT * FROM weekly_schedule
-            WHERE day_of_week = ?
-            ORDER BY start_time
-        '''
-
-        return self._execute_query(query,(current_day,))
     
-    def get_weekly_schedule(self):
-        #Get all scheduled shows
-        query = '''
-            SELECT * FROM weekly_schedule
-            ORDER BY day_of_week, start_time
-        '''
-
-        return self._execute_query(query)
-    
-    def get_weekly_schedule_with_episode(self):
-        query = '''
-            SELECT ws.show_name, ws.day_of_week, ws.start_time, ws.is_rerun, e.episode_number, e.filename, e.keep_next_week FROM weekly_schedule AS ws
-            JOIN episodes e ON e.id = ws.episode_id  
-            ORDER BY ws.day_of_week, ws.start_time
-        '''
-        
-        return self._execute_query(query)
-        
-
-    def get_program_schedule(self, series_id):
-        query = '''
-            SELECT * FROM weekly_schedule
-            WHERE series_id = ?
-            ORDER BY day_of_week, start_time
-        '''
-
-        return self._execute_query(query,(series_id,))
-    
-    def get_scheduled_series(self):
-        query = '''
-            SELECT DISTINCT s.* FROM series as s
-            INNER JOIN weekly_schedule ws ON s.id = ws.series_id
-            ORDER BY s.name
-        '''
-
-        return self._execute_query(query)
-
-
-    #DOWNLOADS
-
-    def get_weekly_download_schedule(self):
-        count = '''
-            SELECT series_id, COUNT() as count
-            FROM weekly_schedule
-            WHERE is_rerun = 0
-            GROUP BY series_id
-        '''
-
-        query = f'''
-            SELECT s.id as series_id, s.name, s.season, s.episode, s.source, s.source_url, s.tmdb_id, s.directory, s.total_episodes, s.reverse_order as reverse, c.count
-            FROM series s
-            LEFT JOIN ({count}) c ON c.series_id = s.id
-            WHERE c.count > 0
-        '''
-
-        return self._execute_query(query)
-    
-    def increment_episode(self, series_id):
-        query = '''
-            UPDATE series
-            SET episode = episode + 1
-            WHERE id = ?
-        '''
-
-        self._execute_query(query,(series_id,))
-        
-        print(f"Serie ID {series_id}: Episode nummer inkrementert.")
-
-    def decrement_episode(self, series_id):
-        query = '''
-            UPDATE series
-            SET episode = episode - 1
-            WHERE id = ?
-        '''
-
-        self._execute_query(query,(series_id,))
-        
-        print(f"Serie ID {series_id}: Episode nummer dekrementert.")
-
-    def update_download_links(self, id, episode_id):
-        query = '''
-            UPDATE weekly_schedule
-            SET episode_id = ?
-            WHERE id = ?
-        '''
-
-        self._execute_query(query,(episode_id,id))
-    
-
-
     #02 EPISODE TABLE OPERATIONS
 
     def add_new_episode(self, episode_data):
@@ -556,6 +442,138 @@ class TVDatabase:
         
         self.edit_row_by_id("episodes", episode_id, **updates)
         print(f"Episode ID {episode_id}: Status oppdatert til '{status}'")
+
+    #MOVIES TABLE OPERATIONS
+
+    def get_all_movies(self):
+        query = 'SELECT * FROM movies ORDER BY name'
+        return self._execute_query(query)
+
+    #WEEKLY SCHEDULE
+
+    def get_daily_schedule(self):
+        now = datetime.now()
+
+        #put this in helper function
+        current_day = int(now.strftime('%w'))
+
+        if current_day == 0:
+            current_day = 7
+
+        query = '''
+            SELECT * FROM weekly_schedule
+            WHERE day_of_week = ?
+            ORDER BY start_time
+        '''
+
+        return self._execute_query(query,(current_day,))
+    
+    def get_weekly_schedule(self):
+        #Get all scheduled shows
+        query = '''
+            SELECT * FROM weekly_schedule
+            ORDER BY day_of_week, start_time
+        '''
+
+        return self._execute_query(query)
+    
+    def get_weekly_schedule_with_episode(self):
+        query = '''
+            SELECT ws.name, ws.day_of_week, ws.start_time, ws.is_rerun, e.episode_number, e.filename, e.keep_next_week FROM weekly_schedule AS ws
+            JOIN episodes e ON e.id = ws.episode_id  
+            ORDER BY ws.day_of_week, ws.start_time
+        '''
+        
+        return self._execute_query(query)
+        
+
+    def get_program_schedule(self, series_id):
+        query = '''
+            SELECT * FROM weekly_schedule
+            WHERE series_id = ?
+            ORDER BY day_of_week, start_time
+        '''
+
+        return self._execute_query(query,(series_id,))
+    
+    def get_scheduled_series(self):
+        query = '''
+            SELECT DISTINCT s.* FROM series as s
+            INNER JOIN weekly_schedule ws ON s.id = ws.series_id
+            ORDER BY s.name
+        '''
+
+        return self._execute_query(query)
+
+    def check_if_rerun_before_new(self, series_id):
+        query = '''
+            SELECT day_of_week, start_time, is_rerun
+            FROM weekly_schedule 
+            WHERE series_id = ?
+            ORDER BY day_of_week, start_time
+        '''
+        
+        airings = self._execute_query(query, (series_id,))
+        
+        if len(airings) < 2:
+            return False  
+        
+        first_airing = airings[0]
+        return first_airing["is_rerun"] == 1
+    
+    #DOWNLOADS
+
+    def get_weekly_download_schedule(self):
+        count = '''
+            SELECT series_id, COUNT() as count
+            FROM weekly_schedule
+            WHERE is_rerun = 0
+            GROUP BY series_id
+        '''
+
+        query = f'''
+            SELECT s.id as series_id, s.name, s.season, s.episode, s.source, s.source_url, s.tmdb_id, s.directory, s.total_episodes, s.reverse_order as reverse, c.count
+            FROM series s
+            LEFT JOIN ({count}) c ON c.series_id = s.id
+            WHERE c.count > 0
+        '''
+
+        return self._execute_query(query)
+    
+    def increment_episode(self, series_id):
+        query = '''
+            UPDATE series
+            SET episode = episode + 1
+            WHERE id = ?
+        '''
+
+        self._execute_query(query,(series_id,))
+        
+        print(f"Serie ID {series_id}: Episode nummer inkrementert.")
+
+    def decrement_episode(self, series_id):
+        query = '''
+            UPDATE series
+            SET episode = episode - 1
+            WHERE id = ?
+        '''
+
+        self._execute_query(query,(series_id,))
+        
+        print(f"Serie ID {series_id}: Episode nummer dekrementert.")
+
+    def update_download_links(self, id, episode_id):
+        query = '''
+            UPDATE weekly_schedule
+            SET episode_id = ?
+            WHERE id = ?
+        '''
+
+        self._execute_query(query,(episode_id,id))
+    
+
+
+
 
 
     #AIRING OPERATIONS
@@ -705,8 +723,5 @@ class TVDatabase:
         '''
         self._execute_query(query, params)
 
-
 if __name__ == "__main__":
     tvdb = TVDatabase()
-
-    tvdb._execute_query("UPDATE sqlite_sequence SET seq = 0 WHERE name = 'weekly_schedule';")

@@ -85,11 +85,12 @@ def verify_password(username, password):
 def admin():  
     schedule_data = tv_db.get_weekly_schedule()
     series_data = tv_db.get_all_series()
+    movie_data = tv_db.get_all_movies()
 
     for series in series_data:
         series['blocks'] = helper._calculate_blocks(series['duration'])
 
-    return render_template('admin.html', schedule_data=schedule_data, series_data=series_data)
+    return render_template('admin.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data)
 
 # Oppdater save_program ruten
 @app.route('/admin/save_schedule', methods=['POST'])
@@ -110,7 +111,7 @@ def add_program():
 
     print(f"Mottatt data for nytt program: {data}")
     
-    return tv_db.save_series(data)
+    return tv_db.add_program(data)
 
 # ============ API ROUTES ============
 

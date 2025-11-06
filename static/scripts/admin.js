@@ -42,7 +42,6 @@ tableBody.appendChild(thead);
 
 const tbody = document.createElement('tbody');
 
-
 timeSlots.forEach(time => {
     const row = document.createElement('tr');
     const timeCell = document.createElement('td');
@@ -63,10 +62,12 @@ timeSlots.forEach(time => {
     tableBody.appendChild(row);
 });
 
+//Updates table with existing data
 scheduleData.forEach(schedule => {
-    updateScheduleTable(schedule.show_name, schedule.is_rerun, schedule.start_time, schedule.blocks, schedule.day_of_week);
+    updateScheduleTable(schedule.name, schedule.is_rerun, schedule.start_time, schedule.blocks, schedule.day_of_week);
 });
 
+//Creates ... for adding/editing new series or movie
 const newProgram = document.getElementById('addProgram');
 newProgram.onclick = () => openProgramForm();
 
@@ -74,6 +75,93 @@ function openProgramForm() {
     document.getElementById('formOverlay').style.display = 'block';
     document.getElementById('programForm').style.display = 'block';
 }
+
+function closeProgramForm() {
+    document.getElementById('formOverlay').style.display = 'none';
+    document.getElementById('programForm').style.display = 'none';
+
+    document.getElementById('programFormData').reset();
+}
+
+function updateProgramType(){
+    document.getElementById('programFormData').reset();
+    const movieSelect = document.getElementById("programOption1").checked;
+
+    if (movieSelect) {
+        document.getElementById('programTitleSelectLabel').innerText = 'Velg film:';
+        document.getElementById('programTitleSelect').innerHTML = `<option selected>--Ny film--</option>`;
+        programSelect = document.getElementById('programTitleSelect');
+        movieData.forEach(m => {
+            option = document.createElement('option');
+            option.id = m.id;
+            option.text = m.name;
+            programSelect.appendChild(option);
+        }
+        )
+
+        document.getElementById('programSeasonLabel').style.display = 'none';
+        document.getElementById('programSeason').style.display = 'none';
+        document.getElementById('programEpisodeLabel').style.display = 'none';
+        document.getElementById('programEpisode').style.display = 'none';
+        document.getElementById('programIsReverseLabel').style.display = 'none';
+        document.getElementById('programIsReverse').style.display = 'none';
+    } else {
+        document.getElementById('programTitleSelectLabel').innerText = "Velg serie:";
+        document.getElementById('programTitleSelect').innerHTML = `<option selected>--Ny serie--</option>`;
+        programSelect = document.getElementById('programTitleSelect');
+        seriesData.forEach(m => {
+            option = document.createElement('option');
+            option.id = m.id;
+            option.text = m.name;
+            programSelect.appendChild(option);
+        }
+        )
+
+        document.getElementById('programSeasonLabel').style.display = 'block';
+        document.getElementById('programSeason').style.display = 'block';
+        document.getElementById('programEpisodeLabel').style.display = 'block';
+        document.getElementById('programEpisode').style.display = 'block';
+        document.getElementById('programIsReverseLabel').style.display = 'block';
+        document.getElementById('programIsReverse').style.display = 'block';
+    }
+}
+
+function updateProgramForm() {
+    const programSelect = document.getElementById('programTitleSelect');
+    const selectedOption = programSelect.options[programSelect.selectedIndex];
+
+    const programId = selectedOption.getAttribute('id');
+
+    const programType = document.querySelector('input[name="programType"]:checked').value;
+
+    let program = ""
+    if (programType == "series"){
+        program = seriesData.find(e => e.id == programId);
+    } else {
+        program = movieData.find(e => e.id == programId);
+    }
+    
+    if (program) {
+        document.getElementById('programTitle').value = program.name;
+        document.getElementById('programSource').value = program.source;
+        document.getElementById('programUrl').value = program.source_url;
+        document.getElementById('programYear').value = program.year;
+        document.getElementById('programGenre').value = program.genre;
+        document.getElementById('programDescription').value = program.description;
+        document.getElementById('programDuration').value = program.duration;
+        document.getElementById('programTmdbId').value = program.tmdb_id;
+        
+        if (program.type == "series"){
+            document.getElementById('programSeason').value = program.season;
+            document.getElementById('programEpisode').value = program.episode;
+            document.getElementById('programIsReverse').checked = program.reverse_order;
+        }
+    } else {
+        document.getElementById('programFormData').reset();
+    }
+}
+
+//Creates ... for updating schedule
 
 function openscheduleForm(day, time) {
     currentDay = day;
@@ -85,8 +173,8 @@ function openscheduleForm(day, time) {
     const currentProgram = scheduleData.find(e => e.start_time === currentTime && e.day_of_week === currentDay);
 
     if (currentProgram) {
-        const programSelect = document.getElementById('scheduledProgramTitle');
-        programSelect.value = currentProgram.show_name;
+        const programSelect = document.getElementById('scheduleTitleSelect');
+        programSelect.value = currentProgram.name;
         document.getElementById('isRerun').checked = currentProgram.is_rerun;
         updateDurationLabel();
     }
@@ -99,15 +187,36 @@ function closeScheduleForm() {
     document.getElementById('scheduleFormData').reset();
 }
 
-function closeProgramForm() {
-    document.getElementById('formOverlay').style.display = 'none';
-    document.getElementById('programForm').style.display = 'none';
+function updateScheduleType() {
+    document.getElementById('scheduleFormData').reset();
+    const movieSelect = document.getElementById("scheduleOption1").checked;
 
-    document.getElementById('programFormData').reset();
+    if (movieSelect) {
+        //document.getElementById('scheduleTitleSelectLabel').innerText = 'Velg film:';
+        scheduleSelect = document.getElementById('scheduleTitleSelect');
+        scheduleSelect.innerHTML = ``;
+        movieData.forEach(m => {
+            option = document.createElement('option');
+            option.id = m.id;
+            option.text = m.name;
+            scheduleSelect.appendChild(option);
+        })
+        document.getElementById("rerunGroup").style.display = "none";
+    } else {
+        scheduleSelect = document.getElementById('scheduleTitleSelect');
+        scheduleSelect.innerHTML = ``;
+        seriesData.forEach(m => {
+            option = document.createElement('option');
+            option.id = m.id;
+            option.text = m.name;
+            scheduleSelect.appendChild(option);
+        })
+        document.getElementById("rerunGroup").style.display = "block";
+    }
 }
 
 function updateDurationLabel() {
-    const programSelect = document.getElementById('scheduledProgramTitle');
+    const programSelect = document.getElementById('scheduleTitleSelect');
     const selectedOption = programSelect.options[programSelect.selectedIndex];
 
     const duration = selectedOption.getAttribute('data-duration');
@@ -117,30 +226,6 @@ function updateDurationLabel() {
         durationLabel.textContent = `Varighet: ${duration} minutter`;
     } else {
         durationLabel.textContent = '';
-    }
-}
-
-function updateSeriesForm() {
-    const programSelect = document.getElementById('programTitleSelect');
-    const selectedOption = programSelect.options[programSelect.selectedIndex];
-
-    const programId = selectedOption.getAttribute('id');
-    const program = seriesData.find(e => e.id == programId);
-
-    if (program) {
-        document.getElementById('programTitle').value = program.name;
-        document.getElementById('programSource').value = program.source;
-        document.getElementById('programUrl').value = program.source_url;
-        document.getElementById('programSeason').value = program.season;
-        document.getElementById('programEpisode').value = program.episode;
-        document.getElementById('programYear').value = program.year;
-        document.getElementById('programGenre').value = program.genre;
-        document.getElementById('programDescription').value = program.description;
-        document.getElementById('programDuration').value = program.duration;
-        document.getElementById('programTmdbId').value = program.tmdb_id;
-        document.getElementById('programIsReverse').checked = program.reverse_order;
-    } else {
-        document.getElementById('programFormData').reset();
     }
 }
 
@@ -167,16 +252,17 @@ function updateScheduleTable(name, isRerun, startTime, blocks, day) {
     }
 }
 
-function saveSchedule() {
 
-    console.log()
+//Saves schedule to database
+function saveSchedule() {
     const data = {
+        content_type: document.getElementById(),
         day_of_week: currentDay,
         start_time: currentTime,
-        series_id: document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].getAttribute('id'),
-        show_name: document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].text,
+        series_id: document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('id'),
+        name: document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].text,
         is_rerun: document.getElementById('isRerun').checked,
-        duration: parseInt(document.getElementById('scheduledProgramTitle').options[document.getElementById('scheduledProgramTitle').selectedIndex].getAttribute('data-duration'))
+        duration: parseInt(document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('data-duration'))
     };
 
     fetch('/admin/save_schedule', {
@@ -189,11 +275,11 @@ function saveSchedule() {
         .then(response => response.json())
         .then(result => {
             if (result.status === 'success') {
-                updateScheduleTable(data.show_name, data.is_rerun, data.end_time, data.time, data.day);
+                updateScheduleTable(data.name, data.is_rerun, data.end_time, data.time, data.day);
 
                 closeScheduleForm();
             } else {
-                alert('Feil ved lagring av program?');
+                alert('Feil ved lagring av program');
             }
         })
         .catch(error => {
@@ -205,6 +291,7 @@ function saveSchedule() {
         });
     }
 
+//Saves ... to database
 function saveProgram() {
     const programSelect = document.getElementById('programTitleSelect');
     const selectedOption = programSelect.options[programSelect.selectedIndex];
@@ -212,18 +299,26 @@ function saveProgram() {
 
     const data = {
         id: programId ? programId : null,
+        type: document.querySelector('input[name="programType"]:checked').value,
         name: document.getElementById('programTitle').value,
         source: document.getElementById('programSource').value,
         source_url: document.getElementById('programUrl').value,
-        season: document.getElementById('programSeason').value,
-        episode: document.getElementById('programEpisode').value,
         year: document.getElementById('programYear').value,
         description: document.getElementById('programDescription').value,
         duration: document.getElementById('programDuration').value,
         genre: document.getElementById('programGenre').value,
         tmdb_id: document.getElementById('programTmdbId').value,
-        reverse_order: document.getElementById('programIsReverse').checked
     };
+
+    if (data.type == "series") {
+        //Må fikses slik at den legger til
+        const data2 =
+        {
+            season: document.getElementById('programSeason').value,
+            episode: document.getElementById('programEpisode').value,
+            reverse_order: document.getElementById('programIsReverse').checked
+        }
+    }
 
     fetch('/admin/add_program', {
             method: 'POST',
