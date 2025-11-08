@@ -160,7 +160,6 @@ class TVDownloader:
             )
 
         if success:
-            # Oppdater med full info
             if helper._verify_local_file(filepath):
                 file_info = {
                     "filename": filename,

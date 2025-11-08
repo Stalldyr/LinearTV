@@ -358,6 +358,22 @@ class TVDatabase:
 
         return self._execute_query(query, (series_id, episode, int(episode) + int(count) - 1))
     
+    def get_local_pending_episodes(self, strict = False):
+        if strict:
+            conditions = "'pending'"
+        else:
+            conditions = "'pending', 'failed', 'missing', 'downloading', 'deleted'"
+
+        query = f'''
+            SELECT e.*, s.name as series_name, s.source_url, s.directory
+            FROM episodes e
+            JOIN series s ON e.series_id = s.id
+            WHERE e.status IN ({conditions}) AND s.source = "Local"
+            ORDER BY e.season_number, e.episode_number
+        '''
+
+        return self._execute_query(query)
+    
     def get_available_episodes(self):
         query = '''
             SELECT e.*, s.name as series_name, s.source_url, s.directory

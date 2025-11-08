@@ -316,12 +316,14 @@ function saveProgram() {
     };
 
     if (data.type == "series") {
-        //Må fikses slik at den legger til
-        data.push({
-            season: document.getElementById('programSeason').value,
-            episode: document.getElementById('programEpisode').value,
-            reverse_order: document.getElementById('programIsReverse').checked
-        })
+        Object.assign(
+            data,
+            {
+                season: document.getElementById('programSeason').value,
+                episode: document.getElementById('programEpisode').value,
+                reverse_order: document.getElementById('programIsReverse').checked
+            }
+        )
     }
 
     fetch('/admin/add_program', {

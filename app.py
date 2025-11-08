@@ -143,6 +143,11 @@ def get_time():
     time = datetime.now().time()
     return [time.strftime("%H")]
 
+@app.route('/api/local_pending_episodes')
+def get_local_pending_episodes():
+    pending = tv_db.get_local_pending_episodes()
+    return jsonify(tv_db.get_local_pending_episodes())
+
 
 @app.route('/api/traffic', methods=['POST'])
 def get_traffic():
