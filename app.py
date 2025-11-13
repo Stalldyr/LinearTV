@@ -97,8 +97,6 @@ def save_schedule():
 
     print(f"Mottatt data for lagring: {data}")
 
-    #tv_dl.prepare_weekly_schedule()
-
     return tv_db.save_schedule_entry(data)
     
 @app.route('/admin/add_program', methods=['POST'])
@@ -145,8 +143,7 @@ def get_time():
 
 @app.route('/api/local_pending_episodes')
 def get_local_pending_episodes():
-    pending = tv_db.get_local_pending_episodes()
-    return jsonify(tv_db.get_local_pending_episodes())
+    return jsonify(tv_db.get_pending_episodes(local=True))
 
 
 @app.route('/api/traffic', methods=['POST'])

@@ -194,7 +194,7 @@ function updateScheduleType() {
     if (movieSelect) {
         //document.getElementById('scheduleTitleSelectLabel').innerText = 'Velg film:';
         scheduleSelect = document.getElementById('scheduleTitleSelect');
-        scheduleSelect.innerHTML = ``;
+        scheduleSelect.innerHTML = `<option selected value>[Ledig]</option>`;
         movieData.forEach(m => {
             option = document.createElement('option');
             option.id = m.id;
@@ -206,7 +206,7 @@ function updateScheduleType() {
         document.getElementById("rerunGroup").style.display = "none";
     } else {
         scheduleSelect = document.getElementById('scheduleTitleSelect');
-        scheduleSelect.innerHTML = ``;
+        scheduleSelect.innerHTML = `<option selected value>[Ledig]</option>`;
         seriesData.forEach(m => {
             option = document.createElement('option');
             option.id = m.id;
@@ -261,10 +261,23 @@ function updateScheduleTable(name, isRerun, startTime, blocks, day) {
 
 //Saves schedule to database
 function saveSchedule() {
+    const programType = document.querySelector('input[name="scheduleType"]:checked').value;
+    let series_id = null
+    let movie_id = null
+
+    if (programType == "series"){
+        series_id = document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('id')
+    } else {
+        movie_id = document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('id')
+    }
+
+
+    
     const data = {
         day_of_week: currentDay,
         start_time: currentTime,
-        series_id: document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('id'),
+        series_id: series_id,
+        movie_id: movie_id,
         name: document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].text,
         is_rerun: document.getElementById('isRerun').checked,
         duration: parseInt(document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('data-duration'))

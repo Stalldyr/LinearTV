@@ -128,7 +128,7 @@ class TVDownloader:
             return len(episodes)
                 
         else:
-            print("No season metada provided")
+            print(f"No season metada provided for {entry["name"]}")
 
             return
     
@@ -143,7 +143,7 @@ class TVDownloader:
         else:
             playlist_idx = episode_num
 
-        filename = f"{entry['directory']}_s{entry['season']:02d}e{episode_num:02d}.mp4"
+        filename = helper._create_file_name(entry['directory'], entry['season'], episode_num)
 
         filepath = helper._get_file_path(self.download_path, entry['directory'], filename)
         success = helper._verify_local_file(filepath)

@@ -7,11 +7,14 @@ from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
 import helper
 
-class TVDatabase:
-    STATUS_PENDING = 'pending'
-    STATUS_AVAILABLE = 'available'
-    STATUS_DELETED = 'deleted'
+STATUS_PENDING = 'pending'
+STATUS_AVAILABLE = 'available'
+STATUS_DELETED = 'deleted'
+STATUS_FAILED = 'failed'
+STATUS_DOWNLOADING = 'downloading'
+STATUS_MISSING = 'missing'
 
+class TVDatabase:
     def __init__(self, db_path = 'data/tv.db', test_time=None):
 
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -117,7 +120,8 @@ class TVDatabase:
                 duration INT,
                 reverse_order BOOLEAN,                    
                 genre TEXT,
-                year INT
+                year INT,
+                episode_count INT DEFAULT 0
             )
         ''')
         
@@ -200,54 +204,6 @@ class TVDatabase:
         
     #SERIES TABLE OPERATIONS
     
-    def save_schedule_entry(self, data):
-        """Save new entry in the weekly schedule"""
-
-        try:
-            existing = self._execute_query('''
-                SELECT id FROM weekly_schedule 
-                WHERE day_of_week = ? AND start_time = ?
-            ''', (data['day_of_week'], data['start_time']))
-
-            if existing:
-                if data["name"] == "[Ledig]":
-                    #Sletter oppføring
-                    self._execute_query('''
-                        DELETE FROM weekly_schedule
-                        WHERE day_of_week = ? AND start_time = ?
-                    ''', (data['day_of_week'], data['start_time']))
-
-                    print(f"Slettet program: {data['name']} på {data['day_of_week']} {data['start_time']}")
-
-                else:
-                    #Oppdater eksisterende oppføring
-                    conditions = {
-                        "day_of_week": data["day_of_week"], 
-                        "start_time": data["start_time"]
-                    }
-
-                    data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
-                    data["blocks"] = helper._calculate_blocks(data["duration"])
-                    data.pop("duration", None)
-
-                    self.edit_row_by_conditions("weekly_schedule", conditions, **data)
-
-                    print(f"Endret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
-            else:
-                # Legg til nytt program
-                data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
-                data["blocks"] = helper._calculate_blocks(data["duration"])
-                data.pop("duration", None)
-                self.insert_row("weekly_schedule", data)
-
-                print(f"Lagret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
-            
-            return jsonify({"status": "success"})
-            
-        except Exception as e:
-            print(f"Feil ved lagring: {e}")
-            return jsonify({"status": "error", "message": str(e)})
-        
     def add_program(self,data):
         data_type = data.pop("type")
 
@@ -335,18 +291,39 @@ class TVDatabase:
             "series_id": series_id,
             "season_number": season,
             "episode_number": episode,
-            "status": "pending",
+            "status": STATUS_PENDING,
             "download_date": None 
         }
         
         self.insert_row("episodes", episode_data)
         return self.get_most_recent_id("episodes")
     
-    def get_pending_episodes(self, series_id, episode, count, strict = False):
+    def get_pending_episodes(self, strict = False, local = False):
+        conditions = []
+        
         if strict:
-            conditions = "'pending'"
+            conditions.append(f'e.status IN ("{STATUS_PENDING}")')
         else:
-            conditions = "'pending', 'failed', 'missing', 'downloading', 'deleted'"
+            conditions.append(f'e.status IN ("{STATUS_PENDING}", "{STATUS_FAILED}", "{STATUS_MISSING}", "{STATUS_DOWNLOADING}", "{STATUS_DELETED}")')
+
+        if local:
+            conditions.append('s.source = "Local"')
+
+        query = f'''
+            SELECT e.*, s.name as series_name, s.source_url, s.directory
+            FROM episodes e
+            JOIN series s ON e.series_id = s.id
+            WHERE {" AND ".join(conditions)} AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            ORDER BY series_name, e.season_number, e.episode_number
+        '''
+
+        return self._execute_query(query)
+    
+    def get_pending_episodes_by_id(self, series_id, episode, count, strict = False):
+        if strict:
+            conditions = f"{STATUS_PENDING}"
+        else:
+            conditions = f"{STATUS_PENDING}, {STATUS_FAILED}, {STATUS_MISSING}, {STATUS_DOWNLOADING}, {STATUS_DELETED}"
 
         query = f'''
             SELECT e.*, s.name as series_name, s.source_url, s.directory
@@ -360,12 +337,12 @@ class TVDatabase:
     
     def get_local_pending_episodes(self, strict = False):
         if strict:
-            conditions = "'pending'"
+            conditions = f"{STATUS_PENDING}"
         else:
-            conditions = "'pending', 'failed', 'missing', 'downloading', 'deleted'"
+            conditions = f"{STATUS_PENDING}, {STATUS_FAILED}, {STATUS_MISSING}, {STATUS_DOWNLOADING}, {STATUS_DELETED}"
 
         query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory
+            SELECT e.id, e.season_number, e.episode_number, e.series_id, s.name as series_name, s.source_url, s.directory
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             WHERE e.status IN ({conditions}) AND s.source = "Local"
@@ -470,6 +447,74 @@ class TVDatabase:
         return self._execute_query(query)
 
     #WEEKLY SCHEDULE
+
+    def save_schedule_entry(self, data):
+        """Save new entry in the weekly schedule"""
+
+        try:
+            existing = self._execute_query('''
+                SELECT id FROM weekly_schedule 
+                WHERE day_of_week = ? AND start_time = ?
+            ''', (data['day_of_week'], data['start_time']))
+
+            if existing:
+                if data["name"] == "[Ledig]":
+                    self._execute_query('''
+                        DELETE FROM weekly_schedule
+                        WHERE day_of_week = ? AND start_time = ?
+                    ''', (data['day_of_week'], data['start_time']))
+
+                    print(f"Slettet program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+
+                else:
+                    conditions = {
+                        "day_of_week": data["day_of_week"], 
+                        "start_time": data["start_time"]
+                    }
+
+                    data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
+                    data["blocks"] = helper._calculate_blocks(data["duration"])
+                    data.pop("duration", None)
+
+                    self.edit_row_by_conditions("weekly_schedule", conditions, **data)
+
+                    print(f"Endret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+            else:
+                data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
+                data["blocks"] = helper._calculate_blocks(data["duration"])
+                data.pop("duration", None)
+                self.insert_row("weekly_schedule", data)
+
+                print(f"Lagret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+            
+            return jsonify({"status": "success"})
+            
+        except Exception as e:
+            print(f"Feil ved lagring: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+        
+
+    def get_episode_count(self):
+        query = '''
+            SELECT series_id, COUNT(*) as count
+            FROM weekly_schedule
+            WHERE is_rerun = 0
+            GROUP BY series_id
+        '''
+
+        return self._execute_query(query)
+    
+    def update_episode_count(self):
+        query = '''
+            UPDATE series
+            SET episode_count = (
+                SELECT COUNT(*)
+                FROM weekly_schedule ws
+                WHERE ws.is_rerun = 0 AND ws.series_id = series.id
+            );
+        '''
+
+        self._execute_query(query)
 
     def get_daily_schedule(self):
         now = datetime.now()
@@ -728,8 +773,6 @@ class TVDatabase:
             VALUES ({placeholders})    
         '''
         self._execute_query(query, params)
-        
-        print(f"Ny oppføring lagt til i {table}.")
 
     def update_row(self, table, data, **kwargs):
         fields = ', '.join([f"{key} = ?" for key in data])
@@ -745,5 +788,8 @@ class TVDatabase:
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
-
+    
     tvdb.setup_database()
+    
+
+    tvdb.rename_column("series", "count", "episode_count")

@@ -44,7 +44,10 @@ class TVPreparer():
 
         for series in series_list:
             if series["source_url"]:
-                yt_dlp_data = self.tv_dl.get_ytdlp_season_metadata(series["season"], series["directory"])
+                try:
+                    yt_dlp_data = self.tv_dl.get_ytdlp_season_metadata(series["season"], series["directory"])
+                except Exception as e:
+                    print(series["name"], e)
 
                 for entry in yt_dlp_data["entries"]:
                     episode_data = self.tv_dl.get_ytdlp_epsiode_info(entry)
@@ -59,6 +62,7 @@ class TVPreparer():
 
                     self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
+                    print(f"Pending episode added for {series["name"]}")
 
             elif series["tmdb_id"]:
                 tmdb_data = self.tv_dl.get_tmdb_season_metadata(series["season"], series["directory"], series["tmdb_id"])
@@ -76,8 +80,10 @@ class TVPreparer():
 
                     self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
+                    print(f"Pending episode added for {series["name"]}")
+
             else:
-                print("No metadata available")
+                print(f"No metadata available for {series["name"]}")
 
     def download_weekly_schedule(self):
         schedule = self.tv_db.get_weekly_download_schedule()
