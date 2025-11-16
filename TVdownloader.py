@@ -145,8 +145,8 @@ class TVDownloader:
 
         filename = helper._create_file_name(entry['directory'], entry['season'], episode_num)
 
-        filepath = helper._get_file_path(self.download_path, entry['directory'], filename)
-        success = helper._verify_local_file(filepath)
+        filepath = helper.create_path(self.download_path, entry['directory'], filename)
+        success = helper.verify_path(filepath)
 
         if success:
             print(f"Lokal fil funnet for {filename}, hopper over nedlasting.")
@@ -160,7 +160,7 @@ class TVDownloader:
             )
 
         if success:
-            if helper._verify_local_file(filepath):
+            if helper.verify_path(filepath):
                 file_info = {
                     "filename": filename,
                     "download_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 

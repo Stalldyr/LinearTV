@@ -6,6 +6,7 @@ import slugify
 from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
 import helper
+from helper import calculate_time_blocks, _create_path_friendly_name, _calculate_end_time
 
 STATUS_PENDING = 'pending'
 STATUS_AVAILABLE = 'available'
@@ -210,7 +211,7 @@ class TVDatabase:
         import TVdownloader
         tv_dl = TVdownloader.TVDownloader()
 
-        directory = helper._create_valid_filename(data['name'])
+        directory = helper._create_path_friendly_name(data['name'])
         if not os.path.exists(f'downloads/{directory}'):
             os.makedirs(f'downloads/{directory}')
         
@@ -335,20 +336,14 @@ class TVDatabase:
 
         return self._execute_query(query, (series_id, episode, int(episode) + int(count) - 1))
     
-    def get_local_pending_episodes(self, strict = False):
-        if strict:
-            conditions = f"{STATUS_PENDING}"
-        else:
-            conditions = f"{STATUS_PENDING}, {STATUS_FAILED}, {STATUS_MISSING}, {STATUS_DOWNLOADING}, {STATUS_DELETED}"
-
+    def get_scheduled_episodes(self):
         query = f'''
-            SELECT e.id, e.season_number, e.episode_number, e.series_id, s.name as series_name, s.source_url, s.directory
+            SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE e.status IN ({conditions}) AND s.source = "Local"
-            ORDER BY e.season_number, e.episode_number
+            WHERE e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            ORDER BY series_name, e.season_number, e.episode_number
         '''
-
         return self._execute_query(query)
     
     def get_available_episodes(self):
@@ -372,7 +367,7 @@ class TVDatabase:
         '''
 
         return self._execute_query(query)
-    
+
     def get_available_episodes_by_id(self, series_id):
         query = '''
             SELECT * FROM episodes
@@ -473,7 +468,7 @@ class TVDatabase:
                     }
 
                     data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
-                    data["blocks"] = helper._calculate_blocks(data["duration"])
+                    data["blocks"] = helper.calculate_time_blocks(data["duration"])
                     data.pop("duration", None)
 
                     self.edit_row_by_conditions("weekly_schedule", conditions, **data)
@@ -481,7 +476,7 @@ class TVDatabase:
                     print(f"Endret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
             else:
                 data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
-                data["blocks"] = helper._calculate_blocks(data["duration"])
+                data["blocks"] = helper.calculate_time_blocks(data["duration"])
                 data.pop("duration", None)
                 self.insert_row("weekly_schedule", data)
 

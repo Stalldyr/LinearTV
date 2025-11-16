@@ -1,6 +1,6 @@
 from TVdownloader import TVDownloader
 from TVdatabase import TVDatabase
-import helper
+from helper import create_path, verify_path, _create_file_name
 import os
 import time
 import sys
@@ -21,9 +21,9 @@ class TVPreparer():
 
             self.tv_db.increment_episode(episode['series_id'])
 
-            file_path = os.path.join(self.download_path, episode['directory'], episode['filename'])
+            file_path = create_path(self.download_path, episode['directory'], episode['filename'])
             try:
-                if os.path.exists(file_path):
+                if verify_path(file_path):
                     os.remove(file_path)
                     print(f"Slettet fil: {file_path}")
                 else:
@@ -105,8 +105,8 @@ class TVPreparer():
         available_episodes = self.tv_db.get_available_episodes()
 
         for episode in available_episodes:
-            path = helper._get_file_path(self.download_path, episode['directory'], episode['filename'])
-            success = helper._verify_local_file(path)
+            path = create_path(self.download_path, episode['directory'], episode['filename'])
+            success = verify_path(path)
 
             if success:
                 print(f"Fil eksisterer: {episode['filename']}")
@@ -116,10 +116,35 @@ class TVPreparer():
 
     def verify_nonavailable_episodes(self):
         '''
-            Checks if any episodes that should not be there
+            Checks if there's any episodes that should not be there
         '''
 
         nonavailable_episodes = self.tv_db.get_nonavailable_episodes()
+
+    def verify_files_for_scheduled_episodes(self):
+        episodes = self.tv_db.get_scheduled_episodes()
+
+        for e in episodes:
+            if e["filename"]:
+                filename = e["filename"]
+            else:
+                filename = _create_file_name(e["directory"],e["season_number"], e["episode_number"])
+
+            path = create_path(self.download_path, e['directory'], filename)
+            success = verify_path(path)
+
+            if success:
+                print(f"Fil eksisterer: {filename}")
+                file_info = {
+                    "filename": filename,
+                    "file_size": os.path.getsize(path), 
+                } 
+
+                self.tv_db.edit_row_by_id("episodes", e["id"], **file_info)
+                self.tv_db.update_episode_status(e['id'], 'available')
+            else:
+                print(f"Fil mangler: {filename}")
+                self.tv_db.update_episode_status(e['id'], 'missing')
 
     def link_episodes_to_schedule(self):
         series = self.tv_db.get_all_series()
@@ -174,7 +199,7 @@ if __name__ == "__main__":
             prep.create_pending_episodes()
 
         elif operation == "verify":
-            prep.verify_available_episodes()
+            prep.verify_files_for_scheduled_episodes()
 
         elif operation == "download":
             prep.download_weekly_schedule()

@@ -2,7 +2,7 @@ import slugify
 from datetime import datetime, timedelta, time as time_class
 import os
 
-def _create_valid_filename(title):
+def _create_path_friendly_name(title):
     return slugify.slugify(title)
 
 def _calculate_end_time(start_time, duration_minutes):
@@ -11,20 +11,17 @@ def _calculate_end_time(start_time, duration_minutes):
     end_datetime = start_datetime + timedelta(minutes=duration_minutes)
     return end_datetime.time().strftime('%H:%M')
 
-def _calculate_blocks(duration, block_size=30):
+def calculate_time_blocks(duration, block_size=30):
     total_blocks = (duration + block_size - 1) // block_size
     return total_blocks
 
-def _verify_local_file(filepath):
-    if os.path.exists(filepath):
-        return True
-    print(f"Lokal fil ikke funnet: {filepath}")
-    return False
+def verify_path(filepath):
+    return os.path.exists(filepath)
 
 def _create_file_name(directory, season, episode):
     return f"{directory}_s{season:02d}e{episode:02d}.mp4"
 
-def _get_file_path(*args):
+def create_path(*args):
     return os.path.join(*args)
 
 def _map_days_to_integer(day):
