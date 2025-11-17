@@ -640,7 +640,7 @@ class TVDatabase:
         
         print(f"Serie ID {series_id}: Episode nummer dekrementert.")
 
-    def update_download_links(self, id, episode_id):
+    def update_episode_links(self, id, episode_id):
         query = '''
             UPDATE weekly_schedule
             SET episode_id = ?

@@ -187,44 +187,40 @@ class TVPreparer():
             available_episodes = self.tv_db.get_available_episodes_by_id(program["id"])
             
             if not entry:
-                #print(f"Ingen sendeskjema funnet for serie {entry["series_id"]}")
+                continue
+            
+            if not available_episodes:
+                print(f"Ingen tilgjengelige episoder for {program['name']}")
                 continue
 
-            #Checks if rerun comes before the new episode in the weekly schedule
-            
+            # Separer originaler og repriser
             originals = [s for s in entry if s["is_rerun"] == 0]
             reruns = [s for s in entry if s["is_rerun"] == 1]
 
-            offset = entry[0]["is_rerun"]
-            if offset:
-                if entry[0]["episode_id"]:
-                    self.tv_db.update_download_links(entry[0]["id"], entry[0]["episode_id"]-1)
-                    self.tv_db.update_episode_keeping_status(entry[0]["episode_id"]-1, True)
-                    reruns.pop(0)
-                #print(f"Koblet reprise sending {name} til (dag {original['day_of_week']}, {original['start_time']}) til episode {available_episodes[idx]['episode_number']}")
+            # Håndter hvis første sending er en reprise
+            first_is_rerun = entry[0]["is_rerun"] == 1
+            
+            if first_is_rerun and reruns and available_episodes:
+                # Linke første reprise til første tilgjengelige episode og behold den
+                first_episode_id = available_episodes[0]['id']
+                self.tv_db.update_episode_links(reruns[0]["id"], first_episode_id)
+                self.tv_db.update_episode_keeping_status(first_episode_id, True)
+                print(f"Koblet første reprise for {program['name']} til episode {available_episodes[0]['episode_number']} (beholdes)")
+                reruns.pop(0)
 
+            # Link originalsendinger
             for idx, original in enumerate(originals):
                 if idx < len(available_episodes):
                     episode_id = available_episodes[idx]['id']
-                    name = available_episodes[idx]["filename"]
-                    self.tv_db.update_download_links(original['id'], episode_id)
-                    print(f"Koblet original sending {name} til (dag {original['day_of_week']}, {original['start_time']}) til episode {available_episodes[idx]['episode_number']}")
+                    self.tv_db.update_episode_links(original['id'], episode_id)
+                    print(f"Koblet original sending {available_episodes[idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
 
+            # Link repriser
             for idx, rerun in enumerate(reruns):
                 if idx < len(available_episodes):
                     episode_id = available_episodes[idx]['id']
-                    name = available_episodes[idx]["filename"]
-                    self.tv_db.update_download_links(rerun['id'], episode_id)
-                    print(f"Koblet reprise {name} til (dag {rerun['day_of_week']}, {rerun['start_time']}) til episode {available_episodes[idx]['episode_number']}")
-
-    def link_episodes_to_schedule2(self):
-        series = self.tv_db.get_scheduled_episodes()
-
-        for entry in series:
-            if entry["status"] != "available":
-                continue
-            
-            print(entry)
+                    self.tv_db.update_episode_links(rerun['id'], episode_id)
+                    print(f"Koblet reprise {available_episodes[idx]['filename']} til (dag {rerun['day_of_week']}, {rerun['start_time']})")
 
         
 if __name__ == "__main__":
