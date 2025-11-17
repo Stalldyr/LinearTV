@@ -4,6 +4,9 @@ from helper import create_path, verify_path, _create_file_name, create_movie_fil
 import os
 import time
 import sys
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 class TVPreparer():
     def __init__(self, download_path="downloads"):

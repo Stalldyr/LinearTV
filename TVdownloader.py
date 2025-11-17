@@ -69,7 +69,7 @@ class TVDownloader:
             "duration": duration
         }
     
-    def get_tmdb_season_metadata(self, season, directory, tmdb_id):
+    def get_tmdb_season_metadata(self, tmdb_id, directory, season):
         json_path = f'{self.download_path}/{directory}/tmdb_data_season_{season}.json'
 
         if os.path.exists(json_path):
