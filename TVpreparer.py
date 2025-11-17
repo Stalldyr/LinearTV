@@ -179,53 +179,53 @@ class TVPreparer():
                 print(f"Fil mangler: {filename}")
                 self.tv_db.update_episode_status(m['id'], 'missing')
 
-def link_episodes_to_schedule(self):
-    series = self.tv_db.get_all_series()
+    def link_episodes_to_schedule(self):
+        series = self.tv_db.get_all_series()
 
-    for program in series:
-        entry = self.tv_db.get_program_schedule(program["id"])
-        available_episodes = self.tv_db.get_available_episodes_by_id(program["id"])
-        
-        if not entry:
-            continue
-        
-        if not available_episodes:
-            print(f"Ingen tilgjengelige episoder for {program['name']}")
-            continue
+        for program in series:
+            entry = self.tv_db.get_program_schedule(program["id"])
+            available_episodes = self.tv_db.get_available_episodes_by_id(program["id"])
+            
+            if not entry:
+                continue
+            
+            if not available_episodes:
+                print(f"Ingen tilgjengelige episoder for {program['name']}")
+                continue
 
-        # Separer originaler og repriser
-        originals = [s for s in entry if s["is_rerun"] == 0]
-        reruns = [s for s in entry if s["is_rerun"] == 1]
+            # Separer originaler og repriser
+            originals = [s for s in entry if s["is_rerun"] == 0]
+            reruns = [s for s in entry if s["is_rerun"] == 1]
 
-        # Håndter hvis første sending er en reprise
-        first_is_rerun = entry[0]["is_rerun"] == 1
-        episode_offset = 0  # Holder styr på hvor mange episoder som er "brukt opp"
-        
-        if first_is_rerun and reruns and available_episodes:
-            # Linke første reprise til første tilgjengelige episode og behold den
-            first_episode_id = available_episodes[0]['id']
-            self.tv_db.update_episode_links(reruns[0]["id"], first_episode_id)
-            self.tv_db.update_episode_keeping_status(first_episode_id, True)
-            print(f"Koblet første reprise for {program['name']} til episode {available_episodes[0]['episode_number']} (beholdes)")
-            reruns.pop(0)
-            episode_offset = 1  # Neste original skal starte på episode 1, ikke 0
+            # Håndter hvis første sending er en reprise
+            first_is_rerun = entry[0]["is_rerun"] == 1
+            episode_offset = 0  # Holder styr på hvor mange episoder som er "brukt opp"
+            
+            if first_is_rerun and reruns and available_episodes:
+                # Linke første reprise til første tilgjengelige episode og behold den
+                first_episode_id = available_episodes[0]['id']
+                self.tv_db.update_episode_links(reruns[0]["id"], first_episode_id)
+                self.tv_db.update_episode_keeping_status(first_episode_id, True)
+                print(f"Koblet første reprise for {program['name']} til episode {available_episodes[0]['episode_number']} (beholdes)")
+                reruns.pop(0)
+                episode_offset = 1  # Neste original skal starte på episode 1, ikke 0
 
-        # Link originalsendinger - starter fra episode_offset
-        for idx, original in enumerate(originals):
-            episode_idx = idx + episode_offset  # Legg til offset!
-            if episode_idx < len(available_episodes):
-                episode_id = available_episodes[episode_idx]['id']
-                self.tv_db.update_episode_links(original['id'], episode_id)
-                print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
+            # Link originalsendinger - starter fra episode_offset
+            for idx, original in enumerate(originals):
+                episode_idx = idx + episode_offset  # Legg til offset!
+                if episode_idx < len(available_episodes):
+                    episode_id = available_episodes[episode_idx]['id']
+                    self.tv_db.update_episode_links(original['id'], episode_id)
+                    print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
 
-        # Link repriser - starter fra episode_offset
-        for idx, rerun in enumerate(reruns):
-            episode_idx = idx + episode_offset  # Legg til offset!
-            if episode_idx < len(available_episodes):
-                episode_id = available_episodes[episode_idx]['id']
-                self.tv_db.update_episode_links(rerun['id'], episode_id)
-                print(f"Koblet reprise {available_episodes[episode_idx]['filename']} til (dag {rerun['day_of_week']}, {rerun['start_time']})")
-        
+            # Link repriser - starter fra episode_offset
+            for idx, rerun in enumerate(reruns):
+                episode_idx = idx + episode_offset  # Legg til offset!
+                if episode_idx < len(available_episodes):
+                    episode_id = available_episodes[episode_idx]['id']
+                    self.tv_db.update_episode_links(rerun['id'], episode_id)
+                    print(f"Koblet reprise {available_episodes[episode_idx]['filename']} til (dag {rerun['day_of_week']}, {rerun['start_time']})")
+            
 if __name__ == "__main__":
     prep = TVPreparer()
 
