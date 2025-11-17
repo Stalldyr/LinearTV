@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import tmdbsimple as tmdb
 import helper
+from helper import create_path, verify_path
 
 class TVDownloader:
     def __init__(self, path="downloads"):
@@ -145,8 +146,8 @@ class TVDownloader:
 
         filename = helper._create_file_name(entry['directory'], entry['season_number'], entry["episode_number"])
 
-        filepath = helper.create_path(self.download_path, entry['directory'], filename)
-        success = helper.verify_path(filepath)
+        filepath = create_path(self.download_path, entry['directory'], filename)
+        success = verify_path(filepath)
 
         if success:
             print(f"Lokal fil funnet for {filename}, hopper over nedlasting.")

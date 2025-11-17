@@ -111,22 +111,6 @@ class TVPreparer():
             else:
                 print(f"No metadata available for {series["name"]}")
 
-    def download_weekly_schedule2(self):
-        schedule = self.tv_db.get_weekly_download_schedule()
-
-        for entry in schedule:
-            total_episodes = self.tv_dl.get_season_metadata(entry)
-            pending_episodes = self.tv_db.get_pending_episodes(entry["series_id"], entry["episode"], entry["count"])
-
-            start_episode = entry["episode"]
-
-            for idx, pending_episode in enumerate(pending_episodes):
-                episode_num = start_episode + idx
-
-                self.tv_dl.download_episode(entry, pending_episode, episode_num, total_episodes)
-
-                time.sleep(1)
-
     def download_weekly_schedule(self):
         pending_episodes = self.tv_db.get_pending_episodes()
 
@@ -213,8 +197,8 @@ class TVPreparer():
 
             offset = entry[0]["is_rerun"]
             if offset:
-                self.tv_db.update_download_links(entry[0]["id"], entry[-1]["episode_id"])
-                self.tv_db.update_episode_keeping_status(entry[-1]["episode_id"], True)
+                self.tv_db.update_download_links(entry[0]["id"], entry[0]["episode_id"]-1)
+                self.tv_db.update_episode_keeping_status(entry[0]["episode_id"]-1, True)
                 reruns.pop(0)
                 #print(f"Koblet reprise sending {name} til (dag {original['day_of_week']}, {original['start_time']}) til episode {available_episodes[idx]['episode_number']}")
 
