@@ -179,7 +179,7 @@ class TVPreparer():
                 print(f"Fil mangler: {filename}")
                 self.tv_db.update_episode_status(m['id'], 'missing')
 
-    def link_episodes_to_schedule2(self):
+    def link_episodes_to_schedule(self):
         series = self.tv_db.get_all_series()
 
         for program in series:
@@ -217,7 +217,7 @@ class TVPreparer():
                     self.tv_db.update_download_links(rerun['id'], episode_id)
                     print(f"Koblet reprise {name} til (dag {rerun['day_of_week']}, {rerun['start_time']}) til episode {available_episodes[idx]['episode_number']}")
 
-    def link_episodes_to_schedule(self):
+    def link_episodes_to_schedule2(self):
         series = self.tv_db.get_scheduled_episodes()
 
         for entry in series:
