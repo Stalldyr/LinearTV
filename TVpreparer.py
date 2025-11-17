@@ -1,6 +1,6 @@
 from TVdownloader import TVDownloader
 from TVdatabase import TVDatabase
-from helper import create_path, verify_path, _create_file_name
+from helper import create_path, verify_path, _create_file_name, create_movie_file_name
 import os
 import time
 import sys
@@ -19,8 +19,6 @@ class TVPreparer():
             if not episode['last_aired']:
                 continue
 
-            self.tv_db.increment_episode(episode['series_id'])
-
             file_path = create_path(self.download_path, episode['directory'], episode['filename'])
             try:
                 if verify_path(file_path):
@@ -33,7 +31,32 @@ class TVPreparer():
             except Exception as e:
                 print(f"Feil ved sletting av fil {file_path}: {e}")
 
+        obsolete_movies = self.tv_db.get_obsolete_movies()
+
+        for movie in obsolete_movies:
+            file_path = create_path(self.download_path, movie['directory'], movie['filename'])
+            try:
+                if verify_path(file_path):
+                    os.remove(file_path)
+                    print(f"Slettet fil: {file_path}")
+                else:
+                    print(f"Filen finnes ikke: {file_path}")
+                
+                self.tv_db.update_episode_status(episode['id'], 'deleted')
+            except Exception as e:
+                print(f"Feil ved sletting av fil {file_path}: {e}")
+
+    def increment_episodes(self):
+        scheduled_episodes = self.tv_db.get_scheduled_episodes()
+
+        for e in scheduled_episodes:
+            self.tv_db.increment_episode(e['series_id'])
+
     def update_keeping_status(self):
+        """
+            Sets episodes that is kept from previous week to be deleted at the end of the week.
+        """
+
         kept_files = self.tv_db.get_kept_episodes()
 
         for episode in kept_files:
@@ -101,18 +124,6 @@ class TVPreparer():
 
                 time.sleep(1)
 
-    def verify_available_episodes(self):
-        available_episodes = self.tv_db.get_available_episodes()
-
-        for episode in available_episodes:
-            path = create_path(self.download_path, episode['directory'], episode['filename'])
-            success = verify_path(path)
-
-            if success:
-                print(f"Fil eksisterer: {episode['filename']}")
-            else:
-                print(f"Fil mangler: {episode['filename']}")
-                self.tv_db.update_episode_status(episode['id'], 'missing')
 
     def verify_nonavailable_episodes(self):
         '''
@@ -121,7 +132,7 @@ class TVPreparer():
 
         nonavailable_episodes = self.tv_db.get_nonavailable_episodes()
 
-    def verify_files_for_scheduled_episodes(self):
+    def verify_files_for_scheduled_media(self):
         episodes = self.tv_db.get_scheduled_episodes()
 
         for e in episodes:
@@ -145,6 +156,30 @@ class TVPreparer():
             else:
                 print(f"Fil mangler: {filename}")
                 self.tv_db.update_episode_status(e['id'], 'missing')
+
+        movies = self.tv_db.get_scheduled_movies()
+
+        for m in movies:
+            if m["filename"]:
+                filename = m["filename"]
+            else:
+                filename = create_movie_file_name(m["directory"])
+
+            path = create_path(self.download_path, m['directory'], filename)
+            success = verify_path(path)
+
+            if success:
+                print(f"Fil eksisterer: {filename}")
+                file_info = {
+                    "filename": filename,
+                    "file_size": os.path.getsize(path), 
+                } 
+
+                self.tv_db.edit_row_by_id("movies", m["id"], **file_info)
+                self.tv_db.update_episode_status(m['id'], 'available')
+            else:
+                print(f"Fil mangler: {filename}")
+                self.tv_db.update_episode_status(m['id'], 'missing')
 
     def link_episodes_to_schedule(self):
         series = self.tv_db.get_all_series()
@@ -192,6 +227,9 @@ if __name__ == "__main__":
         if operation == "delete":
             prep.cleanup_obsolete_episodes()
 
+        if operation == "increment":
+            prep.increment_episodes()
+
         if operation == "keep":
             prep.update_keeping_status()
 
@@ -199,7 +237,7 @@ if __name__ == "__main__":
             prep.create_pending_episodes()
 
         elif operation == "verify":
-            prep.verify_files_for_scheduled_episodes()
+            prep.verify_files_for_scheduled_media()
 
         elif operation == "download":
             prep.download_weekly_schedule()
@@ -212,8 +250,10 @@ if __name__ == "__main__":
             prep.update_keeping_status()
             prep.create_pending_episodes()
             prep.download_weekly_schedule()
-            prep.verify_available_episodes()
+            prep.verify_files_for_scheduled_media()
             prep.link_episodes_to_schedule()
 
         else:
             print("not a valid operation")
+
+    prep.increment_episodes()

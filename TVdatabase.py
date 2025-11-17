@@ -380,8 +380,8 @@ class TVDatabase:
     def get_obsolete_episodes(self):
         query = '''
             SELECT e.*, s.directory FROM episodes as e
-            Join series as s ON e.series_id = s.id
-            WHERE keep_next_week = 0 AND status = 'available'
+            JOIN series as s ON e.series_id = s.id
+            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL
         '''
 
         #  AND last_aired <= DATE('now', '-7 days')
@@ -440,6 +440,24 @@ class TVDatabase:
     def get_all_movies(self):
         query = 'SELECT * FROM movies ORDER BY name'
         return self._execute_query(query)
+    
+    def get_scheduled_movies(self):
+        query = f'''
+            SELECT m.* FROM movies m
+            JOIN weekly_schedule ws ON m.id = ws.movie_id
+        '''
+        return self._execute_query(query)
+    
+    def get_obsolete_movies(self):
+        query = '''
+            SELECT m.* FROM movies as m
+            WHERE status = 'available' AND last_aired IS NOT NULL
+        '''
+
+        #  AND last_aired <= DATE('now', '-7 days')
+        
+        return self._execute_query(query)
+    
 
     #WEEKLY SCHEDULE
 

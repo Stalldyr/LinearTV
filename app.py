@@ -7,7 +7,7 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
 import os
 import sys
-import helper
+from helper import calculate_time_blocks
 import TVtracker
 
 app = Flask(__name__)
@@ -85,7 +85,7 @@ def admin():
     movie_data = tv_db.get_all_movies()
 
     for series in series_data:
-        series['blocks'] = helper._calculate_blocks(series['duration'])
+        series['blocks'] = calculate_time_blocks(series['duration'])
 
     return render_template('admin.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data)
 

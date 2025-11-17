@@ -21,6 +21,9 @@ def verify_path(filepath):
 def _create_file_name(directory, season, episode):
     return f"{directory}_s{season:02d}e{episode:02d}.mp4"
 
+def create_movie_file_name(directory):
+    return f"{directory}.mp4"
+
 def create_path(*args):
     return os.path.join(*args)
 
