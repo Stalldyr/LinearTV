@@ -111,7 +111,7 @@ class TVPreparer():
             else:
                 print(f"No metadata available for {series["name"]}")
 
-    def download_weekly_schedule(self):
+    def download_weekly_schedule2(self):
         schedule = self.tv_db.get_weekly_download_schedule()
 
         for entry in schedule:
@@ -126,6 +126,17 @@ class TVPreparer():
                 self.tv_dl.download_episode(entry, pending_episode, episode_num, total_episodes)
 
                 time.sleep(1)
+
+    def download_weekly_schedule(self):
+        pending_episodes = self.tv_db.get_pending_episodes()
+
+        for e in pending_episodes:
+            if e["source"] == "Local":
+                continue
+            
+            self.tv_dl.download_episode(e)
+            
+            time.sleep(1)
 
 
     def verify_nonavailable_episodes(self):
@@ -258,5 +269,3 @@ if __name__ == "__main__":
 
         else:
             print("not a valid operation")
-
-    prep.increment_episodes()

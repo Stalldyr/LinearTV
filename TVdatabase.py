@@ -311,7 +311,7 @@ class TVDatabase:
             conditions.append('s.source = "Local"')
 
         query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory
+            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             WHERE {" AND ".join(conditions)} AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)

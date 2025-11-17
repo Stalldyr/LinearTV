@@ -134,16 +134,16 @@ class TVDownloader:
     
     #DOWNLOAD
 
-    def download_episode(self, entry, episode, episode_num, total_episodes):
-        self.tv_db.update_episode_status(episode["id"], "downloading")
+    def download_episode(self, entry):
+        self.tv_db.update_episode_status(entry["id"], "downloading")
         
         # Calculate playlist index
-        if entry["reverse"]:
-            playlist_idx = total_episodes - episode_num + 1
+        if entry["reverse_order"]:
+            playlist_idx = entry["total_episodes"] - entry["episode_number"] + 1
         else:
-            playlist_idx = episode_num
+            playlist_idx = entry["episode_number"]
 
-        filename = helper._create_file_name(entry['directory'], entry['season'], episode_num)
+        filename = helper._create_file_name(entry['directory'], entry['season_number'], entry["episode_number"])
 
         filepath = helper.create_path(self.download_path, entry['directory'], filename)
         success = helper.verify_path(filepath)
@@ -151,7 +151,7 @@ class TVDownloader:
         if success:
             print(f"Lokal fil funnet for {filename}, hopper over nedlasting.")
         else:
-            season_url = entry["source_url"].format(season=entry["season"])
+            season_url = entry["source_url"].format(season=entry["season_number"])
             success = self.download(
                 season_url, 
                 entry["directory"],
@@ -167,14 +167,14 @@ class TVDownloader:
                     "file_size": os.path.getsize(filepath), 
                 }   
         
-                self.tv_db.edit_row_by_id("episodes", episode["id"], **file_info)
-                self.tv_db.update_episode_status(episode["id"], "available")
+                self.tv_db.edit_row_by_id("episodes", entry["id"], **file_info)
+                self.tv_db.update_episode_status(entry["id"], "available")
 
             else:
-                self.tv_db.update_episode_status(episode["id"], "missing")
+                self.tv_db.update_episode_status(entry["id"], "missing")
 
         else:
-            self.tv_db.update_episode_status(episode["id"], "failed")
+            self.tv_db.update_episode_status(entry["id"], "failed")
 
         return success
     
