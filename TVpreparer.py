@@ -179,7 +179,7 @@ class TVPreparer():
                 print(f"Fil mangler: {filename}")
                 self.tv_db.update_episode_status(m['id'], 'missing')
 
-    def link_episodes_to_schedule(self):
+    def link_episodes_to_schedule2(self):
         series = self.tv_db.get_all_series()
 
         for program in series:
@@ -197,9 +197,10 @@ class TVPreparer():
 
             offset = entry[0]["is_rerun"]
             if offset:
-                self.tv_db.update_download_links(entry[0]["id"], entry[0]["episode_id"]-1)
-                self.tv_db.update_episode_keeping_status(entry[0]["episode_id"]-1, True)
-                reruns.pop(0)
+                if entry[0]["episode_id"]:
+                    self.tv_db.update_download_links(entry[0]["id"], entry[0]["episode_id"]-1)
+                    self.tv_db.update_episode_keeping_status(entry[0]["episode_id"]-1, True)
+                    reruns.pop(0)
                 #print(f"Koblet reprise sending {name} til (dag {original['day_of_week']}, {original['start_time']}) til episode {available_episodes[idx]['episode_number']}")
 
             for idx, original in enumerate(originals):
@@ -215,6 +216,16 @@ class TVPreparer():
                     name = available_episodes[idx]["filename"]
                     self.tv_db.update_download_links(rerun['id'], episode_id)
                     print(f"Koblet reprise {name} til (dag {rerun['day_of_week']}, {rerun['start_time']}) til episode {available_episodes[idx]['episode_number']}")
+
+    def link_episodes_to_schedule(self):
+        series = self.tv_db.get_scheduled_episodes()
+
+        for entry in series:
+            if entry["status"] != "available":
+                continue
+            
+            print(entry)
+
         
 if __name__ == "__main__":
     prep = TVPreparer()
