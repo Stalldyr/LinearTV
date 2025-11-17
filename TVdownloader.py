@@ -76,17 +76,18 @@ class TVDownloader:
         if os.path.exists(json_path):
             with open(json_path) as f:
                 return json.load(f)
+            
+        else:
+            try: 
+                season_data = tmdb.TV_Seasons(tmdb_id, season).info(language="no")
 
-        try: 
-            season_data = tmdb.TV_Seasons(tmdb_id, season).info(language="no")
+                with open(json_path, 'w') as f:
+                    json.dump(season_data, f, indent=4)
 
-            with open(json_path, 'w') as f:
-                json.dump(season_data, f, indent=4)
-
-            return season_data
-        
-        except Exception as e:
-            print(f"Failed to download tmdb metadata: {e}")
+                return season_data
+            
+            except Exception as e:
+                print(f"Failed to download tmdb metadata: {e}")
 
         return {}
 
