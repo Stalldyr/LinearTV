@@ -149,18 +149,21 @@ def get_schedule():
 def status():
     return jsonify(tv_stream.get_current_status())
 
-@app.route('/api/time')
-def get_time():
-    time = datetime.now().time()
-    return [time.strftime("%H")]
-
 @app.route('/api/pending_episodes')
-def get_local_pending_episodes():
-    return jsonify(tv_db.get_pending_episodes(local=True))
+def get_pending_episodes():
+    return jsonify(tv_db.get_pending_episodes())
 
 @app.route('/api/scheduled_episodes')
 def get_scheduled_episodes():
     return jsonify(tv_db.get_scheduled_episodes())
+
+@app.route('/api/kept_episodes')
+def get_kept_episodes():
+    return jsonify(tv_db.get_kept_episodes())
+
+@app.route('/api/obsolete_episodes')
+def get_obsolete_episodes():
+    return jsonify(tv_db.get_obsolete_episodes())
 
 @app.route('/api/traffic', methods=['POST'])
 def get_traffic():
