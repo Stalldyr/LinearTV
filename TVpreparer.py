@@ -15,7 +15,13 @@ class TVPreparer():
         self.tv_dl = TVDownloader(download_path)
         self.tv_db = TVDatabase()
 
-    def cleanup_obsolete_episodes(self):
+    def increment_episodes(self):
+        scheduled_episodes = self.tv_db.get_scheduled_episodes()
+
+        for e in scheduled_episodes:
+            self.tv_db.increment_episode(e['series_id'])
+
+    def cleanup_obsolete_media(self):
         obsolete_episodes = self.tv_db.get_obsolete_episodes()
 
         for episode in obsolete_episodes:
@@ -45,15 +51,9 @@ class TVPreparer():
                 else:
                     print(f"Filen finnes ikke: {file_path}")
                 
-                self.tv_db.update_episode_status(episode['id'], 'deleted')
+                self.tv_db.update_episode_status(movie['id'], 'deleted')
             except Exception as e:
                 print(f"Feil ved sletting av fil {file_path}: {e}")
-
-    def increment_episodes(self):
-        scheduled_episodes = self.tv_db.get_scheduled_episodes()
-
-        for e in scheduled_episodes:
-            self.tv_db.increment_episode(e['series_id'])
 
     def update_keeping_status(self):
         """
@@ -72,41 +72,46 @@ class TVPreparer():
             if series["source_url"]:
                 try:
                     yt_dlp_data = self.tv_dl.get_ytdlp_season_metadata(series["season"], series["directory"])
+                
+                    for entry in yt_dlp_data["entries"]:
+                        episode_data = self.tv_dl.get_ytdlp_epsiode_info(entry)
+
+                        if not episode_data["season_number"]:
+                            episode_data["season_number"] = series["season"]
+
+                        existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
+
+                        if existing:
+                            continue
+
+                        self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
+
+                        print(f"Pending episode added for {series["name"]}")
+
                 except Exception as e:
                     print(series["name"], e)
 
-                for entry in yt_dlp_data["entries"]:
-                    episode_data = self.tv_dl.get_ytdlp_epsiode_info(entry)
-
-                    if not episode_data["season_number"]:
-                        episode_data["season_number"] = series["season"]
-
-                    existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
-
-                    if existing:
-                        continue
-
-                    self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
-
-                    print(f"Pending episode added for {series["name"]}")
-
             elif series["tmdb_id"]:
-                tmdb_data = self.tv_dl.get_tmdb_season_metadata(series["season"], series["directory"], series["tmdb_id"])
+                try:
+                    tmdb_data = self.tv_dl.get_tmdb_season_metadata(series["tmdb_id"], series["directory"], series["season"])
 
-                for entry in tmdb_data["episodes"]:
-                    episode_data = self.tv_dl.get_tmdb_episode_info(entry)
+                    for entry in tmdb_data["episodes"]:
+                        episode_data = self.tv_dl.get_tmdb_episode_info(entry)
 
-                    if not episode_data["season_number"]:
-                        episode_data["season_number"] = series["season"]
+                        if not episode_data["season_number"]:
+                            episode_data["season_number"] = series["season"]
 
-                    existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
+                        existing = self.tv_db.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
 
-                    if existing:
-                        continue
+                        if existing:
+                            continue
 
-                    self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
+                        self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
-                    print(f"Pending episode added for {series["name"]}")
+                        print(f"Pending episode added for {series["name"]}")
+
+                except Exception as e:
+                    print(e)
 
             else:
                 print(f"No metadata available for {series["name"]}")
@@ -231,12 +236,11 @@ if __name__ == "__main__":
 
     if len(sys.argv)>1:
         operation = sys.argv[1]
-
-        if operation == "delete":
-            prep.cleanup_obsolete_episodes()
-
         if operation == "increment":
             prep.increment_episodes()
+
+        if operation == "delete":
+            prep.cleanup_obsolete_media()
 
         if operation == "keep":
             prep.update_keeping_status()
@@ -254,7 +258,7 @@ if __name__ == "__main__":
             prep.link_episodes_to_schedule()
 
         elif operation == "all":
-            prep.cleanup_obsolete_episodes()
+            prep.cleanup_obsolete_media()
             prep.update_keeping_status()
             prep.create_pending_episodes()
             prep.download_weekly_schedule()

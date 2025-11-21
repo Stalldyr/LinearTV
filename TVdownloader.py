@@ -6,12 +6,13 @@ import os
 import tmdbsimple as tmdb
 import helper
 from helper import create_path, verify_path
+import logging
 
 class TVDownloader:
-    def __init__(self, path="downloads"):
+    def __init__(self, download_path="downloads"):
         self.ydl_opts = {}
         self.tv_db = TVDatabase()
-        self.download_path = path
+        self.download_path = download_path
 
         tmdb.API_KEY = "c8ed91b54503ef6a7e9e9ca6c122a9c9"
 

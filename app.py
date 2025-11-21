@@ -9,6 +9,7 @@ import os
 import sys
 from helper import calculate_time_blocks
 import TVtracker
+import logging
 
 app = Flask(__name__)
 
@@ -17,6 +18,18 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
 tv_dl = TVDownloader()
+
+logging.basicConfig(
+    #filename='/var/log/lineartv.log',
+    level=logging.ERROR,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('lineartv.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logging.info("Test")
 
 #Index page
 @app.route('/')
@@ -141,10 +154,13 @@ def get_time():
     time = datetime.now().time()
     return [time.strftime("%H")]
 
-@app.route('/api/local_pending_episodes')
+@app.route('/api/pending_episodes')
 def get_local_pending_episodes():
     return jsonify(tv_db.get_pending_episodes(local=True))
 
+@app.route('/api/scheduled_episodes')
+def get_scheduled_episodes():
+    return jsonify(tv_db.get_scheduled_episodes())
 
 @app.route('/api/traffic', methods=['POST'])
 def get_traffic():
