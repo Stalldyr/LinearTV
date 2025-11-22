@@ -63,7 +63,6 @@ class TVStreamManager:
         if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
             self.tv_db.edit_cell("episodes", program["episode_id"], "last_aired", datetime.now().date())
 
-    
     def start_monitoring(self):
         #Checks the current program and update the status
         if not self.monitoring:

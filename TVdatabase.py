@@ -311,7 +311,7 @@ class TVDatabase:
             conditions.append('s.source = "Local"')
 
         query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order
+            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             WHERE {" AND ".join(conditions)} AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
@@ -499,6 +499,8 @@ class TVDatabase:
                 self.insert_row("weekly_schedule", data)
 
                 print(f"Lagret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+
+            self.update_episode_count()
             
             return jsonify({"status": "success"})
             
@@ -803,6 +805,3 @@ if __name__ == "__main__":
     tvdb = TVDatabase()
     
     tvdb.setup_database()
-    
-
-    tvdb.rename_column("series", "count", "episode_count")

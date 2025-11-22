@@ -29,8 +29,6 @@ logging.basicConfig(
     ]
 )
 
-logging.info("Test")
-
 #Index page
 @app.route('/')
 def index():
