@@ -1,10 +1,11 @@
 from TVdownloader import TVDownloader
 from TVdatabase import TVDatabase
-from helper import create_path, verify_path, _create_file_name, create_movie_file_name
+from helper import create_path, verify_path, create_episode_file_name, create_movie_file_name
 import os
 import time
 import sys
 import logging
+from TVconstants import *
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -12,7 +13,7 @@ class TVPreparer():
     def __init__(self, download_path="downloads"):
         self.download_path = download_path
 
-        self.tv_dl = TVDownloader(download_path)
+        #self.tv_dl = TVDownloader(download_path) #Remove??
         self.tv_db = TVDatabase()
 
     def increment_episodes(self):
@@ -20,40 +21,6 @@ class TVPreparer():
 
         for e in scheduled_episodes:
             self.tv_db.increment_episode(e['series_id'])
-
-    def cleanup_obsolete_media(self):
-        obsolete_episodes = self.tv_db.get_obsolete_episodes()
-
-        for episode in obsolete_episodes:
-            if not episode['last_aired']:
-                continue
-
-            file_path = create_path(self.download_path, episode['directory'], episode['filename'])
-            try:
-                if verify_path(file_path):
-                    os.remove(file_path)
-                    print(f"Slettet fil: {file_path}")
-                else:
-                    print(f"Filen finnes ikke: {file_path}")
-                
-                self.tv_db.update_episode_status(episode['id'], 'deleted')
-            except Exception as e:
-                print(f"Feil ved sletting av fil {file_path}: {e}")
-
-        obsolete_movies = self.tv_db.get_obsolete_movies()
-
-        for movie in obsolete_movies:
-            file_path = create_path(self.download_path, movie['directory'], movie['filename'])
-            try:
-                if verify_path(file_path):
-                    os.remove(file_path)
-                    print(f"Slettet fil: {file_path}")
-                else:
-                    print(f"Filen finnes ikke: {file_path}")
-                
-                self.tv_db.update_episode_status(movie['id'], 'deleted')
-            except Exception as e:
-                print(f"Feil ved sletting av fil {file_path}: {e}")
 
     def update_keeping_status(self):
         """
@@ -65,16 +32,35 @@ class TVPreparer():
         for episode in kept_files:
             self.tv_db.update_episode_keeping_status(episode['id'], False)
 
+    def cleanup_obsolete_media(self):
+        obsolete_episodes = self.tv_db.get_obsolete_episodes()
+
+        for e in obsolete_episodes:
+            if not e['last_aired']:
+                continue
+
+            series_dl = TVDownloader(e["directory"], SERIES)
+            series_dl.delete_media(e["id"], e["filename"])
+
+        obsolete_movies = self.tv_db.get_obsolete_movies()
+        for m in obsolete_movies:
+            if not m['last_aired']:
+                continue
+
+            series_dl = TVDownloader(m["directory"], MOVIES)
+            series_dl.delete_media(m["id"], m["filename"])
+
     def create_pending_episodes(self):
         series_list = self.tv_db.get_all_series()
 
         for series in series_list:
+            series_dl = TVDownloader(series["directory"], SERIES)
             if series["source_url"]:
                 try:
-                    yt_dlp_data = self.tv_dl.get_ytdlp_season_metadata(series["season"], series["directory"])
+                    yt_dlp_data = series_dl.get_ytdlp_season_metadata(series["season"])
                 
                     for entry in yt_dlp_data["entries"]:
-                        episode_data = self.tv_dl.get_ytdlp_epsiode_info(entry)
+                        episode_data = series_dl.get_ytdlp_epsiode_info(entry)
 
                         if not episode_data["season_number"]:
                             episode_data["season_number"] = series["season"]
@@ -84,7 +70,7 @@ class TVPreparer():
                         if existing:
                             continue
 
-                        self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
+                        self.tv_db.insert_row(TABLE_EPISODES, data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
                         print(f"Pending episode added for {series["name"]}")
 
@@ -93,10 +79,10 @@ class TVPreparer():
 
             elif series["tmdb_id"]:
                 try:
-                    tmdb_data = self.tv_dl.get_tmdb_season_metadata(series["tmdb_id"], series["directory"], series["season"])
+                    tmdb_data = series_dl.get_tmdb_season_metadata(series["tmdb_id"], series["season"])
 
                     for entry in tmdb_data["episodes"]:
-                        episode_data = self.tv_dl.get_tmdb_episode_info(entry)
+                        episode_data = series_dl.get_tmdb_episode_info(entry)
 
                         if not episode_data["season_number"]:
                             episode_data["season_number"] = series["season"]
@@ -106,7 +92,7 @@ class TVPreparer():
                         if existing:
                             continue
 
-                        self.tv_db.insert_row("episodes", data=episode_data, series_id = series["id"], status = "pending", download_date = None)
+                        self.tv_db.insert_row(TABLE_EPISODES, data=episode_data, series_id = series["id"], status = "pending", download_date = None)
 
                         print(f"Pending episode added for {series["name"]}")
 
@@ -120,20 +106,35 @@ class TVPreparer():
         pending_episodes = self.tv_db.get_pending_episodes()
 
         for e in pending_episodes:
-            if e["source"] == "Local":
+            if e["source"] == SOURCE_LOCAL:
                 continue
+
+            series_dl = TVDownloader(e["directory"], SERIES)
+
+            filename = create_episode_file_name(e["directory"], e["season_number"], e["episode_number"])
             
-            self.tv_dl.download_episode(e)
+            series_dl.download_episode(e["id"], 
+                                       e["source_url"], 
+                                       e["season_number"], 
+                                       e["episode_number"],
+                                       filename,
+                                       total_episodes=e["total_episodes"],
+                                       reverse_order= e["reverse_order"]
+                                       )
             
             time.sleep(1)
 
+        pending_movies = self.tv_db.get_scheduled_movies()
+        for m in pending_movies:
+            if m["source"] == SOURCE_LOCAL:
+                continue
+            
+            filename = create_movie_file_name(m["directory"])
 
-    def verify_nonavailable_episodes(self):
-        '''
-            Checks if there's any episodes that should not be there
-        '''
-
-        nonavailable_episodes = self.tv_db.get_nonavailable_episodes()
+            movie_dl = TVDownloader(m["directory"], MOVIES)
+            movie_dl.download_movie(m["id"], m["source_url"], filename)
+            
+            time.sleep(1)
 
     def verify_files_for_scheduled_media(self):
         episodes = self.tv_db.get_scheduled_episodes()
@@ -142,23 +143,10 @@ class TVPreparer():
             if e["filename"]:
                 filename = e["filename"]
             else:
-                filename = _create_file_name(e["directory"],e["season_number"], e["episode_number"])
+                filename = create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
 
-            path = create_path(self.download_path, e['directory'], filename)
-            success = verify_path(path)
-
-            if success:
-                print(f"Fil eksisterer: {filename}")
-                file_info = {
-                    "filename": filename,
-                    "file_size": os.path.getsize(path), 
-                } 
-
-                self.tv_db.edit_row_by_id("episodes", e["id"], **file_info)
-                self.tv_db.update_episode_status(e['id'], 'available')
-            else:
-                print(f"Fil mangler: {filename}")
-                self.tv_db.update_episode_status(e['id'], 'missing')
+            series_dl = TVDownloader(e["directory"], SERIES)
+            series_dl.verify_local_file(e["id"], filename)
 
         movies = self.tv_db.get_scheduled_movies()
 
@@ -168,23 +156,10 @@ class TVPreparer():
             else:
                 filename = create_movie_file_name(m["directory"])
 
-            path = create_path(self.download_path, m['directory'], filename)
-            success = verify_path(path)
+            movies_dl = TVDownloader(m["directory"], MOVIES)
+            movies_dl.verify_local_file(m["id"], filename)
 
-            if success:
-                print(f"Fil eksisterer: {filename}")
-                file_info = {
-                    "filename": filename,
-                    "file_size": os.path.getsize(path), 
-                } 
-
-                self.tv_db.edit_row_by_id("movies", m["id"], **file_info)
-                self.tv_db.update_episode_status(m['id'], 'available')
-            else:
-                print(f"Fil mangler: {filename}")
-                self.tv_db.update_episode_status(m['id'], 'missing')
-
-    def link_episodes_to_schedule(self):
+    def link_programs_to_schedule(self):
         series = self.tv_db.get_all_series()
 
         for program in series:
@@ -195,41 +170,37 @@ class TVPreparer():
                 continue
             
             if not available_episodes:
-                print(f"Ingen tilgjengelige episoder for {program['name']}")
+                print(f"No available episodes for {program['name']}")
                 continue
 
-            # Separer originaler og repriser
             originals = [s for s in entry if s["is_rerun"] == 0]
             reruns = [s for s in entry if s["is_rerun"] == 1]
 
-            # Håndter hvis første sending er en reprise
             first_is_rerun = entry[0]["is_rerun"] == 1
-            episode_offset = 0  # Holder styr på hvor mange episoder som er "brukt opp"
+            episode_offset = 0
             
             if first_is_rerun and reruns and available_episodes:
-                # Linke første reprise til første tilgjengelige episode og behold den
                 first_episode_id = available_episodes[0]['id']
                 self.tv_db.update_episode_links(reruns[0]["id"], first_episode_id)
                 self.tv_db.update_episode_keeping_status(first_episode_id, True)
                 print(f"Koblet første reprise for {program['name']} til episode {available_episodes[0]['episode_number']} (beholdes)")
                 reruns.pop(0)
-                episode_offset = 1  # Neste original skal starte på episode 1, ikke 0
+                episode_offset = 1
 
-            # Link originalsendinger - starter fra episode_offset
             for idx, original in enumerate(originals):
-                episode_idx = idx + episode_offset  # Legg til offset!
+                episode_idx = idx + episode_offset
                 if episode_idx < len(available_episodes):
                     episode_id = available_episodes[episode_idx]['id']
                     self.tv_db.update_episode_links(original['id'], episode_id)
                     print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
 
-            # Link repriser - starter fra episode_offset
             for idx, rerun in enumerate(reruns):
-                episode_idx = idx + episode_offset  # Legg til offset!
+                episode_idx = idx + episode_offset
                 if episode_idx < len(available_episodes):
                     episode_id = available_episodes[episode_idx]['id']
                     self.tv_db.update_episode_links(rerun['id'], episode_id)
                     print(f"Koblet reprise {available_episodes[episode_idx]['filename']} til (dag {rerun['day_of_week']}, {rerun['start_time']})")
+
             
 if __name__ == "__main__":
     prep = TVPreparer()
@@ -255,7 +226,7 @@ if __name__ == "__main__":
             prep.download_weekly_schedule()
 
         elif operation == "link":
-            prep.link_episodes_to_schedule()
+            prep.link_programs_to_schedule()
 
         elif operation == "all":
             prep.cleanup_obsolete_media()
@@ -263,7 +234,7 @@ if __name__ == "__main__":
             prep.create_pending_episodes()
             prep.download_weekly_schedule()
             prep.verify_files_for_scheduled_media()
-            prep.link_episodes_to_schedule()
+            prep.link_programs_to_schedule()
 
         else:
-            print("not a valid operation")
+            print("Not a valid operation")

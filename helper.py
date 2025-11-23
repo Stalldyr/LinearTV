@@ -2,10 +2,10 @@ import slugify
 from datetime import datetime, timedelta, time as time_class
 import os
 
-def _create_path_friendly_name(title):
+def create_path_friendly_name(title):
     return slugify.slugify(title)
 
-def _calculate_end_time(start_time, duration_minutes):
+def calculate_end_time(start_time, duration_minutes):
     start_hour, start_minute = map(int, start_time.split(':'))
     start_datetime = datetime.combine(datetime.today(), time_class(start_hour, start_minute))
     end_datetime = start_datetime + timedelta(minutes=duration_minutes)
@@ -18,7 +18,7 @@ def calculate_time_blocks(duration, block_size=30):
 def verify_path(filepath):
     return os.path.exists(filepath)
 
-def _create_file_name(directory, season, episode):
+def create_episode_file_name(directory, season, episode):
     return f"{directory}_s{season:02d}e{episode:02d}.mp4"
 
 def create_movie_file_name(directory):

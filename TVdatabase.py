@@ -2,23 +2,14 @@ import sqlite3
 import os
 from flask import jsonify
 from contextlib import contextmanager
-import slugify
 from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
-import helper
-from helper import calculate_time_blocks, _create_path_friendly_name, _calculate_end_time
-
-STATUS_PENDING = 'pending'
-STATUS_AVAILABLE = 'available'
-STATUS_DELETED = 'deleted'
-STATUS_FAILED = 'failed'
-STATUS_DOWNLOADING = 'downloading'
-STATUS_MISSING = 'missing'
+import sys
+from helper import calculate_time_blocks, create_path_friendly_name, calculate_end_time
+from TVconstants import *
 
 class TVDatabase:
     def __init__(self, db_path = 'data/tv.db', test_time=None):
-
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
         db_path = os.path.join(BASE_DIR, db_path)
 
         self.db_path = db_path
@@ -26,7 +17,6 @@ class TVDatabase:
 
         if not os.path.exists(self.db_path):
             self.setup_database()
-
 
     #EXECUTE QUERY
 
@@ -205,38 +195,43 @@ class TVDatabase:
         
     #SERIES TABLE OPERATIONS
     
-    def add_program(self,data):
+    def add_program(self, data):
         data_type = data.pop("type")
 
-        import TVdownloader
-        tv_dl = TVdownloader.TVDownloader()
-
-        directory = helper._create_path_friendly_name(data['name'])
-        if not os.path.exists(f'downloads/{directory}'):
-            os.makedirs(f'downloads/{directory}')
-        
-        if data['source_url']:
-            #url = data['source_url'].format(season=data['season'])
-            try:
-                tv_dl.get_ytdlp_season_metadata(directory, video_url=data['source_url'])
-                
-            except Exception as e:
-                print(f"Feil ved henting av ytdlp metadata: {e}")
-
-        if data["tmdb_id"]:
-            try:
-                tv_dl.get_tmdb_season_metadata(data["tmdb_id"], directory, data["season"])
-                
-            except Exception as e:
-                print(f"Feil ved henting av tmdb metadata: {e}")
-
+        directory = create_path_friendly_name(data['name'])
         data.update(
             {
                 "directory": directory
             }
         )
+
+        import TVdownloader
+        tv_dl = TVdownloader.TVDownloader(directory, data_type)
         
-        if data_type == "series":
+        if data['source_url']:
+            if data_type == SERIES:
+                try:
+                    tv_dl.get_ytdlp_season_metadata(data["season"], video_url=data['source_url'])
+                    
+                except Exception as e:
+                    print(f"Error recieving ytdlp metadata: {e}")            
+
+        if data["tmdb_id"]:
+            if data_type == SERIES:
+                try:
+                    tv_dl.get_tmdb_season_metadata(data["tmdb_id"], data["season"])
+                    
+                except Exception as e:
+                    print(f"Error recieving tmdb metadata: {e}")
+
+            if data_type == MOVIES:
+                try:
+                    tv_dl.get_tmdb_movie_metadata(data["tmdb_id"])
+                    
+                except Exception as e:
+                    print(f"Error recieving tmdb metadata: {e}")                
+        
+        if data_type == SERIES:
             total_episodes = tv_dl.get_season_metadata(data)
             data.update(
                 {
@@ -248,12 +243,12 @@ class TVDatabase:
             if data["id"] and self.check_if_id_exists(data_type, data["id"]):
                 new_id = data.pop("id")
                 self.update_row(data_type, data, id = new_id)
-                print(f"Oppdatert program: {data['name']}")
+                print(f"Updated program: {data['name']}")
 
             else:
                 data.pop("id", None)
                 self.insert_row(data_type, data)
-                print(f"Lagt til nytt program: {data['name']}")
+                print(f"Added new program: {data['name']}")
             
             return jsonify({"status": "success"})
             
@@ -308,7 +303,7 @@ class TVDatabase:
             conditions.append(f'e.status IN ("{STATUS_PENDING}", "{STATUS_FAILED}", "{STATUS_MISSING}", "{STATUS_DOWNLOADING}", "{STATUS_DELETED}")')
 
         if local:
-            conditions.append('s.source = "Local"')
+            conditions.append(f's.source = {SOURCE_LOCAL}')
 
         query = f'''
             SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
@@ -381,7 +376,7 @@ class TVDatabase:
         query = '''
             SELECT e.*, s.directory FROM episodes as e
             JOIN series as s ON e.series_id = s.id
-            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL
+            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL AND e.episode_number = s.episode - 1
         '''
 
         #  AND last_aired <= DATE('now', '-7 days')
@@ -392,9 +387,9 @@ class TVDatabase:
         self.edit_cell("episodes", episode_id, "keep_next_week", keep)
 
         if keep:
-            print(f"Episode ID {episode_id} markert for bevaring.")
+            print(f"Episode ID {episode_id} marked for keeping.")
         else:
-            print(f"Episode ID {episode_id} markert for sletting.")
+            print(f"Episode ID {episode_id} marked for deletion.")
 
     def get_kept_episodes(self):
         query = '''
@@ -415,25 +410,16 @@ class TVDatabase:
         result = self._execute_query(query, (series_id, season, episode))
         return result[0] if result else None
     
-    def update_episode_status(self, episode_id, status, **kwargs):
-        """
-        Oppdater status for en episode
-        
-        Args:
-            episode_id: ID for episoden
-            status: Ny status ('pending', 'downloading', 'available', 'failed')
-            **kwargs: Andre felter som skal oppdateres (f.eks. file_size, download_date)
-        """
+    def update_media_status(self, file_id, media_type, status, **kwargs):
         updates = {"status": status}
-        
-        # Legg til download_date hvis status er 'available'
-        if status == "available" and "download_date" not in kwargs:
-            updates["download_date"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
         updates.update(kwargs)
-        
-        self.edit_row_by_id("episodes", episode_id, **updates)
-        print(f"Episode ID {episode_id}: Status oppdatert til '{status}'")
+
+        if media_type == SERIES:
+            self.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
+            print(f"Episode ID {file_id}: Status oppdatert til '{status}'")
+        elif media_type == MOVIES:
+            self.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
+            print(f"Movies ID {file_id}: Status oppdatert til '{status}'")
 
     #MOVIES TABLE OPERATIONS
 
@@ -441,10 +427,18 @@ class TVDatabase:
         query = 'SELECT * FROM movies ORDER BY name'
         return self._execute_query(query)
     
+    def get_available_movies(self):
+        query = f'''
+            SELECT m.* FROM movies m
+            WHERE status = "available"
+        '''
+        return self._execute_query(query)
+    
     def get_scheduled_movies(self):
         query = f'''
             SELECT m.* FROM movies m
             JOIN weekly_schedule ws ON m.id = ws.movie_id
+            WHERE m.status = "available"
         '''
         return self._execute_query(query)
     
@@ -485,16 +479,16 @@ class TVDatabase:
                         "start_time": data["start_time"]
                     }
 
-                    data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
-                    data["blocks"] = helper.calculate_time_blocks(data["duration"])
+                    data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
+                    data["blocks"] = calculate_time_blocks(data["duration"])
                     data.pop("duration", None)
 
                     self.edit_row_by_conditions("weekly_schedule", conditions, **data)
 
                     print(f"Endret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
             else:
-                data["end_time"] = helper._calculate_end_time(data["start_time"], data["duration"])
-                data["blocks"] = helper.calculate_time_blocks(data["duration"])
+                data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
+                data["blocks"] = calculate_time_blocks(data["duration"])
                 data.pop("duration", None)
                 self.insert_row("weekly_schedule", data)
 
@@ -650,6 +644,15 @@ class TVDatabase:
         '''
 
         self._execute_query(query,(episode_id,id))
+
+    def update_movie_link(self, id, movie_id):
+        query = '''
+            UPDATE weekly_schedule
+            SET movie_id = ?
+            WHERE id = ?
+        '''
+
+        self._execute_query(query,(movie_id,id))
     
 
 
@@ -658,13 +661,44 @@ class TVDatabase:
 
     #AIRING OPERATIONS
 
-    def get_air_schedule(self):
+    def get_air_schedule_episodes(self): #For episodes
         query = '''
             SELECT t1.*, s.duration, s.directory, s.description as series_description FROM series s
             LEFT JOIN (SELECT ws.*, e.filename, e.episode_number, e.description as episode_description, e.last_aired, e.status FROM weekly_schedule as ws RIGHT JOIN episodes e ON ws.episode_id = e.id) as t1 ON t1.series_id = s.id
         '''
 
         return self._execute_query(query)
+    
+    def get_air_schedule(self):
+        query = '''
+            SELECT 
+                ws.id,
+                ws.name,
+                ws.day_of_week,
+                ws.start_time,
+                ws.end_time,
+                ws.is_rerun,
+                COALESCE(e.filename, m.filename) as filename,
+                COALESCE(e.description, m.description) as description,
+                COALESCE(e.status, m.status) as status,
+                COALESCE(m.duration, s.duration) as duration,
+                COALESCE(m.last_aired, e.last_aired) as last_aired,
+                e.episode_number,
+                COALESCE(m.directory, s.directory) as directory,
+                COALESCE(s.description, m.description) as program_description,
+                CASE 
+                    WHEN m.id IS NOT NULL THEN 'movies'
+                    WHEN e.id IS NOT NULL THEN 'series'
+                END as content_type
+            FROM weekly_schedule ws
+            LEFT JOIN movies m ON ws.movie_id = m.id
+            LEFT JOIN episodes e ON ws.episode_id = e.id
+            LEFT JOIN series s ON e.series_id = s.id
+        '''
+
+        return self._execute_query(query)
+
+
 
     def get_current_program(self, time = datetime.now(), daily=False):
         schedule = self.get_air_schedule()
@@ -684,7 +718,7 @@ class TVDatabase:
                 end_time = datetime.strptime(program['end_time'], "%H:%M").time() if program['end_time'] else None
                 if not end_time:
                     duration_minutes = program['duration'] if program['duration'] else 30
-                    end_time = helper._calculate_end_time(program['start_time'], duration_minutes)
+                    end_time = calculate_end_time(program['start_time'], duration_minutes)
 
                 # Normal program within same day
                 if start_time <= current_time < end_time:
@@ -712,7 +746,6 @@ class TVDatabase:
 
     def edit_cell(self, table, id, column, new_value):
         self._execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
-        print(f"Oppdatert {table} ID {id}: satt {column} til {new_value}")
     
     def check_if_id_exists(self,table, key):
         query = f'''
@@ -804,4 +837,10 @@ class TVDatabase:
 if __name__ == "__main__":
     tvdb = TVDatabase()
     
-    tvdb.setup_database()
+    if len(sys.argv)>1:
+        operation = sys.argv[1]
+        if operation == "setup":
+            tvdb.setup_database()
+
+        if operation == "reset":
+            tvdb.reset_database()

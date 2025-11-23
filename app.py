@@ -2,22 +2,19 @@ from flask import Flask, jsonify, render_template, send_from_directory, request
 from datetime import datetime, timedelta
 from TVstreamer import TVStreamManager
 from TVdatabase import TVDatabase
-from TVdownloader import TVDownloader
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
+from helper import calculate_time_blocks
+from TVconstants import *
 import os
 import sys
-from helper import calculate_time_blocks
 import TVtracker
 import logging
 
 app = Flask(__name__)
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
-tv_dl = TVDownloader()
 
 logging.basicConfig(
     #filename='/var/log/lineartv.log',
@@ -121,9 +118,9 @@ def add_program():
 
 # ============ API ROUTES ============
 
-@app.route('/video/<directory>/<filename>')
-def serve_video(directory, filename):
-    return send_from_directory(f'downloads/{directory}', filename)
+@app.route('/video/<content_type>/<directory>/<filename>')
+def serve_video(content_type, directory, filename):
+    return send_from_directory(f'downloads/{content_type}/{directory}', filename)
 
 @app.route('/api/current')
 def current_program():

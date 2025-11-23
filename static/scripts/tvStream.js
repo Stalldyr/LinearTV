@@ -30,14 +30,22 @@ function updateProgram() {
                     document.getElementById('programTime').innerText = "";
                     document.getElementById('programDescription').innerText = program.description;
                 } else {
-                    player.src = `/video/${program.directory}/${program.filename}`;
+                    player.src = `/video/${program.content_type}/${program.directory}/${program.filename}`;
                     document.getElementById('programTitle').innerText = program.name;
                     document.getElementById('programTime').innerText = `${program.start_time} - ${program.end_time}`;
                     if (program.episode_description){
-                        document.getElementById('programDescription').innerText = program.episode_description;
+                        if (program.episode_number){
+                            document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.episode_description}`;
+                        } else {
+                            document.getElementById('programDescription').innerText = program.episode_description;
+                        }
                     } else {
-                        document.getElementById('programDescription').innerText = program.series_description;
+                        document.getElementById('programDescription').innerText = program.program_description;
                     }
+                }
+
+                if (program.is_rerun){
+                    document.getElementById('programTitle').innerText += " (R)"
                 }
             }
         });
