@@ -270,8 +270,6 @@ function saveSchedule() {
     } else {
         movie_id = document.getElementById('scheduleTitleSelect').options[document.getElementById('scheduleTitleSelect').selectedIndex].getAttribute('id')
     }
-
-
     
     const data = {
         day_of_week: currentDay,
@@ -309,7 +307,7 @@ function saveSchedule() {
         });
     }
 
-//Saves ... to database
+//Saves program to database
 function saveProgram() {
     const programSelect = document.getElementById('programTitleSelect');
     const selectedOption = programSelect.options[programSelect.selectedIndex];

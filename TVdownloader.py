@@ -9,7 +9,7 @@ import logging
 from TVconstants import *
 
 class TVDownloader:
-    def __init__(self, directory, media_type, download_path="downloads", series_path=SERIES, movies_path=MOVIES):
+    def __init__(self, directory, media_type, download_path="downloads", series_path=TYPE_SERIES, movies_path=TYPE_MOVIES):
         self.ydl_opts = {}
         self.tv_db = TVDatabase()
 
@@ -22,9 +22,9 @@ class TVDownloader:
         self.movies_path = create_path(download_path, movies_path)
         self.path_setup()
 
-        if media_type == SERIES:
+        if media_type == TYPE_SERIES:
             self.program_dir = create_path(download_path, series_path, directory)
-        elif media_type == MOVIES:
+        elif media_type == TYPE_MOVIES:
             self.program_dir = create_path(download_path, movies_path, directory)
         else:
             print("Not a valid media type")
@@ -238,9 +238,9 @@ class TVDownloader:
             if verify_path(filepath):
                 file_info = self.get_file_info(filename)
 
-                if self.media_type == SERIES:
+                if self.media_type == TYPE_SERIES:
                     self.tv_db.edit_row_by_id(TABLE_EPISODES, id, **file_info)
-                elif self.media_type == MOVIES:
+                elif self.media_type == TYPE_MOVIES:
                     self.tv_db.edit_row_by_id(TABLE_MOVIES, id, **file_info)
 
                 self.tv_db.update_media_status(id, self.media_type, STATUS_AVAILABLE)
@@ -297,9 +297,9 @@ class TVDownloader:
         filepath = create_path(self.program_dir, filename)
 
         file_info = self.get_file_info(filename)
-        if self.media_type == SERIES:
+        if self.media_type == TYPE_SERIES:
             self.tv_db.edit_row_by_id(TABLE_EPISODES, file_id, **file_info)
-        elif self.media_type == MOVIES:
+        elif self.media_type == TYPE_MOVIES:
             self.tv_db.edit_row_by_id(TABLE_MOVIES, file_id, **file_info)
 
         success = verify_path(filepath)

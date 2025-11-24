@@ -209,7 +209,7 @@ class TVDatabase:
         tv_dl = TVdownloader.TVDownloader(directory, data_type)
         
         if data['source_url']:
-            if data_type == SERIES:
+            if data_type == TYPE_SERIES:
                 try:
                     tv_dl.get_ytdlp_season_metadata(data["season"], video_url=data['source_url'])
                     
@@ -217,21 +217,21 @@ class TVDatabase:
                     print(f"Error recieving ytdlp metadata: {e}")            
 
         if data["tmdb_id"]:
-            if data_type == SERIES:
+            if data_type == TYPE_SERIES:
                 try:
                     tv_dl.get_tmdb_season_metadata(data["tmdb_id"], data["season"])
                     
                 except Exception as e:
                     print(f"Error recieving tmdb metadata: {e}")
 
-            if data_type == MOVIES:
+            if data_type == TYPE_MOVIES:
                 try:
                     tv_dl.get_tmdb_movie_metadata(data["tmdb_id"])
                     
                 except Exception as e:
                     print(f"Error recieving tmdb metadata: {e}")                
         
-        if data_type == SERIES:
+        if data_type == TYPE_SERIES:
             total_episodes = tv_dl.get_season_metadata(data)
             data.update(
                 {
@@ -309,7 +309,7 @@ class TVDatabase:
             SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE {" AND ".join(conditions)} AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
             ORDER BY series_name, e.season_number, e.episode_number
         '''
 
@@ -414,10 +414,10 @@ class TVDatabase:
         updates = {"status": status}
         updates.update(kwargs)
 
-        if media_type == SERIES:
+        if media_type == TYPE_SERIES:
             self.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
             print(f"Episode ID {file_id}: Status oppdatert til '{status}'")
-        elif media_type == MOVIES:
+        elif media_type == TYPE_MOVIES:
             self.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
             print(f"Movies ID {file_id}: Status oppdatert til '{status}'")
 
@@ -660,14 +660,6 @@ class TVDatabase:
 
 
     #AIRING OPERATIONS
-
-    def get_air_schedule_episodes(self): #For episodes
-        query = '''
-            SELECT t1.*, s.duration, s.directory, s.description as series_description FROM series s
-            LEFT JOIN (SELECT ws.*, e.filename, e.episode_number, e.description as episode_description, e.last_aired, e.status FROM weekly_schedule as ws RIGHT JOIN episodes e ON ws.episode_id = e.id) as t1 ON t1.series_id = s.id
-        '''
-
-        return self._execute_query(query)
     
     def get_air_schedule(self):
         query = '''

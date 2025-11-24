@@ -12,8 +12,6 @@ STATUS_DOWNLOADING = 'downloading'
 STATUS_MISSING = 'missing'
 
 #Media types
-SERIES = 'series'
-MOVIES = 'movies'
 TYPE_SERIES = 'series'
 TYPE_MOVIES = 'movies'
 

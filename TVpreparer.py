@@ -39,7 +39,7 @@ class TVPreparer():
             if not e['last_aired']:
                 continue
 
-            series_dl = TVDownloader(e["directory"], SERIES)
+            series_dl = TVDownloader(e["directory"], TYPE_SERIES)
             series_dl.delete_media(e["id"], e["filename"])
 
         obsolete_movies = self.tv_db.get_obsolete_movies()
@@ -47,14 +47,14 @@ class TVPreparer():
             if not m['last_aired']:
                 continue
 
-            series_dl = TVDownloader(m["directory"], MOVIES)
+            series_dl = TVDownloader(m["directory"], TYPE_MOVIES)
             series_dl.delete_media(m["id"], m["filename"])
 
     def create_pending_episodes(self):
         series_list = self.tv_db.get_all_series()
 
         for series in series_list:
-            series_dl = TVDownloader(series["directory"], SERIES)
+            series_dl = TVDownloader(series["directory"], TYPE_SERIES)
             if series["source_url"]:
                 try:
                     yt_dlp_data = series_dl.get_ytdlp_season_metadata(series["season"])
@@ -105,11 +105,14 @@ class TVPreparer():
     def download_weekly_schedule(self):
         pending_episodes = self.tv_db.get_pending_episodes()
 
+        if not pending_episodes:
+            print("All episodes are already downloaded")
+
         for e in pending_episodes:
             if e["source"] == SOURCE_LOCAL:
                 continue
 
-            series_dl = TVDownloader(e["directory"], SERIES)
+            series_dl = TVDownloader(e["directory"], TYPE_SERIES)
 
             filename = create_episode_file_name(e["directory"], e["season_number"], e["episode_number"])
             
@@ -131,7 +134,7 @@ class TVPreparer():
             
             filename = create_movie_file_name(m["directory"])
 
-            movie_dl = TVDownloader(m["directory"], MOVIES)
+            movie_dl = TVDownloader(m["directory"], TYPE_MOVIES)
             movie_dl.download_movie(m["id"], m["source_url"], filename)
             
             time.sleep(1)
@@ -145,7 +148,7 @@ class TVPreparer():
             else:
                 filename = create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
 
-            series_dl = TVDownloader(e["directory"], SERIES)
+            series_dl = TVDownloader(e["directory"], TYPE_SERIES)
             series_dl.verify_local_file(e["id"], filename)
 
         movies = self.tv_db.get_scheduled_movies()
@@ -156,7 +159,7 @@ class TVPreparer():
             else:
                 filename = create_movie_file_name(m["directory"])
 
-            movies_dl = TVDownloader(m["directory"], MOVIES)
+            movies_dl = TVDownloader(m["directory"], TYPE_MOVIES)
             movies_dl.verify_local_file(m["id"], filename)
 
     def link_programs_to_schedule(self):
@@ -210,11 +213,11 @@ if __name__ == "__main__":
         if operation == "increment":
             prep.increment_episodes()
 
-        if operation == "delete":
-            prep.cleanup_obsolete_media()
-
-        if operation == "keep":
+        elif operation == "keep":
             prep.update_keeping_status()
+
+        elif operation == "delete":
+            prep.cleanup_obsolete_media()
 
         elif operation == "pending":
             prep.create_pending_episodes()
