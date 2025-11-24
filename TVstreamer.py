@@ -1,6 +1,7 @@
 import threading
 from datetime import datetime, timedelta, time as time_class
 from TVdatabase import TVDatabase
+from TVconstants import *
 
 class TVStreamManager:
     def __init__(self, time=None):
@@ -61,7 +62,10 @@ class TVStreamManager:
     
     def update_air_date(self, program):
         if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
-            self.tv_db.edit_cell("episodes", program["episode_id"], "last_aired", datetime.now().date())
+            if program["content_type"] == TYPE_SERIES:
+                self.tv_db.edit_cell("episodes", program["media_id"], "last_aired", datetime.now().date())
+        if program["content_type"] == TYPE_MOVIES:
+                self.tv_db.edit_cell("movies", program["media_id"], "last_aired", datetime.now().date())
 
     def start_monitoring(self):
         #Checks the current program and update the status

@@ -673,6 +673,7 @@ class TVDatabase:
                 e.episode_number,
                 COALESCE(m.directory, s.directory) as directory,
                 COALESCE(s.description, m.description) as program_description,
+                COALESCE(e.id, m.id) as media_id,
                 CASE 
                     WHEN m.id IS NOT NULL THEN 'movies'
                     WHEN e.id IS NOT NULL THEN 'series'
