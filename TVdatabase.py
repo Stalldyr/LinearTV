@@ -336,7 +336,7 @@ class TVDatabase:
             SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            WHERE e.season_number = s.sean AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY series_name, e.season_number, e.episode_number
         '''
         return self._execute_query(query)
@@ -385,11 +385,6 @@ class TVDatabase:
     
     def update_episode_keeping_status(self, episode_id, keep:bool):
         self.edit_cell("episodes", episode_id, "keep_next_week", keep)
-
-        if keep:
-            print(f"Episode ID {episode_id} marked for keeping.")
-        else:
-            print(f"Episode ID {episode_id} marked for deletion.")
 
     def get_kept_episodes(self):
         query = '''

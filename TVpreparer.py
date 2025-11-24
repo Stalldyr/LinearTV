@@ -31,6 +31,7 @@ class TVPreparer():
 
         for episode in kept_files:
             self.tv_db.update_episode_keeping_status(episode['id'], False)
+            print("marked for deletion")
 
     def cleanup_obsolete_media(self):
         obsolete_episodes = self.tv_db.get_obsolete_episodes()
