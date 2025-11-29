@@ -433,7 +433,6 @@ class TVDatabase:
         query = f'''
             SELECT m.* FROM movies m
             JOIN weekly_schedule ws ON m.id = ws.movie_id
-            WHERE m.status = "available"
         '''
         return self._execute_query(query)
     
