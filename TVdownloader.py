@@ -310,12 +310,12 @@ class TVDownloader:
 
         if success:
             print(f"File found: {filename}")
-            print(f"Checking file integrity.")
-            test = subprocess.run(["ffmpeg", "-v", "error", "-i", filepath, "-f", "null", "-"],
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            print(test.stdout)
+            #print(f"Checking file integrity.")
+            #test = subprocess.run(["ffmpeg", "-v", "error", "-i", filepath, "-f", "null", "-"],
+                #stderr=subprocess.PIPE,
+                #text=True
+            #)
+            #print(test.stdout)
             self.tv_db.update_media_status(file_id, self.media_type, STATUS_AVAILABLE)
         else:
             print(f"File is missing: {filename}")
