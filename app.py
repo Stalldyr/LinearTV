@@ -34,12 +34,13 @@ def index():
 #TV streaming page
 @app.route('/tv')
 def tv():
-    #episode_info = tv_stream.current_stream
-    #episode_id = episode_info.get("id", None)
-    #ip_address = request.remote_addr
+    episode_info = tv_stream.current_stream
+    if episode_info:
+        episode_id = episode_info.get("id", None)
+        ip_address = request.remote_addr
 
-    #if episode_id:
-    #    TVtracker.log_view(episode_id,ip_address)
+        if episode_id:
+            TVtracker.log_view(episode_id,ip_address)
 
     return render_template('tv.html')
 
@@ -162,12 +163,13 @@ def get_obsolete_episodes():
 
 @app.route('/api/traffic', methods=['POST'])
 def get_traffic():
-    #seconds = request.get_json()["seconds"]
-    #episode_id = tv_stream.current_stream.get("id", None)
-    #ip_address = request.remote_addr
+    seconds = request.get_json()["seconds"]
+    if tv_stream.current_stream:
+        episode_id = tv_stream.current_stream.get("id", None)
+        ip_address = request.remote_addr
 
-    #if episode_id:
-    #    TVtracker.update_time(seconds, episode_id, ip_address)
+        if episode_id:
+            TVtracker.update_time(seconds, episode_id, ip_address)
     
     return {'status': 'ok'}
 

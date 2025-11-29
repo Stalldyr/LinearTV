@@ -7,6 +7,7 @@ import sys
 import logging
 from TVconstants import *
 
+
 logging.basicConfig(level=logging.DEBUG)
 
 class TVPreparer():

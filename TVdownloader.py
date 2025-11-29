@@ -7,6 +7,9 @@ import tmdbsimple as tmdb
 from helper import create_path, verify_path, create_episode_file_name
 import logging
 from TVconstants import *
+import ffmpeg 
+import subprocess
+
 
 class TVDownloader:
     def __init__(self, directory, media_type, download_path="downloads", series_path=TYPE_SERIES, movies_path=TYPE_MOVIES):
@@ -303,8 +306,16 @@ class TVDownloader:
             self.tv_db.edit_row_by_id(TABLE_MOVIES, file_id, **file_info)
 
         success = verify_path(filepath)
+
+
         if success:
             print(f"File found: {filename}")
+            print(f"Checking file integrity.")
+            test = subprocess.run(["ffmpeg", "-v", "error", "-i", filepath, "-f", "null", "-"],
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            print(test.stdout)
             self.tv_db.update_media_status(file_id, self.media_type, STATUS_AVAILABLE)
         else:
             print(f"File is missing: {filename}")
