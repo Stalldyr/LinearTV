@@ -366,7 +366,8 @@ class TVDatabase:
     def get_available_episodes_by_id(self, series_id):
         query = '''
             SELECT * FROM episodes
-            WHERE status = 'available' AND series_id = ?
+            JOIN series as s ON e.series_id = s.id
+            WHERE status = 'available' AND series_id = ? AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY series_id, season_number, episode_number
         '''
 
@@ -376,7 +377,7 @@ class TVDatabase:
         query = '''
             SELECT e.*, s.directory FROM episodes as e
             JOIN series as s ON e.series_id = s.id
-            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL AND e.episode_number = s.episode - 1
+            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL AND e.episode_number BETWEEN s.episode - s.count AND s.episode - 1
         '''
 
         #  AND last_aired <= DATE('now', '-7 days')

@@ -32,9 +32,9 @@ class TVPreparer():
 
         for episode in kept_files:
             self.tv_db.update_episode_keeping_status(episode['id'], False)
-            print("marked for deletion")
+            print(f"{episode["filename"]} marked for deletion")
 
-    def cleanup_obsolete_media(self):
+    def cleanup_obsolete_episodes(self):
         obsolete_episodes = self.tv_db.get_obsolete_episodes()
 
         for e in obsolete_episodes:
@@ -44,6 +44,7 @@ class TVPreparer():
             series_dl = TVDownloader(e["directory"], TYPE_SERIES)
             series_dl.delete_media(e["id"], e["filename"])
 
+    def delete_obsolete_movies(self):
         obsolete_movies = self.tv_db.get_obsolete_movies()
         for m in obsolete_movies:
             if not m['last_aired']:
@@ -195,7 +196,8 @@ class TVPreparer():
             for idx, original in enumerate(originals):
                 episode_idx = idx + episode_offset
                 if episode_idx < len(available_episodes):
-                    episode_id = available_episodes[episode_idx]['id']
+                    filename = create_episode_file_name(entry["directory"], entry["directory"], episode_idx)
+                    episode_id = available_episodes.index(filename)['id']
                     self.tv_db.update_episode_links(original['id'], episode_id)
                     print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
 
@@ -215,11 +217,11 @@ if __name__ == "__main__":
         if operation == "increment":
             prep.increment_episodes()
 
+        elif operation == "delete":
+            prep.cleanup_obsolete_episodes()
+
         elif operation == "keep":
             prep.update_keeping_status()
-
-        elif operation == "delete":
-            prep.cleanup_obsolete_media()
 
         elif operation == "pending":
             prep.create_pending_episodes()
@@ -234,7 +236,7 @@ if __name__ == "__main__":
             prep.link_programs_to_schedule()
 
         elif operation == "all":
-            prep.cleanup_obsolete_media()
+            prep.cleanup_obsolete_episodes()
             prep.update_keeping_status()
             prep.create_pending_episodes()
             prep.download_weekly_schedule()
