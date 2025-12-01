@@ -196,8 +196,7 @@ class TVPreparer():
             for idx, original in enumerate(originals):
                 episode_idx = idx + episode_offset
                 if episode_idx < len(available_episodes):
-                    filename = create_episode_file_name(entry["directory"], entry["directory"], episode_idx)
-                    episode_id = available_episodes.index(filename)['id']
+                    episode_id = available_episodes[episode_idx]['id']
                     self.tv_db.update_episode_links(original['id'], episode_id)
                     print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
 
