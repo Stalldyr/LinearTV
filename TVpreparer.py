@@ -151,6 +151,8 @@ class TVPreparer():
             else:
                 filename = create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
 
+            print(e)
+
             series_dl = TVDownloader(e["directory"], TYPE_SERIES)
             series_dl.verify_local_file(e["id"], filename)
 
@@ -170,7 +172,9 @@ class TVPreparer():
 
         for program in series:
             entry = self.tv_db.get_program_schedule(program["id"])
+            print(entry)
             available_episodes = self.tv_db.get_available_episodes_by_id(program["id"])
+            print(available_episodes)
             
             if not entry:
                 continue
@@ -197,6 +201,7 @@ class TVPreparer():
                 episode_idx = idx + episode_offset
                 if episode_idx < len(available_episodes):
                     episode_id = available_episodes[episode_idx]['id']
+                    print(episode_id)
                     self.tv_db.update_episode_links(original['id'], episode_id)
                     print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
 
