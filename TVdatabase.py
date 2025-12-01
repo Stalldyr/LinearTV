@@ -365,7 +365,7 @@ class TVDatabase:
 
     def get_available_episodes_by_id(self, series_id):
         query = '''
-            SELECT * FROM episodes
+            SELECT * FROM episodes e
             JOIN series as s ON e.series_id = s.id
             WHERE status = 'available' AND series_id = ? AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY series_id, season_number, episode_number
