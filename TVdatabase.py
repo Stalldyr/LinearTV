@@ -377,7 +377,7 @@ class TVDatabase:
         query = '''
             SELECT e.*, s.directory FROM episodes as e
             JOIN series as s ON e.series_id = s.id
-            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL AND e.episode_number BETWEEN s.episode - s.count AND s.episode - 1
+            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL AND e.episode_number < s.episode
         '''
 
         #  AND last_aired <= DATE('now', '-7 days')
