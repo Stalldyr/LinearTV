@@ -18,6 +18,7 @@ cryptography==46.0.3
 cssbeautifier==1.15.4
 dacite==1.9.2
 djlint==1.36.4
+dotenv==0.9.9
 EditorConfig==0.17.1
 ffmpeg-python==0.2.0
 Flask==3.1.1
@@ -58,6 +59,7 @@ pytest==8.4.1
 pytest-cov==6.2.1
 python-crontab==3.3.0
 python-dateutil==2.9.0.post0
+python-dotenv==1.2.1
 python-engineio==4.12.3
 python-slugify==8.0.4
 python-socketio==5.14.1

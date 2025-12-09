@@ -6,6 +6,7 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
 from helper import calculate_time_blocks
 from TVconstants import *
+from dotenv import load_dotenv
 import os
 import sys
 import TVtracker
@@ -76,6 +77,7 @@ def serve_gamja(path='index.html'):
     return send_from_directory(os.path.join(BASE_DIR, 'gamja'), path)
 
 # ============ ADMIN PAGES ============
+
 auth = HTTPBasicAuth()
 ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$Rk2fJmaIfyGgnuLN$a50e8a6e564506cb60563386a62c48392f489885298ae1bcb92b1f3f7b24008986586df534616d495aff6f36db2339c995804fa554c004e99c6b6fbe93ae207f"
 

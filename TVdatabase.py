@@ -1,12 +1,11 @@
-import sqlite3
 import os
 from flask import jsonify
-from contextlib import contextmanager
 from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
 import sys
 from helper import calculate_time_blocks, create_path_friendly_name, calculate_end_time
 from TVconstants import *
+from SQLexecute import SQLexecute
 
 class TVDatabase:
     def __init__(self, db_path = 'data/tv.db', test_time=None):
@@ -17,86 +16,15 @@ class TVDatabase:
 
         if not os.path.exists(self.db_path):
             self.setup_database()
-
-    #EXECUTE QUERY
-
-    @contextmanager
-    def get_connection(self, row_factory):
-        """
-        Context manager for database connections.
-        Ensures proper connection handling and cleanup.
-        """
-        conn = None
-        try:
-            conn = sqlite3.connect(self.db_path)
-            if row_factory:
-                conn.row_factory = sqlite3.Row
-            yield conn
-        except sqlite3.Error as e:
-            if conn:
-                conn.rollback()
-            print(f"Database error: {e}")
-            raise
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            print(f"Unexpected error: {e}")
-            raise
-        finally:
-            if conn:
-                conn.close()
-
-
-    def _execute_query(self, query, params=None, fetch_one=False, fetch_all=True, output = "dict"):
-        """
-        Universal query executor with error handling.
         
-        Args:
-            query: SQL query string
-            params: Parameters for the query (optional)
-            fetch_one: Return single row instead of all rows
-            fetch_all: Whether to fetch results (False for INSERT/UPDATE/DELETE)
-        
-        Returns:
-            Query results or None for non-SELECT queries
-        """
-
-        row_factory = False
-        if output == "dict" or output == "rows":
-            row_factory = True
-
-
-        with self.get_connection(row_factory=row_factory) as conn:
-
-            cursor = conn.cursor()
-
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            
-            if fetch_all and not fetch_one:
-                result = cursor.fetchall()
-            elif fetch_one:
-                result = cursor.fetchone()
-            else:
-                result = cursor.rowcount  # For INSERT/UPDATE/DELETE operations
-            
-            conn.commit()
-
-            if output == "dict":
-                return [dict(zip(row.keys(), row)) for row in result] 
-
-            else:
-                return result
-
+        self.execute_query = SQLexecute(db_path).execute_query
 
     #SETUP
 
     def setup_database(self):
         os.makedirs('data', exist_ok=True)
                 
-        self._execute_query('''
+        self.execute_query('''
             CREATE TABLE IF NOT EXISTS series (
                 id INTEGER PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
@@ -116,7 +44,7 @@ class TVDatabase:
             )
         ''')
         
-        self._execute_query('''
+        self.execute_query('''
             CREATE TABLE IF NOT EXISTS episodes (
                 id INTEGER PRIMARY KEY,
                 series_id INTEGER REFERENCES series(id),
@@ -137,7 +65,7 @@ class TVDatabase:
             )
         ''')
 
-        self._execute_query('''
+        self.execute_query('''
             CREATE TABLE IF NOT EXISTS movies (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -159,7 +87,7 @@ class TVDatabase:
             )                                    
         ''')
 
-        self._execute_query('''
+        self.execute_query('''
             CREATE TABLE IF NOT EXISTS weekly_schedule (
                 id INTEGER PRIMARY KEY,
                 content_type TEXT NOT NULL,
@@ -258,7 +186,7 @@ class TVDatabase:
             
     def get_all_series(self):
         query = 'SELECT * FROM series ORDER BY name'
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     #02 EPISODE TABLE OPERATIONS
 
@@ -278,7 +206,7 @@ class TVDatabase:
             SELECT status FROM episodes
             WHERE series_id = ? AND season_number = ? AND episode_number = ?
         ''' 
-        result = self._execute_query(query, (series_id, season, episode))
+        result = self.execute_query(query, (series_id, season, episode))
         
         return result[0]['status'] if result else None
     
@@ -313,7 +241,7 @@ class TVDatabase:
             ORDER BY series_name, e.season_number, e.episode_number
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_pending_episodes_by_id(self, series_id, episode, count, strict = False):
         if strict:
@@ -329,7 +257,7 @@ class TVDatabase:
             ORDER BY e.season_number, e.episode_number
         '''
 
-        return self._execute_query(query, (series_id, episode, int(episode) + int(count) - 1))
+        return self.execute_query(query, (series_id, episode, int(episode) + int(count) - 1))
     
     def get_scheduled_episodes(self):
         query = f'''
@@ -339,7 +267,7 @@ class TVDatabase:
             WHERE e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY series_name, e.season_number, e.episode_number
         '''
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_available_episodes(self):
         query = '''
@@ -350,7 +278,7 @@ class TVDatabase:
             ORDER BY e.series_id, e.season_number, e.episode_number
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_nonavailable_episodes(self):
         query = '''
@@ -361,48 +289,68 @@ class TVDatabase:
             ORDER BY e.series_id, e.season_number, e.episode_number
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
 
-    def get_available_episodes_by_id(self, series_id):
+    def get_scheduled_episodes_by_id(self, series_id):
         query = '''
-            SELECT * FROM episodes e
-            WHERE status = 'available' AND series_id = ? 
-            ORDER BY season_number, episode_number
+            SELECT e.* FROM episodes e
+            JOIN series s ON e.series_id = s.id
+            WHERE series_id = ? AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            ORDER BY e.season_number, e.episode_number
         '''
 
-        return self._execute_query(query, (series_id,))
+        return self.execute_query(query, (series_id,))
     
     def get_obsolete_episodes(self):
         query = '''
             SELECT e.*, s.directory FROM episodes as e
             JOIN series as s ON e.series_id = s.id
-            WHERE keep_next_week = 0 AND status = 'available' AND last_aired IS NOT NULL AND e.episode_number < s.episode
+            WHERE keep_next_week = 0 
+                AND status = 'available' 
+                AND last_aired IS NOT NULL 
+                AND (
+                    e.season_number < s.season
+                    OR (e.season_number = s.season AND e.episode_number < s.episode)
+                )
         '''
-
-        #  AND last_aired <= DATE('now', '-7 days')
         
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def update_episode_keeping_status(self, episode_id, keep:bool):
+        ''''
+            Sets if the episode to be kept or not
+
+            episode_id: The id of the episode
+            keep (boolean): Marks the episode for keeping (true) or deleting (false)
+        '''
+
         self.edit_cell("episodes", episode_id, "keep_next_week", keep)
 
     def get_kept_episodes(self):
         query = '''
-            SELECT * FROM episodes
-            WHERE keep_next_week = 1 AND status = 'available'
+            SELECT e.* FROM episodes as e
+            JOIN series s ON s.id = e.series_id
+            WHERE keep_next_week = 1 
+                AND status = 'available' 
+                AND (
+                    e.season_number < s.season
+                    OR (e.season_number = s.season AND e.episode_number < s.episode)
+                )
+
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
     
-    def get_episode_by_details(self, series_id, season, episode):
+    def get_episode_by_details(self, series_id: int, season:int , episode: int):
         """
-        Hent episode basert på series_id, season og episode number
+            Hent episode basert på series_id, season og episode number
         """
+
         query = '''
             SELECT * FROM episodes
             WHERE series_id = ? AND season_number = ? AND episode_number = ?
         '''
-        result = self._execute_query(query, (series_id, season, episode))
+        result = self.execute_query(query, (series_id, season, episode))
         return result[0] if result else None
     
     def update_media_status(self, file_id, media_type, status, **kwargs):
@@ -411,40 +359,38 @@ class TVDatabase:
 
         if media_type == TYPE_SERIES:
             self.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
-            print(f"Episode ID {file_id}: Status oppdatert til '{status}'")
+            #print(f"Episode ID {file_id}: Status oppdatert til '{status}'")
         elif media_type == TYPE_MOVIES:
             self.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
-            print(f"Movies ID {file_id}: Status oppdatert til '{status}'")
+            #print(f"Movies ID {file_id}: Status oppdatert til '{status}'")
 
     #MOVIES TABLE OPERATIONS
 
     def get_all_movies(self):
         query = 'SELECT * FROM movies ORDER BY name'
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_available_movies(self):
         query = f'''
             SELECT m.* FROM movies m
             WHERE status = "available"
         '''
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_scheduled_movies(self):
         query = f'''
             SELECT m.* FROM movies m
             JOIN weekly_schedule ws ON m.id = ws.movie_id
         '''
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_obsolete_movies(self):
         query = '''
             SELECT m.* FROM movies as m
             WHERE status = 'available' AND last_aired IS NOT NULL
         '''
-
-        #  AND last_aired <= DATE('now', '-7 days')
         
-        return self._execute_query(query)
+        return self.execute_query(query)
     
 
     #WEEKLY SCHEDULE
@@ -453,14 +399,14 @@ class TVDatabase:
         """Save new entry in the weekly schedule"""
 
         try:
-            existing = self._execute_query('''
+            existing = self.execute_query('''
                 SELECT id FROM weekly_schedule 
                 WHERE day_of_week = ? AND start_time = ?
             ''', (data['day_of_week'], data['start_time']))
 
             if existing:
                 if data["name"] == "[Ledig]":
-                    self._execute_query('''
+                    self.execute_query('''
                         DELETE FROM weekly_schedule
                         WHERE day_of_week = ? AND start_time = ?
                     ''', (data['day_of_week'], data['start_time']))
@@ -505,7 +451,7 @@ class TVDatabase:
             GROUP BY series_id
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def update_episode_count(self):
         query = '''
@@ -517,7 +463,7 @@ class TVDatabase:
             );
         '''
 
-        self._execute_query(query)
+        self.execute_query(query)
 
     def get_daily_schedule(self):
         now = datetime.now()
@@ -534,7 +480,7 @@ class TVDatabase:
             ORDER BY start_time
         '''
 
-        return self._execute_query(query,(current_day,))
+        return self.execute_query(query,(current_day,))
     
     def get_weekly_schedule(self):
         #Get all scheduled shows
@@ -543,7 +489,7 @@ class TVDatabase:
             ORDER BY day_of_week, start_time
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def get_weekly_schedule_with_episode(self):
         query = '''
@@ -552,17 +498,17 @@ class TVDatabase:
             ORDER BY ws.day_of_week, ws.start_time
         '''
         
-        return self._execute_query(query)
+        return self.execute_query(query)
         
 
-    def get_program_schedule(self, series_id):
+    def get_program_schedule_by_id(self, series_id):
         query = '''
             SELECT * FROM weekly_schedule
             WHERE series_id = ?
             ORDER BY day_of_week, start_time
         '''
 
-        return self._execute_query(query,(series_id,))
+        return self.execute_query(query,(series_id,))
     
     def get_scheduled_series(self):
         query = '''
@@ -571,7 +517,7 @@ class TVDatabase:
             ORDER BY s.name
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
 
     def check_if_rerun_before_new(self, series_id):
         query = '''
@@ -581,7 +527,7 @@ class TVDatabase:
             ORDER BY day_of_week, start_time
         '''
         
-        airings = self._execute_query(query, (series_id,))
+        airings = self.execute_query(query, (series_id,))
         
         if len(airings) < 2:
             return False  
@@ -606,7 +552,7 @@ class TVDatabase:
             WHERE c.count > 0
         '''
 
-        return self._execute_query(query)
+        return self.execute_query(query)
     
     def increment_episode(self, series_id):
         query = '''
@@ -615,9 +561,7 @@ class TVDatabase:
             WHERE id = ?
         '''
 
-        self._execute_query(query,(series_id,))
-        
-        print(f"Serie ID {series_id}: Episode nummer inkrementert.")
+        self.execute_query(query,(series_id,))
 
     def decrement_episode(self, series_id):
         query = '''
@@ -626,7 +570,7 @@ class TVDatabase:
             WHERE id = ?
         '''
 
-        self._execute_query(query,(series_id,))
+        self.execute_query(query,(series_id,))
         
         print(f"Serie ID {series_id}: Episode nummer dekrementert.")
 
@@ -637,7 +581,7 @@ class TVDatabase:
             WHERE id = ?
         '''
 
-        self._execute_query(query,(episode_id,id))
+        self.execute_query(query,(episode_id,id))
 
     def update_movie_link(self, id, movie_id):
         query = '''
@@ -646,13 +590,8 @@ class TVDatabase:
             WHERE id = ?
         '''
 
-        self._execute_query(query,(movie_id,id))
+        self.execute_query(query,(movie_id,id))
     
-
-
-
-
-
     #AIRING OPERATIONS
     
     def get_air_schedule(self):
@@ -683,9 +622,7 @@ class TVDatabase:
             LEFT JOIN series s ON e.series_id = s.id
         '''
 
-        return self._execute_query(query)
-
-
+        return self.execute_query(query)
 
     def get_current_program(self, time = datetime.now(), daily=False):
         schedule = self.get_air_schedule()
@@ -718,7 +655,7 @@ class TVDatabase:
 
     #Cell operations
     def get_most_recent_id(self, table):
-        table_id = self._execute_query(f'''
+        table_id = self.execute_query(f'''
             SELECT id 
             FROM {table} 
             ORDER BY id DESC 
@@ -728,11 +665,11 @@ class TVDatabase:
         return table_id[0][0]
     
     def get_cell(self, table, record_id, column):
-        result = self._execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
+        result = self.execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
         return result[0] if result else None
 
     def edit_cell(self, table, id, column, new_value):
-        self._execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
+        self.execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
     
     def check_if_id_exists(self,table, key):
         query = f'''
@@ -741,32 +678,32 @@ class TVDatabase:
             WHERE id = ?;
         '''
 
-        return self._execute_query(query,(key,),output=tuple)[0][0]
+        return self.execute_query(query,(key,),output=tuple)[0][0]
     
 
     #Column operations
     def add_column(self, table, col, type=None):
-        self._execute_query(f"""ALTER TABLE {table} ADD COLUMN {col} {type};""")
+        self.execute_query(f"""ALTER TABLE {table} ADD COLUMN {col} {type};""")
 
     def rename_column(self,table,col1,col2):
-        self._execute_query(f"""ALTER TABLE {table} RENAME COLUMN {col1} TO {col2};""")
+        self.execute_query(f"""ALTER TABLE {table} RENAME COLUMN {col1} TO {col2};""")
 
     def drop_column(self,table,col):
-        self._execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
+        self.execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
 
     def update_column(self, table, col, value):
-        self._execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
+        self.execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
 
     #Row operations
     def get_row_by_id(self, table, row_id):
-        result = self._execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
+        result = self.execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
         return result[0] if result else None
 
     def delete_row(self, table, id):
         if id == -1:
             id = "(SELECT MAX(id))"
 
-        self._execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
+        self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
         print(f"Slettet oppføring {id} i {table}")
 
     def edit_row_by_id(self, table, series_id, **kwargs):        
@@ -779,7 +716,7 @@ class TVDatabase:
         values.append(series_id)
         
         query = f"UPDATE {table} SET {', '.join(fields)} WHERE id = ?"
-        self._execute_query(query,values)
+        self.execute_query(query,values)
 
     def edit_row_by_conditions(self, table, conditions:dict, **kwargs):        
         fields = []
@@ -795,7 +732,7 @@ class TVDatabase:
             values.append(value)
         
         query = f"UPDATE {table} SET {', '.join(fields)} WHERE {' AND '.join(conditions_list)}"
-        self._execute_query(query,values)
+        self.execute_query(query,values)
 
     def insert_row(self, table, data:dict={}, **kwargs):
         fields = ', '.join(list(data.keys()) + list(kwargs.keys()))
@@ -807,7 +744,7 @@ class TVDatabase:
             ({fields}) 
             VALUES ({placeholders})    
         '''
-        self._execute_query(query, params)
+        self.execute_query(query, params)
 
     def update_row(self, table, data, **kwargs):
         fields = ', '.join([f"{key} = ?" for key in data])
@@ -819,11 +756,11 @@ class TVDatabase:
             SET {fields}
             WHERE {conditions}
         '''
-        self._execute_query(query, params)
+        self.execute_query(query, params)
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
-    
+
     if len(sys.argv)>1:
         operation = sys.argv[1]
         if operation == "setup":

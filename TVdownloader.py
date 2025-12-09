@@ -12,7 +12,12 @@ import subprocess
 
 
 class TVDownloader:
-    def __init__(self, directory, media_type, download_path="downloads", series_path=TYPE_SERIES, movies_path=TYPE_MOVIES):
+    def __init__(self, directory, media_type, filename, download_path="downloads", series_path=TYPE_SERIES, movies_path=TYPE_MOVIES):
+        '''
+        
+            series_path: 
+        '''
+
         self.ydl_opts = {}
         self.tv_db = TVDatabase()
 
@@ -33,6 +38,8 @@ class TVDownloader:
             print("Not a valid media type")
         self.create_subpath()
 
+        self.filename = filename
+        self.filepath = create_path(self.program_dir, filename)
 
     def path_setup(self):
         if not os.path.exists(self.download_path):
@@ -190,8 +197,8 @@ class TVDownloader:
     
     #DOWNLOAD
 
-    def download_episode(self, episode_id, download_url, season, episode, filename, total_episodes = 0, reverse_order = False):
-        print(f"Started downloading episode {episode} of season {season}")
+    def download_episode(self, episode_id, download_url, episode, filename, total_episodes = 0, reverse_order = False):
+        #print(f"Started downloading episode {episode} of season {season}") Move to TVpreparer?
         self.tv_db.update_media_status(episode_id, self.media_type, STATUS_DOWNLOADING)
         
         # Calculate playlist index
@@ -200,57 +207,34 @@ class TVDownloader:
         else:
             playlist_idx = episode
 
-        filepath = create_path(self.program_dir, filename)
-        success = verify_path(filepath)
+        success = self.download(
+            download_url,
+            self.filename,
+            index = playlist_idx
+        )
 
-        if success:
-            print(f"Local file found for {filename}, skipping download.")
-        else:
-            success = self.download(
-                download_url,
-                filename,
-                index = playlist_idx
-            )
-
-        self._verify_and_update_status(success, episode_id, filename)
-
-        return success
+        status = self._update_download_status(episode_id, success)
+        return status
     
     def download_movie(self, movie_id, download_url, filename):
-        #print(f"Started downloading episode {episode} of season {season}")
         self.tv_db.update_media_status(movie_id, self.media_type, STATUS_DOWNLOADING)
         
-        filepath = create_path(self.program_dir, filename)
-        success = verify_path(filepath)
+        success = self.download(
+            download_url,
+            self.filename
+        )
 
-        if success:
-            print(f"Local file found for {filename}, skipping download.")
-        else:
-            success = self.download(
-                download_url,
-                filename
-            )
-
-        self._verify_and_update_status(success, movie_id, filename)
-
-        return success
+        status = self._update_download_status(movie_id, success)
+        return status
     
-    def _verify_and_update_status(self, success, id, filename):
+    def _update_download_status(self, media_id, success):
         if success:
-            filepath = create_path(self.program_dir, filename)
-            if verify_path(filepath):
-                file_info = self.get_file_info(filename)
-
-                if self.media_type == TYPE_SERIES:
-                    self.tv_db.edit_row_by_id(TABLE_EPISODES, id, **file_info)
-                elif self.media_type == TYPE_MOVIES:
-                    self.tv_db.edit_row_by_id(TABLE_MOVIES, id, **file_info)
-
-                self.tv_db.update_media_status(id, self.media_type, STATUS_AVAILABLE)
-            else:
-                self.tv_db.update_media_status(id, self.media_type, STATUS_MISSING)
+            self.tv_db.update_media_status(media_id, self.media_type, STATUS_AVAILABLE)
+            return STATUS_AVAILABLE
         else:
-            self.tv_db.update_media_status(id, self.media_type, STATUS_FAILED)
+            self.tv_db.update_media_status(media_id, self.media_type, STATUS_FAILED)
+            return STATUS_FAILED
+    
     
     def download(self, url, filename, index=1, quality = 480, **kwargs):
         if kwargs:
@@ -293,54 +277,47 @@ class TVDownloader:
 
         except Exception as e:
             print(f"Error while deleting {file_path}: {e}")
-            
+
     #LOCAL FILES
 
-    def verify_local_file(self, file_id, filename):
-        filepath = create_path(self.program_dir, filename)
-
-        file_info = self.get_file_info(filename)
-        if self.media_type == TYPE_SERIES:
-            self.tv_db.edit_row_by_id(TABLE_EPISODES, file_id, **file_info)
-        elif self.media_type == TYPE_MOVIES:
-            self.tv_db.edit_row_by_id(TABLE_MOVIES, file_id, **file_info)
-
-        success = verify_path(filepath)
-
-
-        if success:
-            print(f"File found: {filename}")
-            #print(f"Checking file integrity.")
-            #test = subprocess.run(["ffmpeg", "-v", "error", "-i", filepath, "-f", "null", "-"],
-                #stderr=subprocess.PIPE,
-                #text=True
-            #)
-            #print(test.stdout)
+    def verify_local_file(self, file_id):
+        if verify_path(self.filepath):
             self.tv_db.update_media_status(file_id, self.media_type, STATUS_AVAILABLE)
+            return STATUS_AVAILABLE
         else:
-            print(f"File is missing: {filename}")
             self.tv_db.update_media_status(file_id, self.media_type, STATUS_MISSING)
-    
-    def update_local_files(self, entry):
-        "FUNCTION UNUSED AND OUT OF DATE"
+            return STATUS_MISSING
 
-        if not os.path.exists(self.program_dir):
-            print("No directory exists")
-            return None
-            
-        local_files = sorted([f for f in os.listdir(self.program_dir) if os.path.splitext(f)[1] == ".mp4"])
+    def _check_file_integrity(self):
+        pass
+        print(f"Checking file integrity.")
+        test = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", self.filepath, "-f", "null", "-"],
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        print(test.stdout)
 
-        start_episode = entry["episode"]
-        for idx, file in enumerate(local_files):
-            episode_num = start_episode + idx
+    def _update_file_info(self, id):
+        if verify_path(self.filepath):
+            file_info = self.get_file_info(self.filepath)
 
-            existing = self.tv_db.get_episode_by_details(entry["series_id"], entry["season"], episode_num)
+            if self.media_type == TYPE_SERIES:
+                self.tv_db.edit_row_by_id(TABLE_EPISODES, id, **file_info)
+            elif self.media_type == TYPE_MOVIES:
+                self.tv_db.edit_row_by_id(TABLE_MOVIES, id, **file_info)
 
-            if existing and existing['status'] == STATUS_AVAILABLE:
-                continue    
-
-            file_info = self.get_file_info(entry["series_id"], entry['directory'], file, episode_num)
-            self.tv_db.add_new_episode("episodes", file_info)
+    def _verify_file_and_update_status(self, success, id, filepath):
+        if success:
+            if verify_path(filepath):
+                self.tv_db.update_media_status(id, self.media_type, STATUS_AVAILABLE)
+                return STATUS_AVAILABLE
+            else:
+                self.tv_db.update_media_status(id, self.media_type, STATUS_MISSING)
+                return STATUS_MISSING
+        else:
+            self.tv_db.update_media_status(id, self.media_type, STATUS_FAILED)
+            return STATUS_FAILED
 
     def get_file_info(self, filename):
         filepath = os.path.join(self.program_dir, filename)

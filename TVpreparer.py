@@ -1,12 +1,11 @@
 from TVdownloader import TVDownloader
 from TVdatabase import TVDatabase
-from helper import create_path, verify_path, create_episode_file_name, create_movie_file_name
-import os
+from TVconstants import *
+from helper import create_episode_file_name, create_movie_file_name, verify_path, create_path
+from colorama import Fore, Style
 import time
 import sys
 import logging
-from TVconstants import *
-
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -14,19 +13,23 @@ class TVPreparer():
     def __init__(self, download_path="downloads"):
         self.download_path = download_path
 
-        #self.tv_dl = TVDownloader(download_path) #Remove??
         self.tv_db = TVDatabase()
 
     def increment_episodes(self):
+        '''
+            Increment the current episode.
+            Run only once at the start of the week.
+        '''
         scheduled_episodes = self.tv_db.get_scheduled_episodes()
 
         for e in scheduled_episodes:
             self.tv_db.increment_episode(e['series_id'])
+            print(f"Series {e["series_name"]}: Episode number incremented.")
 
     def update_keeping_status(self):
-        """
+        '''
             Sets episodes that is kept from previous week to be deleted at the end of the week.
-        """
+        '''
 
         kept_files = self.tv_db.get_kept_episodes()
 
@@ -115,19 +118,35 @@ class TVPreparer():
             if e["source"] == SOURCE_LOCAL:
                 continue
 
-            series_dl = TVDownloader(e["directory"], TYPE_SERIES)
+            filename = create_episode_file_name(
+                e["directory"],
+                e["season_number"],
+                e["episode_number"]
+            )
 
-            filename = create_episode_file_name(e["directory"], e["season_number"], e["episode_number"])
-            
-            series_dl.download_episode(e["id"], 
-                                       e["source_url"], 
-                                       e["season_number"], 
-                                       e["episode_number"],
-                                       filename,
-                                       total_episodes=e["total_episodes"],
-                                       reverse_order= e["reverse_order"]
-                                       )
-            
+            series_dl = TVDownloader(e["directory"], TYPE_SERIES, filename)
+
+            filepath = create_path(series_dl.program_dir, filename)
+            integrity_check = verify_path(filepath)
+
+            #Verify file integrity
+
+            if integrity_check:
+                print(f"Local file found for {filename}, skipping download.")
+            else:
+                status = series_dl.download_episode(
+                    e["id"], 
+                    e["source_url"], 
+                    e["season_number"], 
+                    e["episode_number"],
+                    filename,
+                    total_episodes=e["total_episodes"],
+                    reverse_order= e["reverse_order"]
+                )
+
+                if status == STATUS_AVAILABLE:
+                    series_dl._update_file_info(e["id"])
+
             time.sleep(1)
 
         pending_movies = self.tv_db.get_scheduled_movies()
@@ -136,9 +155,15 @@ class TVPreparer():
                 continue
             
             filename = create_movie_file_name(m["directory"])
+            integrity_check = verify_path(filepath)
 
-            movie_dl = TVDownloader(m["directory"], TYPE_MOVIES)
-            movie_dl.download_movie(m["id"], m["source_url"], filename)
+            #Verify file integrity
+
+            if integrity_check:
+                print(f"Local file found for {filename}, skipping download.")
+            else:
+                movie_dl = TVDownloader(m["directory"], TYPE_MOVIES, filename)
+                movie_dl.download_movie(m["id"], m["source_url"], filename)
             
             time.sleep(1)
 
@@ -151,10 +176,14 @@ class TVPreparer():
             else:
                 filename = create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
 
-            print(e)
+            series_dl = TVDownloader(e["directory"], TYPE_SERIES, filename)
+            #series_dl._check_file_integrity()
+            if series_dl.verify_local_file(e["id"]) == STATUS_AVAILABLE:
+                print(Fore.GREEN + "File found: " + Style.RESET_ALL, filename)
+            else:
+                print(Fore.RED + "File missing: "+ Style.RESET_ALL, filename)
 
-            series_dl = TVDownloader(e["directory"], TYPE_SERIES)
-            series_dl.verify_local_file(e["id"], filename)
+            series_dl._update_file_info(e["id"])
 
         movies = self.tv_db.get_scheduled_movies()
 
@@ -164,23 +193,26 @@ class TVPreparer():
             else:
                 filename = create_movie_file_name(m["directory"])
 
-            movies_dl = TVDownloader(m["directory"], TYPE_MOVIES)
-            movies_dl.verify_local_file(m["id"], filename)
+            movies_dl = TVDownloader(m["directory"], TYPE_MOVIES, filename)
+            
+            #series_dl._check_file_integrity()
+            if movies_dl.verify_local_file(e["id"]) == STATUS_AVAILABLE:
+                print(Fore.GREEN + "File found: " + Style.RESET_ALL, filename)
+            else:
+                print(Fore.RED + "File missing: "+ Style.RESET_ALL, filename)
 
     def link_programs_to_schedule(self):
         series = self.tv_db.get_all_series()
 
         for program in series:
-            entry = self.tv_db.get_program_schedule(program["id"])
-            print(entry)
-            available_episodes = self.tv_db.get_available_episodes_by_id(program["id"])
-            print(available_episodes)
+            entry = self.tv_db.get_program_schedule_by_id(program["id"])
+            scheduled_episodes = self.tv_db.get_scheduled_episodes_by_id(program["id"])
             
             if not entry:
                 continue
             
-            if not available_episodes:
-                print(f"No available episodes for {program['name']}")
+            if not scheduled_episodes:
+                print(f"No scheduled episodes for {program['name']}")
                 continue
 
             originals = [s for s in entry if s["is_rerun"] == 0]
@@ -189,28 +221,37 @@ class TVPreparer():
             first_is_rerun = entry[0]["is_rerun"] == 1
             episode_offset = 0
             
-            if first_is_rerun and reruns and available_episodes:
-                first_episode_id = available_episodes[0]['id']
-                self.tv_db.update_episode_links(reruns[0]["id"], first_episode_id)
-                self.tv_db.update_episode_keeping_status(first_episode_id, True)
-                print(f"Koblet første reprise for {program['name']} til episode {available_episodes[0]['episode_number']} (beholdes)")
+            if first_is_rerun and reruns and scheduled_episodes:
+                if scheduled_episodes[0]["status"] == STATUS_AVAILABLE:
+                    first_episode_id = scheduled_episodes[0]['id']
+                    self.tv_db.update_episode_links(reruns[0]["id"], first_episode_id)
+                    self.tv_db.update_episode_keeping_status(first_episode_id, True)
+                    print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked first re-run of {program['name']} to episode {scheduled_episodes[0]['episode_number']} (kept from last week)")
+                else:
+                    print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link first re-run of {program['name']} (S{scheduled_episodes[0]['season_number']}E{scheduled_episodes[0]['episode_number']}) scheduled to link to (day {rerun['day_of_week']}, {rerun['start_time']}). File is not available")
+                
                 reruns.pop(0)
                 episode_offset = 1
 
             for idx, original in enumerate(originals):
                 episode_idx = idx + episode_offset
-                if episode_idx < len(available_episodes):
-                    episode_id = available_episodes[episode_idx]['id']
-                    print(episode_id)
-                    self.tv_db.update_episode_links(original['id'], episode_id)
-                    print(f"Koblet original sending {available_episodes[episode_idx]['filename']} til (dag {original['day_of_week']}, {original['start_time']})")
+                if episode_idx < len(scheduled_episodes):
+                    if scheduled_episodes[episode_idx]["status"] == STATUS_AVAILABLE:
+                        episode_id = scheduled_episodes[episode_idx]['id']
+                        self.tv_db.update_episode_links(original['id'], episode_id)
+                        print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked original run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}). {scheduled_episodes[episode_idx]['filename']} set to show at (day {original['day_of_week']}, {original['start_time']})")
+                    else:
+                        print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link original run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}), scheduled to show at (day {original['day_of_week']}, {original['start_time']}). File is not available")
 
             for idx, rerun in enumerate(reruns):
                 episode_idx = idx + episode_offset
-                if episode_idx < len(available_episodes):
-                    episode_id = available_episodes[episode_idx]['id']
-                    self.tv_db.update_episode_links(rerun['id'], episode_id)
-                    print(f"Koblet reprise {available_episodes[episode_idx]['filename']} til (dag {rerun['day_of_week']}, {rerun['start_time']})")
+                if episode_idx < len(scheduled_episodes):
+                    if scheduled_episodes[episode_idx]["status"] == STATUS_AVAILABLE:
+                        episode_id = scheduled_episodes[episode_idx]['id']
+                        self.tv_db.update_episode_links(rerun['id'], episode_id)
+                        print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked re-run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}). {scheduled_episodes[episode_idx]['filename']} set to show at (day {rerun['day_of_week']}, {rerun['start_time']})")
+                    else:
+                        print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link re-run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}), scheduled to show at (day {rerun['day_of_week']}, {rerun['start_time']}). File is not available")
 
             
 if __name__ == "__main__":

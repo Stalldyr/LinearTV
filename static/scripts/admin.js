@@ -1,13 +1,4 @@
 const days = ['mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag', 'søndag'];
-const dayMapping = {
-    'mandag': 1,
-    'tirsdag': 2,
-    'onsdag': 3,
-    'torsdag': 4,
-    'fredag': 5,
-    'lørdag': 6,
-    'søndag': 7
-};
 const daysInt = [1, 2, 3, 4, 5, 6, 7];
 
 let currentDay = '';
