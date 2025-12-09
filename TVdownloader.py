@@ -300,7 +300,9 @@ class TVDownloader:
 
     def _update_file_info(self, id):
         if verify_path(self.filepath):
-            file_info = self.get_file_info(self.filepath)
+            file_info = self.get_file_info()
+
+            print(file_info)
 
             if self.media_type == TYPE_SERIES:
                 self.tv_db.edit_row_by_id(TABLE_EPISODES, id, **file_info)
@@ -319,16 +321,14 @@ class TVDownloader:
             self.tv_db.update_media_status(id, self.media_type, STATUS_FAILED)
             return STATUS_FAILED
 
-    def get_file_info(self, filename):
-        filepath = os.path.join(self.program_dir, filename)
-
-        if os.path.exists(filepath):
-            timestamp = os.path.getctime(filepath)
+    def get_file_info(self):
+        if os.path.exists(self.filepath):
+            timestamp = os.path.getctime(self.filepath)
             download_time = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
             return {
-                "filename": filename,
+                "filename": self.filename,
                 "download_date": download_time, 
-                "file_size": os.path.getsize(filepath), 
+                "file_size": os.path.getsize(self.filepath), 
             }
         
         else:

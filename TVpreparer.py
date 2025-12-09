@@ -190,16 +190,19 @@ class TVPreparer():
         for m in movies:
             if m["filename"]:
                 filename = m["filename"]
+
             else:
                 filename = create_movie_file_name(m["directory"])
 
             movies_dl = TVDownloader(m["directory"], TYPE_MOVIES, filename)
             
             #series_dl._check_file_integrity()
-            if movies_dl.verify_local_file(e["id"]) == STATUS_AVAILABLE:
+            if movies_dl.verify_local_file(m["id"]) == STATUS_AVAILABLE:
                 print(Fore.GREEN + "File found: " + Style.RESET_ALL, filename)
             else:
                 print(Fore.RED + "File missing: "+ Style.RESET_ALL, filename)
+
+            movies_dl._update_file_info(m["id"])
 
     def link_programs_to_schedule(self):
         series = self.tv_db.get_all_series()
@@ -236,6 +239,7 @@ class TVPreparer():
             for idx, original in enumerate(originals):
                 episode_idx = idx + episode_offset
                 if episode_idx < len(scheduled_episodes):
+                    print(scheduled_episodes[episode_idx])
                     if scheduled_episodes[episode_idx]["status"] == STATUS_AVAILABLE:
                         episode_id = scheduled_episodes[episode_idx]['id']
                         self.tv_db.update_episode_links(original['id'], episode_id)
