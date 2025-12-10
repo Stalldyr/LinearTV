@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, time as time_class
-from TVconstants import *
+from tvconstants import *
 import slugify
 import os
 

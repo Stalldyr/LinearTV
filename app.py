@@ -1,13 +1,12 @@
 from flask import Flask, jsonify, render_template, send_from_directory, request
 from datetime import datetime, timedelta
-from TVstreamer import TVStreamManager
-from TVdatabase import TVDatabase
+from tvstreamer import TVStreamManager
+from tvdatabase import TVDatabase
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
 from helper import calculate_time_blocks
-from TVconstants import *
+from tvconstants import *
 from dotenv import load_dotenv
-import os
 import sys
 import TVtracker
 import logging
@@ -69,12 +68,6 @@ def info():
 @app.route('/links')
 def links():
     return render_template('links.html')
-
-#Gamja page
-@app.route('/gamja/')
-@app.route('/gamja/<path:path>')
-def serve_gamja(path='index.html'):
-    return send_from_directory(os.path.join(BASE_DIR, 'gamja'), path)
 
 # ============ ADMIN PAGES ============
 

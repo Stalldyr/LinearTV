@@ -1,29 +1,26 @@
-import os
 from flask import jsonify
 from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
 import sys
 from helper import calculate_time_blocks, create_path_friendly_name, calculate_end_time
-from TVconstants import *
+from tvconstants import *
 from SQLexecute import SQLexecute
+from pathlib import Path
 
 class TVDatabase:
-    def __init__(self, db_path = 'data/tv.db', test_time=None):
-        db_path = os.path.join(BASE_DIR, db_path)
-
-        self.db_path = db_path
+    def __init__(self, db_path="data/tv.db", test_time=None):
+        self.db_path = Path(db_path)
         self.test_time = test_time
 
-        if not os.path.exists(self.db_path):
+        if not self.db_path.exists():
+            self.db_path.mkdir(exist_ok=True)
             self.setup_database()
         
-        self.execute_query = SQLexecute(db_path).execute_query
+        self.execute_query = SQLexecute(self.db_path).execute_query
 
     #SETUP
 
     def setup_database(self):
-        os.makedirs('data', exist_ok=True)
-                
         self.execute_query('''
             CREATE TABLE IF NOT EXISTS series (
                 id INTEGER PRIMARY KEY,
@@ -133,8 +130,8 @@ class TVDatabase:
             }
         )
 
-        import TVdownloader
-        tv_dl = TVdownloader.TVDownloader(directory, data_type)
+        import tvdownloader
+        tv_dl = tvdownloader.TVDownloader(directory, data_type, directory)
         
         if data['source_url']:
             if data_type == TYPE_SERIES:

@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime, timedelta, time as time_class
-from TVdatabase import TVDatabase
-from TVconstants import *
+from tvdatabase import TVDatabase
+from tvconstants import *
 
 class TVStreamManager:
     def __init__(self, time=None):
@@ -10,7 +10,7 @@ class TVStreamManager:
 
         self.test_time = time
 
-        self.tv_db = TVDatabase()
+        self.database = TVDatabase()
 
     def get_current_status(self):
         if self.current_stream:
@@ -33,7 +33,7 @@ class TVStreamManager:
                 "filepath": None
             }
 
-        program = self.tv_db.get_current_program(time=time)
+        program = self.database.get_current_program(time=time)
 
         if not program:
             return {
@@ -57,22 +57,22 @@ class TVStreamManager:
     
     def get_next_program(self):
         #Delete??
-        next_program = self.tv_db.get_next_program()
+        next_program = self.database.get_next_program()
         return next_program
     
     def update_air_date(self, program):
         if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
             if program["content_type"] == TYPE_SERIES:
-                self.tv_db.edit_cell("episodes", program["media_id"], "last_aired", datetime.now().date())
+                self.database.edit_cell("episodes", program["media_id"], "last_aired", datetime.now().date())
         if program["content_type"] == TYPE_MOVIES:
-                self.tv_db.edit_cell("movies", program["media_id"], "last_aired", datetime.now().date())
+                self.database.edit_cell("movies", program["media_id"], "last_aired", datetime.now().date())
 
     def start_monitoring(self):
         #Checks the current program and update the status
         if not self.monitoring:
             self.monitoring = True
             print("Started monitoring streams.")
-            self.schedule = self.tv_db.get_weekly_schedule()
+            self.schedule = self.database.get_weekly_schedule()
             threading.Thread(target=self._monitor_streams, daemon=True).start()
 
     def stop_monitoring(self):
