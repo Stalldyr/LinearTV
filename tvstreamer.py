@@ -55,11 +55,6 @@ class TVStreamManager:
 
         return program
     
-    def get_next_program(self):
-        #Delete??
-        next_program = self.database.get_next_program()
-        return next_program
-    
     def update_air_date(self, program):
         if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
             if program["content_type"] == TYPE_SERIES:

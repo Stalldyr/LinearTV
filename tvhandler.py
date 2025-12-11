@@ -1,10 +1,7 @@
-
-#from helper import create_path, verify_path, create_episode_file_name
-from tvdatabase import TVDatabase
 from tvconstants import *
-import subprocess
 from datetime import datetime
 from pathlib import Path
+import subprocess
 
 class MediaPathManager:
     def __init__(self, download_path="downloads", series_subdir=TYPE_SERIES, movies_subdir=TYPE_MOVIES, **kwargs):
@@ -29,6 +26,7 @@ class MediaPathManager:
     
     def get_program_dir(self, media_type, directory):
         """Get the full path to a program's directory"""
+
         if media_type == TYPE_SERIES:
             base = self.series_path
         elif media_type == TYPE_MOVIES:
@@ -53,11 +51,27 @@ class MediaPathManager:
         program_dir = self.get_program_dir(media_type, directory)
         return Path(program_dir)/metadata_file
     
-    def get_database_path(self, file_path):
-        return self.data_path/file_path
+    #Filename generation
+
+    def create_episode_file_name(self, directory, season, episode):
+        return f"{directory}_s{season:02d}e{episode:02d}.mp4"
+
+    def create_movie_file_name(self, directory):
+        return f"{directory}.mp4"
+
+    def create_ytdlp_season_json_name(self, season):
+        return f'ytdlp_data_season_{season}.json'
+    
+    def create_tmbd_season_json_name(self, season):
+        return f'tmdb_data_season_{season}.json'
+    
+    def create_tmbd_movie_json_name(self, film_name):
+        return f'{film_name}_tmdb_data.json'
 
 class TVFileHandler:
     def __init__(self):
+        from tvdatabase import TVDatabase
+
         self.paths = MediaPathManager()
         self.tv_db = TVDatabase()
 
@@ -80,10 +94,7 @@ class TVFileHandler:
         
         file_info = self.get_file_info(file_path)
 
-        if media_type == TYPE_SERIES:
-            self.tv_db.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
-        elif media_type == TYPE_MOVIES:
-            self.tv_db.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
+        self.tv_db.update_episode_info(self, media_type, media_id, file_info)
 
         return file_info
 

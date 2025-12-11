@@ -8,7 +8,7 @@ from helper import calculate_time_blocks
 from tvconstants import *
 from dotenv import load_dotenv
 import sys
-import TVtracker
+import tvtracker
 import logging
 
 app = Flask(__name__)
@@ -40,7 +40,7 @@ def tv():
         ip_address = request.remote_addr
 
         if episode_id:
-            TVtracker.log_view(episode_id,ip_address)
+            tvtracker.log_view(episode_id,ip_address)
 
     return render_template('tv.html')
 
@@ -164,7 +164,7 @@ def get_traffic():
         ip_address = request.remote_addr
 
         if episode_id:
-            TVtracker.update_time(seconds, episode_id, ip_address)
+            tvtracker.update_time(seconds, episode_id, ip_address)
     
     return {'status': 'ok'}
 

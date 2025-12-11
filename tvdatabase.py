@@ -6,12 +6,15 @@ from helper import calculate_time_blocks, create_path_friendly_name, calculate_e
 from tvconstants import *
 from SQLexecute import SQLexecute
 from pathlib import Path
+from metadatafetcher import MetaDataFetcher
 
 class TVDatabase:
     def __init__(self, db_path="data/tv.db", test_time=None):
         self.db_path = Path(db_path)
         self.test_time = test_time
 
+        self.metadatafetcher = MetaDataFetcher()
+    
         if not self.db_path.exists():
             self.db_path.mkdir(exist_ok=True)
             self.setup_database()
@@ -120,7 +123,7 @@ class TVDatabase:
         
     #SERIES TABLE OPERATIONS
     
-    def add_program(self, data):
+    def add_program(self, data:dict):
         data_type = data.pop("type")
 
         directory = create_path_friendly_name(data['name'])
@@ -129,14 +132,11 @@ class TVDatabase:
                 "directory": directory
             }
         )
-
-        import tvdownloader
-        tv_dl = tvdownloader.TVDownloader(directory, data_type, directory)
         
         if data['source_url']:
             if data_type == TYPE_SERIES:
                 try:
-                    tv_dl.get_ytdlp_season_metadata(data["season"], video_url=data['source_url'])
+                    self.metadatafetcher.get_ytdlp_season_metadata(data_type, directory, data["season"], video_url=data['source_url'])
                     
                 except Exception as e:
                     print(f"Error recieving ytdlp metadata: {e}")            
@@ -144,20 +144,16 @@ class TVDatabase:
         if data["tmdb_id"]:
             if data_type == TYPE_SERIES:
                 try:
-                    tv_dl.get_tmdb_season_metadata(data["tmdb_id"], data["season"])
+                    season = data.get("season", None)
+                    self.metadatafetcher.get_tmdb_metadata(data_type, directory, data["tmdb_id"], season)
                     
                 except Exception as e:
                     print(f"Error recieving tmdb metadata: {e}")
 
-            if data_type == TYPE_MOVIES:
-                try:
-                    tv_dl.get_tmdb_movie_metadata(data["tmdb_id"])
-                    
-                except Exception as e:
-                    print(f"Error recieving tmdb metadata: {e}")                
-        
         if data_type == TYPE_SERIES:
-            total_episodes = tv_dl.get_season_metadata(data)
+            url = data.get("source_url", None)
+            tmdb_id = data.get("tmdb_id", None)
+            total_episodes = self.metadatafetcher.get_season_episode_count(directory, data["season"], url, tmdb_id)
             data.update(
                 {
                     "total_episodes": total_episodes
@@ -187,18 +183,25 @@ class TVDatabase:
     
     #02 EPISODE TABLE OPERATIONS
 
-    def add_new_episode(self, episode_data):
+    def update_episode_info(self, media_type:str, media_id:int, file_info:dict):
         '''
-        If files downloaded sucessfully, place info in the database.
+            If files downloaded sucessfully, place file info in the database.
         '''
 
-        self.insert_row("episodes", episode_data)
-        
-        print(f"Logget nedlastet fil: {episode_data["filepath"]}")
+        if media_type == TYPE_SERIES:
+            self.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
+        elif media_type == TYPE_MOVIES:
+            self.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
+
+        self.insert_row("episodes", file_info)
 
         return self.get_most_recent_id("episodes")
 
-    def get_status(self, series_id, season, episode):
+    def get_episode_status(self, series_id:int, season:int, episode:int):
+        '''
+            Gets status of episode. UNUSED!
+        '''
+
         query = '''
             SELECT status FROM episodes
             WHERE series_id = ? AND season_number = ? AND episode_number = ?
@@ -207,7 +210,7 @@ class TVDatabase:
         
         return result[0]['status'] if result else None
     
-    def create_pending_episode(self, series_id, season, episode):
+    def create_pending_episode(self, series_id:int, season:int, episode:int):
         episode_data = {
             "series_id": series_id,
             "season_number": season,
@@ -219,7 +222,10 @@ class TVDatabase:
         self.insert_row("episodes", episode_data)
         return self.get_most_recent_id("episodes")
     
-    def get_pending_episodes(self, strict = False, local = False):
+    def get_pending_episodes(self, strict:bool = False, local:bool = False):
+        '''
+            strict: wether status is strictly "pending" or have other nonavailable statuses
+        '''
         conditions = []
         
         if strict:
@@ -239,24 +245,11 @@ class TVDatabase:
         '''
 
         return self.execute_query(query)
-    
-    def get_pending_episodes_by_id(self, series_id, episode, count, strict = False):
-        if strict:
-            conditions = f"{STATUS_PENDING}"
-        else:
-            conditions = f"{STATUS_PENDING}, {STATUS_FAILED}, {STATUS_MISSING}, {STATUS_DOWNLOADING}, {STATUS_DELETED}"
-
-        query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory
-            FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            WHERE e.status IN ({conditions}) AND e.series_id = ? AND e.episode_number BETWEEN ? AND ?
-            ORDER BY e.season_number, e.episode_number
-        '''
-
-        return self.execute_query(query, (series_id, episode, int(episode) + int(count) - 1))
-    
+        
     def get_scheduled_episodes(self):
+        '''
+        
+        '''
         query = f'''
             SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
@@ -313,7 +306,7 @@ class TVDatabase:
         
         return self.execute_query(query)
     
-    def update_episode_keeping_status(self, episode_id, keep:bool):
+    def update_episode_keeping_status(self, episode_id:int, keep:bool):
         ''''
             Sets if the episode to be kept or not
 
@@ -340,7 +333,7 @@ class TVDatabase:
     
     def get_episode_by_details(self, series_id: int, season:int , episode: int):
         """
-            Hent episode basert på series_id, season og episode number
+            Gets episodes based on series_id, season and episode number
         """
 
         query = '''
@@ -350,16 +343,14 @@ class TVDatabase:
         result = self.execute_query(query, (series_id, season, episode))
         return result[0] if result else None
     
-    def update_media_status(self, file_id, media_type, status, **kwargs):
+    def update_media_status(self, file_id:int, media_type:str, status:str, **kwargs):
         updates = {"status": status}
         updates.update(kwargs)
 
         if media_type == TYPE_SERIES:
             self.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
-            #print(f"Episode ID {file_id}: Status oppdatert til '{status}'")
         elif media_type == TYPE_MOVIES:
             self.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
-            #print(f"Movies ID {file_id}: Status oppdatert til '{status}'")
 
     #MOVIES TABLE OPERATIONS
 
@@ -422,33 +413,23 @@ class TVDatabase:
 
                     self.edit_row_by_conditions("weekly_schedule", conditions, **data)
 
-                    print(f"Endret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+                    print(f"Edited program: {data['name']} at {data['day_of_week']} {data['start_time']}")
             else:
                 data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
                 data["blocks"] = calculate_time_blocks(data["duration"])
                 data.pop("duration", None)
                 self.insert_row("weekly_schedule", data)
 
-                print(f"Lagret program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+                print(f"Saved program: {data['name']} at {data['day_of_week']} {data['start_time']}")
 
             self.update_episode_count()
             
             return jsonify({"status": "success"})
             
         except Exception as e:
-            print(f"Feil ved lagring: {e}")
+            print(f"Error while saving: {e}")
             return jsonify({"status": "error", "message": str(e)})
         
-
-    def get_episode_count(self):
-        query = '''
-            SELECT series_id, COUNT(*) as count
-            FROM weekly_schedule
-            WHERE is_rerun = 0
-            GROUP BY series_id
-        '''
-
-        return self.execute_query(query)
     
     def update_episode_count(self):
         query = '''
@@ -569,8 +550,6 @@ class TVDatabase:
 
         self.execute_query(query,(series_id,))
         
-        print(f"Serie ID {series_id}: Episode nummer dekrementert.")
-
     def update_episode_links(self, id, episode_id):
         query = '''
             UPDATE weekly_schedule
@@ -692,7 +671,7 @@ class TVDatabase:
         self.execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
 
     #Row operations
-    def get_row_by_id(self, table, row_id):
+    def get_row_by_id(self, table:str, row_id:int):
         result = self.execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
         return result[0] if result else None
 
@@ -703,7 +682,7 @@ class TVDatabase:
         self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
         print(f"Slettet oppføring {id} i {table}")
 
-    def edit_row_by_id(self, table, series_id, **kwargs):        
+    def edit_row_by_id(self, table:str, series_id:int, **kwargs):        
         fields = []
         values = []
         for key, value in kwargs.items():
@@ -715,7 +694,7 @@ class TVDatabase:
         query = f"UPDATE {table} SET {', '.join(fields)} WHERE id = ?"
         self.execute_query(query,values)
 
-    def edit_row_by_conditions(self, table, conditions:dict, **kwargs):        
+    def edit_row_by_conditions(self, table:str, conditions:dict, **kwargs):        
         fields = []
         values = []
         conditions_list = []
@@ -731,7 +710,7 @@ class TVDatabase:
         query = f"UPDATE {table} SET {', '.join(fields)} WHERE {' AND '.join(conditions_list)}"
         self.execute_query(query,values)
 
-    def insert_row(self, table, data:dict={}, **kwargs):
+    def insert_row(self, table:str, data:dict={}, **kwargs):
         fields = ', '.join(list(data.keys()) + list(kwargs.keys()))
         placeholders = ', '.join(['?'] * (len(data) + len(kwargs)))
         params = list(data.values()) + list(kwargs.values())
@@ -743,7 +722,7 @@ class TVDatabase:
         '''
         self.execute_query(query, params)
 
-    def update_row(self, table, data, **kwargs):
+    def update_row(self, table:str, data:dict, **kwargs):
         fields = ', '.join([f"{key} = ?" for key in data])
         conditions = ', AND '.join([f"{key} = ?" for key in kwargs])
         params = list(data.values()) + list(kwargs.values())

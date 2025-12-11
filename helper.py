@@ -1,22 +1,9 @@
 from datetime import datetime, timedelta, time as time_class
 from tvconstants import *
 import slugify
-import os
 
 def create_path_friendly_name(title):
     return slugify.slugify(title)
-
-def verify_path(filepath):
-    return os.path.exists(filepath)
-
-def create_episode_file_name(directory, season, episode):
-    return f"{directory}_s{season:02d}e{episode:02d}.mp4"
-
-def create_movie_file_name(directory):
-    return f"{directory}.mp4"
-
-def create_path(*args):
-    return os.path.join(*args)
 
 def map_days_to_integer(day):
     days_map = {

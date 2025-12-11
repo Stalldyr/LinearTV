@@ -1,16 +1,14 @@
-from tvdownloader import TVDownloader, MetaDataFetcher
+from tvdownloader import TVDownloader
+from metadatafetcher import MetaDataFetcher
 from tvdatabase import TVDatabase
 from tvhandler import TVFileHandler, MediaPathManager
 from tvconstants import *
-from helper import create_episode_file_name, create_movie_file_name, verify_path, create_path
 from colorama import Fore, Style
 import time
 import sys
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
-
-
 
 
 class TVPreparer():
@@ -98,7 +96,7 @@ class TVPreparer():
 
             elif series["tmdb_id"]:
                 try:
-                    tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["tmdb_id"], series["directory"], series["season"])
+                    tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
 
                     for entry in tmdb_data["episodes"]:
                         episode_data = metadata_fetcher.extract_episode_info_from_tmdb(entry)
@@ -122,8 +120,6 @@ class TVPreparer():
                 print(f"No metadata available for {series["name"]}")
 
     def download_weekly_schedule(self):
-        
-
         pending_episodes = self.database.get_pending_episodes()
         if not pending_episodes:
             print("All episodes are already downloaded")
@@ -132,7 +128,7 @@ class TVPreparer():
             if e["source"] == SOURCE_LOCAL:
                 continue
 
-            filename = create_episode_file_name(
+            filename = self.paths.create_episode_file_name(
                 e["directory"],
                 e["season_number"],
                 e["episode_number"]
@@ -164,8 +160,8 @@ class TVPreparer():
             if m["source"] == SOURCE_LOCAL:
                 continue
             
-            filename = create_movie_file_name(m["directory"])
-            file_path_check = self.handler.get_filepath(TYPE_MOVIES, e["directory"], filename).exists()
+            filename = self.paths.create_movie_file_name(m["directory"])
+            file_path_check = self.paths.get_filepath(TYPE_MOVIES, e["directory"], filename).exists()
 
             if file_path_check:
                 print(f"Local file found for {filename}, skipping download.")
@@ -184,7 +180,7 @@ class TVPreparer():
             if e["filename"]:
                 filename = e["filename"]
             else:
-                filename = create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
+                filename = self.paths.create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
 
             #series_dl._check_file_integrity()
 
@@ -204,7 +200,7 @@ class TVPreparer():
             if m["filename"]:
                 filename = m["filename"]
             else:
-                filename = create_movie_file_name(m["directory"])
+                filename = self.paths.create_movie_file_name(m["directory"])
             
             #series_dl._check_file_integrity()
 
