@@ -1,11 +1,11 @@
-from datetime import datetime
+from tvcore.helper import calculate_end_time
+from tvcore.tvconstants import *
+from tvcore.SQLexecute import SQLexecute
+from tvcore.metadatafetcher import MetaDataFetcher
+from pathlib import Path
+from datetime import datetime #Remove?
 from datetime import datetime, timedelta, time as time_class
 import sys
-from helper import calculate_end_time
-from tvconstants import *
-from SQLexecute import SQLexecute
-from pathlib import Path
-from metadatafetcher import MetaDataFetcher
 
 class TVDatabase:
     def __init__(self, db_path="data/tv.db", test_time=None):

@@ -1,8 +1,8 @@
-from tvhandler import MediaPathManager
+from tvcore.tvhandler import MediaPathManager
+from tvcore.tvconstants import *
 import yt_dlp
 import json
 import tmdbsimple as tmdb
-from tvconstants import *
 
 class MetaDataFetcher:
     def __init__(self, tmdb_api_key="c8ed91b54503ef6a7e9e9ca6c122a9c9"):

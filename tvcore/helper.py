@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, time as time_class
-from tvconstants import *
 import slugify
 
 def create_path_friendly_name(title):

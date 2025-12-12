@@ -1,4 +1,4 @@
-from tvdatabase import TVDatabase
+from tvcore.tvdatabase import TVDatabase
 
 tv_db = TVDatabase()
 

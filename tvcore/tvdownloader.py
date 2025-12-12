@@ -1,6 +1,6 @@
+from tvcore.tvconstants import *
+from tvcore.tvdatabase import TVDatabase
 import yt_dlp
-from tvconstants import *
-from tvdatabase import TVDatabase
 
 class TVDownloader:
     def __init__(self):

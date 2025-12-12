@@ -1,4 +1,4 @@
-from tvconstants import *
+from tvcore.tvconstants import *
 from datetime import datetime
 from pathlib import Path
 import subprocess

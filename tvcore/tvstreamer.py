@@ -1,7 +1,7 @@
-import threading
+from tvcore.tvdatabase import TVDatabase
+from tvcore.tvconstants import *
 from datetime import datetime, timedelta, time as time_class
-from tvdatabase import TVDatabase
-from tvconstants import *
+import threading
 
 class TVStreamManager:
     def __init__(self, time=None):

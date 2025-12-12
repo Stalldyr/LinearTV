@@ -1,8 +1,8 @@
-from tvdownloader import TVDownloader
-from metadatafetcher import MetaDataFetcher
-from tvdatabase import TVDatabase
-from tvhandler import TVFileHandler, MediaPathManager
-from tvconstants import *
+from tvcore.tvdownloader import TVDownloader
+from tvcore.metadatafetcher import MetaDataFetcher
+from tvcore.tvdatabase import TVDatabase
+from tvcore.tvhandler import TVFileHandler, MediaPathManager
+from tvcore.tvconstants import *
 from colorama import Fore, Style
 import time
 import sys

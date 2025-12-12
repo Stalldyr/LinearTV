@@ -1,8 +1,7 @@
-from tvdatabase import TVDatabase
-from metadatafetcher import MetaDataFetcher
-from tvconstants import *
-from helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
-from pathlib import Path
+from tvcore.tvdatabase import TVDatabase
+from tvcore.metadatafetcher import MetaDataFetcher
+from tvcore.tvconstants import *
+from tvcore.helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
 
 class ProgramManager:
     def __init__(self):

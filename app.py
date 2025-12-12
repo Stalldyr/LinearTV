@@ -1,16 +1,15 @@
+from tvcore.tvstreamer import TVStreamManager
+from tvcore.tvdatabase import TVDatabase
+from tvcore.programmanager import ProgramManager
+from tvcore.helper import calculate_time_blocks
 from flask import Flask, jsonify, render_template, send_from_directory, request
-from datetime import datetime, timedelta
-from tvstreamer import TVStreamManager
-from tvdatabase import TVDatabase
-from programmanager import ProgramManager
+from datetime import datetime
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
-from helper import calculate_time_blocks, create_path_friendly_name
-from tvconstants import *
 from dotenv import load_dotenv
-import sys
-import tvtracker
+import tvcore.tvtracker as tvtracker
 import logging
+import sys
 
 app = Flask(__name__)
 
@@ -184,8 +183,6 @@ def return_status(success, message, error_code = None, debug=False):
         return jsonify({"status": "success", "message": message})
     else:
         return jsonify({"status": "error", "message": message}), error_code
-
-
 
 if __name__ == '__main__':
     test_time = None
