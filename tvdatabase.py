@@ -1,24 +1,11 @@
-from flask import jsonify
 from datetime import datetime
 from datetime import datetime, timedelta, time as time_class
 import sys
-from helper import calculate_time_blocks, create_path_friendly_name, calculate_end_time
+from helper import calculate_end_time
 from tvconstants import *
 from SQLexecute import SQLexecute
 from pathlib import Path
 from metadatafetcher import MetaDataFetcher
-from typing import TypedDict, Optional
-from dataclasses import dataclass
-
-@dataclass
-class ProgramData:
-    name: str
-    source: str
-    season: int
-    type: str
-    id: Optional[int] = None
-    source_url: Optional[str] = None
-    tmdb_id: Optional[str] = None
 
 class TVDatabase:
     def __init__(self, db_path="data/tv.db", test_time=None):
@@ -31,6 +18,7 @@ class TVDatabase:
             self.db_path.mkdir(exist_ok=True)
             self.setup_database()
         
+        self.sql = SQLexecute(self.db_path)
         self.execute_query = SQLexecute(self.db_path).execute_query
 
     #SETUP
@@ -122,16 +110,16 @@ class TVDatabase:
             Cleans the database while keeping the series and schedule intact
         '''
 
-        self.update_column("episodes", "file_size", None)
-        self.update_column("episodes", "filename", None)
-        self.update_column("episodes", "download_date", None)
-        self.update_column("episodes", "status", "pending")
-        self.update_column("episodes", "last_aired", None)
-        self.update_column("episodes", "views", 0)
-        self.update_column("episodes", "tmdb_id", None)
-        self.update_column("episodes", "keep_next_week", False)
+        self.sql.update_column("episodes", "file_size", None)
+        self.sql.update_column("episodes", "filename", None)
+        self.sql.update_column("episodes", "download_date", None)
+        self.sql.update_column("episodes", "status", "pending")
+        self.sql.update_column("episodes", "last_aired", None)
+        self.sql.update_column("episodes", "views", 0)
+        self.sql.update_column("episodes", "tmdb_id", None)
+        self.sql.update_column("episodes", "keep_next_week", False)
 
-        self.update_column("weekly_schedule", "episode_id", None)
+        self.sql.update_column("weekly_schedule", "episode_id", None)
         
     #SERIES TABLE OPERATIONS
     
@@ -154,8 +142,8 @@ class TVDatabase:
                 season, episode, directory, total_episodes, etc.
         '''
 
-        self.insert_row(program_type, program_data)
-        new_id = self.get_most_recent_id(program_type)
+        self.sql.insert_row(program_type, program_data)
+        new_id = self.sql.get_most_recent_id(program_type)
         print(f"Added new program: {program_data.get('name')}")
         return new_id
         
@@ -173,79 +161,31 @@ class TVDatabase:
                 season, episode, directory, total_episodes, etc.
         '''
 
-        self.update_row(program_type, program_data, id=program_id)
+        self.sql.update_row(program_type, program_data, id=program_id)
 
         print(f"Updated program {program_data.get('name')}")
 
 
     def delete_program(self, program_id, media_type):
         if media_type == TYPE_SERIES:
-            self.delete_row(TABLE_SERIES, program_id)
+            self.sql.delete_row(TABLE_SERIES, program_id)
 
             for airing in self.get_program_schedule_by_series_id(program_id):
-                self.delete_row(TABLE_SCHEDULE, airing["id"])
+                self.sql.delete_row(TABLE_SCHEDULE, airing["id"])
 
             return True
 
         elif media_type == TYPE_MOVIES:
-            self.delete_row(TABLE_MOVIES, program_id)
+            self.sql.delete_row(TABLE_MOVIES, program_id)
 
             for airing in self.get_program_schedule_by_movie_id(program_id):
-                self.delete_row(TABLE_SCHEDULE, airing["id"])
+                self.sql.delete_row(TABLE_SCHEDULE, airing["id"])
 
             return True
         
         else:
             return False
 
-            
-    def save_schedule_entry(self, data):
-        """Save new entry in the weekly schedule"""
-
-        try:
-            existing = self.execute_query('''
-                SELECT id FROM weekly_schedule 
-                WHERE day_of_week = ? AND start_time = ?
-            ''', (data['day_of_week'], data['start_time']))
-
-            if existing:
-                if data["name"] == "[Ledig]":
-                    self.execute_query('''
-                        DELETE FROM weekly_schedule
-                        WHERE day_of_week = ? AND start_time = ?
-                    ''', (data['day_of_week'], data['start_time']))
-
-                    print(f"Removed program: {data['name']} på {data['day_of_week']} {data['start_time']}")
-
-                else:
-                    conditions = {
-                        "day_of_week": data["day_of_week"], 
-                        "start_time": data["start_time"]
-                    }
-
-                    data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
-                    data["blocks"] = calculate_time_blocks(data["duration"])
-                    data.pop("duration", None)
-
-                    self.edit_row_by_conditions("weekly_schedule", conditions, **data)
-
-                    print(f"Edited program: {data['name']} at {data['day_of_week']} {data['start_time']}")
-            else:
-                data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
-                data["blocks"] = calculate_time_blocks(data["duration"])
-                data.pop("duration", None)
-                self.insert_row("weekly_schedule", data)
-
-                print(f"Saved program: {data['name']} at {data['day_of_week']} {data['start_time']}")
-
-            self.update_episode_count()
-            
-            return jsonify({"status": "success"})
-            
-        except Exception as e:
-            print(f"Error while saving: {e}")
-            return jsonify({"status": "error", "message": str(e)})
-        
     def get_schedule_by_time(self, day_of_week, start_time):
         query = '''
                 SELECT * FROM weekly_schedule 
@@ -255,14 +195,13 @@ class TVDatabase:
         return self.execute_query(query, (day_of_week, start_time))
 
     def add_schedule_entry(self, data):
-        self.insert_row(TABLE_SCHEDULE, data)
+        self.sql.insert_row(TABLE_SCHEDULE, data)
     
     def delete_schedule_by_id(self, schedule_id):
-        print(schedule_id)
-        self.delete_row(TABLE_SCHEDULE, schedule_id)
+        self.sql.delete_row(TABLE_SCHEDULE, schedule_id)
 
     def edit_schedule(self, conditions, data):
-        self.edit_row_by_conditions(TABLE_SCHEDULE, conditions, **data)
+        self.sql.edit_row_by_conditions(TABLE_SCHEDULE, conditions, **data)
     
     def get_all_series(self):
         query = 'SELECT * FROM series ORDER BY name'
@@ -276,13 +215,13 @@ class TVDatabase:
         '''
 
         if media_type == TYPE_SERIES:
-            self.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
+            self.sql.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
         elif media_type == TYPE_MOVIES:
-            self.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
+            self.sql.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
 
-        self.insert_row("episodes", file_info)
+        self.sql.insert_row(TABLE_EPISODES, file_info)
 
-        return self.get_most_recent_id("episodes")
+        return self.sql.get_most_recent_id(TABLE_EPISODES)
 
     def get_episode_status(self, series_id:int, season:int, episode:int):
         '''
@@ -306,8 +245,8 @@ class TVDatabase:
             "download_date": None 
         }
         
-        self.insert_row("episodes", episode_data)
-        return self.get_most_recent_id("episodes")
+        self.sql.insert_row("episodes", episode_data)
+        return self.sql.get_most_recent_id("episodes")
     
     def get_pending_episodes(self, strict:bool = False, local:bool = False):
         '''
@@ -401,7 +340,7 @@ class TVDatabase:
             keep (boolean): Marks the episode for keeping (true) or deleting (false)
         '''
 
-        self.edit_cell("episodes", episode_id, "keep_next_week", keep)
+        self.sql.edit_cell(TABLE_EPISODES, episode_id, "keep_next_week", keep)
 
     def get_kept_episodes(self):
         query = '''
@@ -435,9 +374,9 @@ class TVDatabase:
         updates.update(kwargs)
 
         if media_type == TYPE_SERIES:
-            self.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
+            self.sql.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
         elif media_type == TYPE_MOVIES:
-            self.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
+            self.sql.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
 
     #MOVIES TABLE OPERATIONS
 
@@ -673,114 +612,6 @@ class TVDatabase:
                     return program
         
         return None
-
-
-    #TABLE OPERATIONS
-
-    #Cell operations
-    def get_most_recent_id(self, table):
-        table_id = self.execute_query(f'''
-            SELECT id 
-            FROM {table} 
-            ORDER BY id DESC 
-            LIMIT 1;
-        ''', output="tuples")
-
-        return table_id[0][0]
-    
-    def get_cell(self, table, record_id, column):
-        result = self.execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
-        return result[0] if result else None
-
-    def edit_cell(self, table, id, column, new_value):
-        self.execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
-    
-    def check_if_id_exists(self,table, key):
-        query = f'''
-            SELECT COUNT(*)
-            FROM {table}
-            WHERE id = ?;
-        '''
-
-        return self.execute_query(query,(key,),output=tuple)[0][0]
-    
-
-    #Column operations
-    def add_column(self, table, col, type=None):
-        self.execute_query(f"""ALTER TABLE {table} ADD COLUMN {col} {type};""")
-
-    def rename_column(self,table,col1,col2):
-        self.execute_query(f"""ALTER TABLE {table} RENAME COLUMN {col1} TO {col2};""")
-
-    def drop_column(self,table,col):
-        self.execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
-
-    def update_column(self, table, col, value):
-        self.execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
-
-    #Row operations
-    def get_row_by_id(self, table:str, row_id:int):
-        result = self.execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
-        return result[0] if result else None
-
-    def delete_row(self, table, id):
-        if id == -1:
-            id = "(SELECT MAX(id))"
-
-        self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
-        print(f"Slettet oppføring {id} i {table}")
-
-    def edit_row_by_id(self, table:str, series_id:int, **kwargs):        
-        fields = []
-        values = []
-        for key, value in kwargs.items():
-            fields.append(f"{key} = ?")
-            values.append(value)
-        
-        values.append(series_id)
-        
-        query = f"UPDATE {table} SET {', '.join(fields)} WHERE id = ?"
-        self.execute_query(query,values)
-
-    def edit_row_by_conditions(self, table:str, conditions:dict, **kwargs):        
-        fields = []
-        values = []
-        conditions_list = []
-
-        for key, value in kwargs.items():
-            fields.append(f"{key} = ?")
-            values.append(value)
-
-        for key, value in conditions.items():
-            conditions_list.append(f"{key} = ?")
-            values.append(value)
-        
-        query = f"UPDATE {table} SET {', '.join(fields)} WHERE {' AND '.join(conditions_list)}"
-        self.execute_query(query,values)
-
-    def insert_row(self, table:str, data:dict={}, **kwargs):
-        fields = ', '.join(list(data.keys()) + list(kwargs.keys()))
-        placeholders = ', '.join(['?'] * (len(data) + len(kwargs)))
-        params = list(data.values()) + list(kwargs.values())
-        
-        query = f'''
-            INSERT INTO {table}
-            ({fields}) 
-            VALUES ({placeholders})    
-        '''
-        self.execute_query(query, params)
-
-    def update_row(self, table:str, data:dict, **kwargs):
-        fields = ', '.join([f"{key} = ?" for key in data])
-        conditions = ', AND '.join([f"{key} = ?" for key in kwargs])
-        params = list(data.values()) + list(kwargs.values())
-
-        query = f'''
-            UPDATE {table}
-            SET {fields}
-            WHERE {conditions}
-        '''
-        self.execute_query(query, params)
 
 if __name__ == "__main__":
     tvdb = TVDatabase()
