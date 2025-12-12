@@ -125,7 +125,7 @@ class MetaDataFetcher:
             return len(episodes)
         
         else:
-            print("Need either source_url or tmdb_id")
+            print("Need either source_url or tmdb_id to get episode_count")
             return 0
         
     def extract_episode_info_from_ytdlp(self, episode_data):

@@ -2,9 +2,10 @@ from flask import Flask, jsonify, render_template, send_from_directory, request
 from datetime import datetime, timedelta
 from tvstreamer import TVStreamManager
 from tvdatabase import TVDatabase
+from programmanager import ProgramManager
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import check_password_hash
-from helper import calculate_time_blocks
+from helper import calculate_time_blocks, create_path_friendly_name
 from tvconstants import *
 from dotenv import load_dotenv
 import sys
@@ -15,6 +16,7 @@ app = Flask(__name__)
 
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
+program_manager = ProgramManager()
 
 logging.basicConfig(
     #filename='/var/log/lineartv.log',
@@ -93,24 +95,30 @@ def admin():
 
     return render_template('admin.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data)
 
-# Oppdater save_program ruten
 @app.route('/admin/save_schedule', methods=['POST'])
 @auth.login_required
 def save_schedule():
     data = request.get_json()
 
-    print(f"Mottatt data for lagring: {data}")
+    print(f"Recived data for weekly schedule: {data}")
 
-    return tv_db.save_schedule_entry(data)
+    return return_status(*program_manager.save_schedule(data))
     
 @app.route('/admin/add_program', methods=['POST'])
 @auth.login_required
 def add_program():
     data = request.get_json()
 
-    print(f"Mottatt data for nytt program: {data}")
-    
-    return tv_db.add_program(data)
+    print(f"Recieved data for new program: {data}")
+
+    return return_status(*program_manager.create_or_update_program(data))
+
+@app.route('/admin/delete_program', methods=['POST'])
+@auth.login_required
+def delete_program():
+    data = request.get_json()
+
+    return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
 
 # ============ API ROUTES ============
 
@@ -167,6 +175,17 @@ def get_traffic():
             tvtracker.update_time(seconds, episode_id, ip_address)
     
     return {'status': 'ok'}
+
+def return_status(success, message, error_code = None, debug=False):
+    if debug:
+        print(message)
+
+    if success:
+        return jsonify({"status": "success", "message": message})
+    else:
+        return jsonify({"status": "error", "message": message}), error_code
+
+
 
 if __name__ == '__main__':
     test_time = None

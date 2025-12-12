@@ -216,7 +216,7 @@ function updateDurationLabel() {
     const programSelect = document.getElementById('scheduleTitleSelect');
     const selectedOption = programSelect.options[programSelect.selectedIndex];
 
-    const duration = selectedOption.getAttribute('data-duration');
+    const duration = selectedOption.getAttribute('data-duration'); //Returns error when selectiing a movie
     const durationLabel = document.getElementById('duration');
 
     if (duration) {
@@ -303,10 +303,11 @@ function saveProgram() {
     const programSelect = document.getElementById('programTitleSelect');
     const selectedOption = programSelect.options[programSelect.selectedIndex];
     const programId = selectedOption.getAttribute('id');
+    const programType = document.querySelector('input[name="programType"]:checked').value
 
     const data = {
         id: programId ? programId : null,
-        type: document.querySelector('input[name="programType"]:checked').value,
+        program_type: programType,
         name: document.getElementById('programTitle').value,
         source: document.getElementById('programSource').value,
         source_url: document.getElementById('programUrl').value,
@@ -317,7 +318,7 @@ function saveProgram() {
         tmdb_id: document.getElementById('programTmdbId').value,
     };
 
-    if (data.type == "series") {
+    if (programType == "series") {
         Object.assign(
             data,
             {
@@ -338,7 +339,7 @@ function saveProgram() {
         .then(response => response.json())
         .then(result => {
             if (result.status === 'success') {
-                alert('Program lagt til!');
+                alert('Program added');
                 closeProgramForm();
             } else {
                 alert('Feil ved lagring av program?');
@@ -350,6 +351,43 @@ function saveProgram() {
         .catch(error => {
             console.error('Error:', error);
             alert('Feil ved lagring av program!');
+        })
+        .finally(() => {
+            location.reload();
+        });
+}
+
+function deleteProgram() {
+    const programSelect = document.getElementById('programTitleSelect');
+    const selectedOption = programSelect.options[programSelect.selectedIndex];
+    
+    data = {
+        program_id: selectedOption.getAttribute('id'),
+        program_type: document.querySelector('input[name="programType"]:checked').value
+    }
+
+    fetch('/admin/delete_program', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                alert('Program deleted');
+                closeProgramForm();
+            } else {
+                alert('Error while deleting program');
+            }
+        })
+        .then(() => {
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error while deleting program');
         })
         .finally(() => {
             location.reload();

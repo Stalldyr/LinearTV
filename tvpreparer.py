@@ -266,7 +266,7 @@ class TVPreparer():
                     else:
                         print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link re-run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}), scheduled to show at (day {rerun['day_of_week']}, {rerun['start_time']}). File is not available")
 
-            
+
 if __name__ == "__main__":
     prep = TVPreparer()
 

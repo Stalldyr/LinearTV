@@ -7,6 +7,18 @@ from tvconstants import *
 from SQLexecute import SQLexecute
 from pathlib import Path
 from metadatafetcher import MetaDataFetcher
+from typing import TypedDict, Optional
+from dataclasses import dataclass
+
+@dataclass
+class ProgramData:
+    name: str
+    source: str
+    season: int
+    type: str
+    id: Optional[int] = None
+    source_url: Optional[str] = None
+    tmdb_id: Optional[str] = None
 
 class TVDatabase:
     def __init__(self, db_path="data/tv.db", test_time=None):
@@ -123,60 +135,135 @@ class TVDatabase:
         
     #SERIES TABLE OPERATIONS
     
-    def add_program(self, data:dict):
-        data_type = data.pop("type")
+    def add_program(self, program_type:str, **program_data):
+        '''
+            Adds or a program to the database.
 
-        directory = create_path_friendly_name(data['name'])
-        data.update(
-            {
-                "directory": directory
-            }
-        )
+            Required:
+                program_type: Should be set to either "series" or "movies.
+                program_id: Id for the program. Should be set to None for a new program
+                
+            Required fields in program_data:
+                name: Program name
+                source: Source platform (NRK, TV2, YouTube, etc)
+                season (for series)
+                episode (for series)
+            
+            Optional (via program_data or kwargs):
+                source_url, year, description, duration, genre, tmdb_id,
+                season, episode, directory, total_episodes, etc.
+        '''
+
+        self.insert_row(program_type, program_data)
+        new_id = self.get_most_recent_id(program_type)
+        print(f"Added new program: {program_data.get('name')}")
+        return new_id
         
-        if data['source_url']:
-            if data_type == TYPE_SERIES:
-                try:
-                    self.metadatafetcher.get_ytdlp_season_metadata(data_type, directory, data["season"], video_url=data['source_url'])
-                    
-                except Exception as e:
-                    print(f"Error recieving ytdlp metadata: {e}")            
+    def update_program(self, program_type:str, program_id:int, **program_data):
+        '''
+            Updates existing program in the database.
 
-        if data["tmdb_id"]:
-            if data_type == TYPE_SERIES:
-                try:
-                    season = data.get("season", None)
-                    self.metadatafetcher.get_tmdb_metadata(data_type, directory, data["tmdb_id"], season)
-                    
-                except Exception as e:
-                    print(f"Error recieving tmdb metadata: {e}")
+            Args:
+                program_type: Should be set to either "series" or "movies.
+                program_id: Database ID for the program.
+                **program_data: Fields to update
+                            
+            Optional (via program_data or kwargs):
+                source_url, year, description, duration, genre, tmdb_id,
+                season, episode, directory, total_episodes, etc.
+        '''
 
-        if data_type == TYPE_SERIES:
-            url = data.get("source_url", None)
-            tmdb_id = data.get("tmdb_id", None)
-            total_episodes = self.metadatafetcher.get_season_episode_count(directory, data["season"], url, tmdb_id)
-            data.update(
-                {
-                    "total_episodes": total_episodes
-                }
-            )
+        self.update_row(program_type, program_data, id=program_id)
+
+        print(f"Updated program {program_data.get('name')}")
+
+
+    def delete_program(self, program_id, media_type):
+        if media_type == TYPE_SERIES:
+            self.delete_row(TABLE_SERIES, program_id)
+
+            for airing in self.get_program_schedule_by_series_id(program_id):
+                self.delete_row(TABLE_SCHEDULE, airing["id"])
+
+            return True
+
+        elif media_type == TYPE_MOVIES:
+            self.delete_row(TABLE_MOVIES, program_id)
+
+            for airing in self.get_program_schedule_by_movie_id(program_id):
+                self.delete_row(TABLE_SCHEDULE, airing["id"])
+
+            return True
+        
+        else:
+            return False
+
+            
+    def save_schedule_entry(self, data):
+        """Save new entry in the weekly schedule"""
 
         try:
-            if data["id"] and self.check_if_id_exists(data_type, data["id"]):
-                new_id = data.pop("id")
-                self.update_row(data_type, data, id = new_id)
-                print(f"Updated program: {data['name']}")
+            existing = self.execute_query('''
+                SELECT id FROM weekly_schedule 
+                WHERE day_of_week = ? AND start_time = ?
+            ''', (data['day_of_week'], data['start_time']))
 
+            if existing:
+                if data["name"] == "[Ledig]":
+                    self.execute_query('''
+                        DELETE FROM weekly_schedule
+                        WHERE day_of_week = ? AND start_time = ?
+                    ''', (data['day_of_week'], data['start_time']))
+
+                    print(f"Removed program: {data['name']} på {data['day_of_week']} {data['start_time']}")
+
+                else:
+                    conditions = {
+                        "day_of_week": data["day_of_week"], 
+                        "start_time": data["start_time"]
+                    }
+
+                    data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
+                    data["blocks"] = calculate_time_blocks(data["duration"])
+                    data.pop("duration", None)
+
+                    self.edit_row_by_conditions("weekly_schedule", conditions, **data)
+
+                    print(f"Edited program: {data['name']} at {data['day_of_week']} {data['start_time']}")
             else:
-                data.pop("id", None)
-                self.insert_row(data_type, data)
-                print(f"Added new program: {data['name']}")
+                data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
+                data["blocks"] = calculate_time_blocks(data["duration"])
+                data.pop("duration", None)
+                self.insert_row("weekly_schedule", data)
+
+                print(f"Saved program: {data['name']} at {data['day_of_week']} {data['start_time']}")
+
+            self.update_episode_count()
             
             return jsonify({"status": "success"})
             
         except Exception as e:
-            print(f"Feil ved lagring: {e}")
+            print(f"Error while saving: {e}")
             return jsonify({"status": "error", "message": str(e)})
-            
+        
+    def get_schedule_by_time(self, day_of_week, start_time):
+        query = '''
+                SELECT * FROM weekly_schedule 
+                WHERE day_of_week = ? AND start_time = ?
+        '''
+
+        return self.execute_query(query, (day_of_week, start_time))
+
+    def add_schedule_entry(self, data):
+        self.insert_row(TABLE_SCHEDULE, data)
+    
+    def delete_schedule_by_id(self, schedule_id):
+        print(schedule_id)
+        self.delete_row(TABLE_SCHEDULE, schedule_id)
+
+    def edit_schedule(self, conditions, data):
+        self.edit_row_by_conditions(TABLE_SCHEDULE, conditions, **data)
+    
     def get_all_series(self):
         query = 'SELECT * FROM series ORDER BY name'
         return self.execute_query(query)
@@ -381,55 +468,7 @@ class TVDatabase:
         return self.execute_query(query)
     
 
-    #WEEKLY SCHEDULE
-
-    def save_schedule_entry(self, data):
-        """Save new entry in the weekly schedule"""
-
-        try:
-            existing = self.execute_query('''
-                SELECT id FROM weekly_schedule 
-                WHERE day_of_week = ? AND start_time = ?
-            ''', (data['day_of_week'], data['start_time']))
-
-            if existing:
-                if data["name"] == "[Ledig]":
-                    self.execute_query('''
-                        DELETE FROM weekly_schedule
-                        WHERE day_of_week = ? AND start_time = ?
-                    ''', (data['day_of_week'], data['start_time']))
-
-                    print(f"Slettet program: {data['name']} på {data['day_of_week']} {data['start_time']}")
-
-                else:
-                    conditions = {
-                        "day_of_week": data["day_of_week"], 
-                        "start_time": data["start_time"]
-                    }
-
-                    data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
-                    data["blocks"] = calculate_time_blocks(data["duration"])
-                    data.pop("duration", None)
-
-                    self.edit_row_by_conditions("weekly_schedule", conditions, **data)
-
-                    print(f"Edited program: {data['name']} at {data['day_of_week']} {data['start_time']}")
-            else:
-                data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
-                data["blocks"] = calculate_time_blocks(data["duration"])
-                data.pop("duration", None)
-                self.insert_row("weekly_schedule", data)
-
-                print(f"Saved program: {data['name']} at {data['day_of_week']} {data['start_time']}")
-
-            self.update_episode_count()
-            
-            return jsonify({"status": "success"})
-            
-        except Exception as e:
-            print(f"Error while saving: {e}")
-            return jsonify({"status": "error", "message": str(e)})
-        
+    #WEEKLY SCHEDULE     
     
     def update_episode_count(self):
         query = '''
@@ -479,7 +518,7 @@ class TVDatabase:
         return self.execute_query(query)
         
 
-    def get_program_schedule_by_id(self, series_id):
+    def get_program_schedule_by_series_id(self, series_id):
         query = '''
             SELECT * FROM weekly_schedule
             WHERE series_id = ?
@@ -487,6 +526,15 @@ class TVDatabase:
         '''
 
         return self.execute_query(query,(series_id,))
+    
+    def get_program_schedule_by_movie_id(self, movie_id):
+        query = '''
+            SELECT * FROM weekly_schedule
+            WHERE movie_id = ?
+            ORDER BY day_of_week, start_time
+        '''
+
+        return self.execute_query(query,(movie_id,))
     
     def get_scheduled_series(self):
         query = '''

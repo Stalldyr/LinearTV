@@ -94,7 +94,7 @@ class TVFileHandler:
         
         file_info = self.get_file_info(file_path)
 
-        self.tv_db.update_episode_info(self, media_type, media_id, file_info)
+        self.tv_db.update_episode_info(media_type, media_id, file_info)
 
         return file_info
 
