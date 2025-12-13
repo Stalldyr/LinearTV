@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 import tvcore.tvtracker as tvtracker
 import logging
 import sys
+import os
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -18,7 +21,6 @@ tv_db = TVDatabase()
 program_manager = ProgramManager()
 
 logging.basicConfig(
-    #filename='/var/log/lineartv.log',
     level=logging.ERROR,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
@@ -26,6 +28,10 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
+# Suppress logs from other libraries
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('flask').setLevel(logging.ERROR)
 
 #Index page
 @app.route('/')
@@ -73,7 +79,7 @@ def links():
 # ============ ADMIN PAGES ============
 
 auth = HTTPBasicAuth()
-ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$Rk2fJmaIfyGgnuLN$a50e8a6e564506cb60563386a62c48392f489885298ae1bcb92b1f3f7b24008986586df534616d495aff6f36db2339c995804fa554c004e99c6b6fbe93ae207f"
+ADMIN_PASSWORD_HASH = os.getenv('ADMIN_PASSWORD_HASH')
 
 @auth.verify_password
 def verify_password(username, password):
