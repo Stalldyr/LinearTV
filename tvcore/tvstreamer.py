@@ -58,10 +58,10 @@ class TVStreamManager:
     def update_air_date(self, program):
         if program["last_aired"] != datetime.now().date().strftime("%Y-%m-%d"):
             if program["content_type"] == TYPE_SERIES:
-                self.database.edit_cell("episodes", program["media_id"], "last_aired", datetime.now().date())
+                self.database.update_program_info(TYPE_SERIES, program["media_id"], last_aired = datetime.now().date())
         if program["content_type"] == TYPE_MOVIES:
-                self.database.edit_cell("movies", program["media_id"], "last_aired", datetime.now().date())
-
+                self.database.update_program_info(TYPE_MOVIES, program["media_id"], last_aired = datetime.now().date())
+    
     def start_monitoring(self):
         #Checks the current program and update the status
         if not self.monitoring:

@@ -62,7 +62,7 @@ class ProgramManager:
             data["directory"] = total_episodes
 
         try:
-            if program_id and self.db.check_if_id_exists(program_type, program_id):
+            if program_id:
                 self.db.update_program(program_type, program_id, **data)
             else:
                 self.db.add_program(program_type, **data)

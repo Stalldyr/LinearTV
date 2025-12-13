@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from tvcore.tvdownloader import TVDownloader
 from tvcore.metadatafetcher import MetaDataFetcher
 from tvcore.tvdatabase import TVDatabase
@@ -6,13 +10,15 @@ from tvcore.mediapathmanager import MediaPathManager
 from tvcore.tvconstants import *
 from colorama import Fore, Style
 import time
-import sys
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-
 class TVPreparer():
+    '''
+        Preperation for new week in the schedule.
+    '''
+
     def __init__(self):
         self.paths = MediaPathManager()
         self.database = TVDatabase()
@@ -87,8 +93,8 @@ class TVPreparer():
 
                         if existing:
                             continue
-
-                        self.database.insert_row(TABLE_EPISODES, data=episode_data, series_id = series["id"], status = "pending", download_date = None)
+                        
+                        self.database.add_pending_episodes(**episode_data, series_id = series["id"], download_date = None)
 
                         print(f"Pending episode added for {series["name"]}")
 
@@ -109,8 +115,8 @@ class TVPreparer():
 
                         if existing:
                             continue
-
-                        self.database.insert_row(TABLE_EPISODES, data=episode_data, series_id = series["id"], status = "pending", download_date = None)
+                        
+                        self.database.add_pending_episodes(**episode_data, series_id = series["id"], download_date = None)
 
                         print(f"Pending episode added for {series["name"]}")
 
@@ -219,7 +225,7 @@ class TVPreparer():
         series = self.database.get_all_series()
 
         for program in series:
-            entry = self.database.get_program_schedule_by_id(program["id"])
+            entry = self.database.get_program_schedule_by_series_id(program["id"])
             scheduled_episodes = self.database.get_scheduled_episodes_by_id(program["id"])
             
             if not entry:

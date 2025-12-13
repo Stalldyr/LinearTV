@@ -3,7 +3,6 @@ from tvcore.tvconstants import *
 from tvcore.SQLexecute import SQLexecute
 from tvcore.metadatafetcher import MetaDataFetcher
 from pathlib import Path
-from datetime import datetime #Remove?
 from datetime import datetime, timedelta, time as time_class
 import sys
 
@@ -209,7 +208,7 @@ class TVDatabase:
     
     #02 EPISODE TABLE OPERATIONS
 
-    def update_episode_info(self, media_type:str, media_id:int, file_info:dict):
+    def update_program_info(self, media_type:str, media_id:int, **file_info):
         '''
             If files downloaded sucessfully, place file info in the database.
         '''
@@ -218,8 +217,6 @@ class TVDatabase:
             self.sql.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
         elif media_type == TYPE_MOVIES:
             self.sql.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
-
-        self.sql.insert_row(TABLE_EPISODES, file_info)
 
         return self.sql.get_most_recent_id(TABLE_EPISODES)
 
@@ -331,6 +328,9 @@ class TVDatabase:
         '''
         
         return self.execute_query(query)
+    
+    def add_pending_episodes(self, **kwargs):
+        self.sql.insert_row(TABLE_EPISODES, status = STATUS_PENDING, **kwargs)
     
     def update_episode_keeping_status(self, episode_id:int, keep:bool):
         ''''
