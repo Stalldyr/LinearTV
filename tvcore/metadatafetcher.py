@@ -1,4 +1,4 @@
-from tvcore.tvhandler import MediaPathManager
+from tvcore.mediapathmanager import MediaPathManager
 from tvcore.tvconstants import *
 import yt_dlp
 import json

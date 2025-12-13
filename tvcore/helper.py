@@ -16,7 +16,7 @@ def map_days_to_integer(day):
     }
 
 
-def _map_integer_to_day(number):
+def map_integer_to_day(number):
     days_map = {
         1: "monday",
 

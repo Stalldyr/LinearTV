@@ -4,6 +4,9 @@ from tvcore.tvconstants import *
 from tvcore.helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
 
 class ProgramManager:
+    '''
+        Works as a manager between flask and the database
+    '''
     def __init__(self):
         self.db = TVDatabase()
         self.metadatafetcher = MetaDataFetcher()
