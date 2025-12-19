@@ -14,6 +14,7 @@ TYPE_MOVIES = 'movies'
 SOURCE_LOCAL = "Local"
 SOURCE_NRK = "NRK"
 SOURCE_YOUTUBE = "Youtube"
+SOURCES = [SOURCE_LOCAL, SOURCE_NRK, SOURCE_YOUTUBE]
 
 #Database tables
 TABLE_MOVIES = "movies"

@@ -5,58 +5,67 @@ let currentDay = '';
 let currentTime = '';
 
 //Creates a scheduletable
-const startHour = 18;
-const endHour = 23;
-const timeSlots = [];
-for (let i = startHour; i < endHour; i++) { 
-    let timeWhole = `${i}:00`;
-    timeSlots.push(timeWhole);
-    let timeHalf = `${i}:30`;
-    timeSlots.push(timeHalf);
+function createTimeSlots () {
+    const startHour = parseInt(tvConfig.broadcast_start.split(":")[0]);
+    const endHour = parseInt(tvConfig.broadcast_end.split(":")[0]);
+    const timeSlots = [];
+    for (let i = startHour; i < endHour; i++) { 
+        let timeWhole = `${i}:00`;
+        timeSlots.push(timeWhole);
+        let timeHalf = `${i}:30`;
+        timeSlots.push(timeHalf);
+    }
+
+    return timeSlots
 }
 
-const tableBody = document.getElementsByClassName('schedule-calendar')[0]
+function createScheduleTable(){
+    const tableBody = document.getElementsByClassName('schedule-calendar')[0]
+    timeSlots = createTimeSlots()
 
-const thead = document.createElement('thead');
-const headerRow = document.createElement('tr');
-const th = document.createElement('th');
-th.textContent = "Tid";
-headerRow.appendChild(th);
-
-days.forEach(day => {
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
     const th = document.createElement('th');
-    th.textContent = day.charAt(0).toUpperCase() + day.slice(1);
+    th.textContent = "Tid";
     headerRow.appendChild(th);
-});
-thead.appendChild(headerRow);
-tableBody.appendChild(thead);
 
-const tbody = document.createElement('tbody');
+    days.forEach(day => {
+        const th = document.createElement('th');
+        th.textContent = day.charAt(0).toUpperCase() + day.slice(1);
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    tableBody.appendChild(thead);
 
-timeSlots.forEach(time => {
-    const row = document.createElement('tr');
-    const timeCell = document.createElement('td');
-    timeCell.className = 'time-slot';
-    timeCell.textContent = time;
-    row.appendChild(timeCell);
+    const tbody = document.createElement('tbody');
 
-    daysInt.forEach(day => {
-        const cell = document.createElement('td');
-        cell.onclick = () => openscheduleForm(day, time);
+    timeSlots.forEach(time => {
+        const row = document.createElement('tr');
+        const timeCell = document.createElement('td');
+        timeCell.className = 'time-slot';
+        timeCell.textContent = time;
+        row.appendChild(timeCell);
 
-        cell.textContent = '[Ledig]';
-        cell.className = 'empty-slot';
+        daysInt.forEach(day => {
+            const cell = document.createElement('td');
+            cell.onclick = () => openscheduleForm(day, time);
 
-        row.appendChild(cell);
+            cell.textContent = '[Ledig]';
+            cell.className = 'empty-slot';
+
+            row.appendChild(cell);
+        });
+
+        tableBody.appendChild(row);
     });
 
-    tableBody.appendChild(row);
-});
+    //Updates table with existing data
+    scheduleData.forEach(schedule => {
+        updateScheduleTable(schedule.name, schedule.is_rerun, schedule.start_time, schedule.blocks, schedule.day_of_week);
+    });
+}
 
-//Updates table with existing data
-scheduleData.forEach(schedule => {
-    updateScheduleTable(schedule.name, schedule.is_rerun, schedule.start_time, schedule.blocks, schedule.day_of_week);
-});
+createScheduleTable()
 
 //Creates ... for adding/editing new series or movie
 const newProgram = document.getElementById('addProgram');

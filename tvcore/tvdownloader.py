@@ -84,13 +84,12 @@ class Downloader:
          
     def download(self, url, output_path, index=1, quality=None, **kwargs):
         '''
-            Downloads from playlist
-            
-            :param self: Description
-            :param url: Description
-            :param output_path: Description
-            :param index: Description
-            :param kwargs: Description
+        Downloads from playlist
+        
+        :param url: Description
+        :param output_path: Description
+        :param index: Description
+        :param kwargs: Description
         '''
 
         quality = quality or self.default_quality

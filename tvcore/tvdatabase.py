@@ -14,7 +14,7 @@ class TVDatabase:
         self.metadatafetcher = MetaDataFetcher()
     
         if not self.db_path.exists():
-            self.db_path.mkdir(exist_ok=True)
+            self.db_path.touch(exist_ok=True)
             self.setup_database()
         
         self.sql = SQLexecute(self.db_path)
@@ -23,6 +23,10 @@ class TVDatabase:
     #SETUP
 
     def setup_database(self):
+        """
+        Sets up database tables if they don't already exists.
+        """
+
         self.execute_query('''
             CREATE TABLE IF NOT EXISTS series (
                 id INTEGER PRIMARY KEY,
@@ -101,13 +105,20 @@ class TVDatabase:
                 is_rerun BOOLEAN DEFAULT 0
             )
         ''')
-        
-        print("Databasetabeller opprettet!")
 
     def reset_database(self):
-        '''
-            Cleans the database while keeping the series and schedule intact
-        '''
+        """
+        Reset the database to its initial state while preserving series and schedule data.
+
+        This method clears episode-specific metadata by:
+        - Removing file information (file_size, filename)
+        - Clearing download and air date information (download_date, last_aired)
+        - Resetting episode status to 'pending'
+        - Resetting view count to 0
+        - Clearing third-party identifiers (tmdb_id)
+        - Removing keep flags (keep_next_week)
+        - Disassociating episodes from the weekly schedule
+        """
 
         self.sql.update_column("episodes", "file_size", None)
         self.sql.update_column("episodes", "filename", None)
@@ -123,23 +134,23 @@ class TVDatabase:
     #SERIES TABLE OPERATIONS
     
     def add_program(self, program_type:str, **program_data):
-        '''
-            Adds or a program to the database.
+        """
+        Adds a new program to the database.
 
-            Required:
-                program_type: Should be set to either "series" or "movies.
-                program_id: Id for the program. Should be set to None for a new program
-                
-            Required fields in program_data:
-                name: Program name
-                source: Source platform (NRK, TV2, YouTube, etc)
-                season (for series)
-                episode (for series)
+        Required:
+            program_type: Should be set to either "series" or "movies.
+            program_id: Id for the program. Should be set to None for a new program
             
-            Optional (via program_data or kwargs):
-                source_url, year, description, duration, genre, tmdb_id,
-                season, episode, directory, total_episodes, etc.
-        '''
+        Required fields in program_data:
+            name: Program name
+            source: Source platform (NRK, TV2, YouTube, etc)
+            season (for series)
+            episode (for series)
+        
+        Optional (via program_data or kwargs):
+            source_url, year, description, duration, genre, tmdb_id,
+            season, episode, directory, total_episodes, etc.
+        """
 
         self.sql.insert_row(program_type, program_data)
         new_id = self.sql.get_most_recent_id(program_type)
@@ -147,18 +158,18 @@ class TVDatabase:
         return new_id
         
     def update_program(self, program_type:str, program_id:int, **program_data):
-        '''
-            Updates existing program in the database.
+        """
+        Updates existing program in the database.
 
-            Args:
-                program_type: Should be set to either "series" or "movies.
-                program_id: Database ID for the program.
-                **program_data: Fields to update
-                            
-            Optional (via program_data or kwargs):
-                source_url, year, description, duration, genre, tmdb_id,
-                season, episode, directory, total_episodes, etc.
-        '''
+        Args:
+            program_type: Should be set to either "series" or "movies.
+            program_id: Database ID for the program.
+            program_data: Fields to update
+                        
+        Optional (via program_data or kwargs):
+            source_url, year, description, duration, genre, tmdb_id,
+            season, episode, directory, total_episodes, etc.
+        """
 
         self.sql.update_row(program_type, program_data, id=program_id)
 
@@ -166,6 +177,13 @@ class TVDatabase:
 
 
     def delete_program(self, program_id, media_type):
+        """
+        Deletes a program from the movies/series-table and the weekly schedule (if scheduled).
+        
+        program_id: id in the table
+        media_type: "movies" or "series"
+        """
+
         if media_type == TYPE_SERIES:
             self.sql.delete_row(TABLE_SERIES, program_id)
 
@@ -185,33 +203,42 @@ class TVDatabase:
         else:
             return False
 
-    def get_schedule_by_time(self, day_of_week, start_time):
+    def get_schedule_by_time(self, day_of_week, start_time, end_time = None):
+        """
+        Returns rows from the weekly schedule filtered on date and time.
+        Note!: Should possibly be merged with get_current_program 
+        """
+
         query = '''
-                SELECT * FROM weekly_schedule 
-                WHERE day_of_week = ? AND start_time = ?
+            SELECT * FROM weekly_schedule 
+            WHERE day_of_week = ? AND start_time BETWEEN ? and ?
+            ORDER BY day_of_week, start_time
         '''
 
-        return self.execute_query(query, (day_of_week, start_time))
+        return self.execute_query(query, (day_of_week, start_time, end_time if end_time else start_time))
 
     def add_schedule_entry(self, data):
+        """Adds new entry to the weekly schedule"""
         self.sql.insert_row(TABLE_SCHEDULE, data)
     
     def delete_schedule_by_id(self, schedule_id):
+        """Deletes entry from schedule based on the primary ID"""
         self.sql.delete_row(TABLE_SCHEDULE, schedule_id)
 
     def edit_schedule(self, conditions, data):
+        """Deletes entry from schedule based on custom conditions"""
         self.sql.edit_row_by_conditions(TABLE_SCHEDULE, conditions, **data)
     
     def get_all_series(self):
-        query = 'SELECT * FROM series ORDER BY name'
-        return self.execute_query(query)
+        """Returns all series from the series-table."""
+        return self.execute_query('SELECT * FROM series ORDER BY name')
     
     #02 EPISODE TABLE OPERATIONS
 
-    def update_program_info(self, media_type:str, media_id:int, **file_info):
-        '''
-            If files downloaded sucessfully, place file info in the database.
-        '''
+    def update_program_info(self, media_type:str, media_id:int, **file_info): #change name?
+        """
+        Adds file info for local files to the database.
+        """
 
         if media_type == TYPE_SERIES:
             self.sql.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
@@ -219,36 +246,44 @@ class TVDatabase:
             self.sql.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
 
         return self.sql.get_most_recent_id(TABLE_EPISODES)
-
-    def get_episode_status(self, series_id:int, season:int, episode:int):
-        '''
-            Gets status of episode. UNUSED!
-        '''
-
-        query = '''
-            SELECT status FROM episodes
-            WHERE series_id = ? AND season_number = ? AND episode_number = ?
-        ''' 
-        result = self.execute_query(query, (series_id, season, episode))
-        
-        return result[0]['status'] if result else None
     
-    def create_pending_episode(self, series_id:int, season:int, episode:int):
-        episode_data = {
-            "series_id": series_id,
-            "season_number": season,
-            "episode_number": episode,
-            "status": STATUS_PENDING,
-            "download_date": None 
-        }
+    def get_pending_episodes(self, strict:bool = False, local:bool = False, schedule:bool = True):
+        """
+        Return pending episodes from the episodes table.
+
+        strict: Wether status is strictly "pending" or have other nonavailable statuses, i.e. "failed" or "missing".
+        local: Wether .... 
+        schedule: Wether or not it return pending episodes .... only from programs that are in the weekly schedule
+        """
+        conditions = []
+        join = ""
         
-        self.sql.insert_row("episodes", episode_data)
-        return self.sql.get_most_recent_id("episodes")
+        if strict:
+            conditions.append(f'e.status IN ("{STATUS_PENDING}")')
+        else:
+            conditions.append(f'e.status IN ("{STATUS_PENDING}", "{STATUS_FAILED}", "{STATUS_MISSING}", "{STATUS_DOWNLOADING}", "{STATUS_DELETED}")')
+
+        if local:
+            conditions.append(f's.source = {SOURCE_LOCAL}')
+
+        if schedule:
+            join = "RIGHT JOIN weekly_schedule ws ON ws.series_id = e.series_id"
+
+        query = f'''
+            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
+            FROM episodes e
+            JOIN series s ON e.series_id = s.id
+            {join}
+            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            ORDER BY series_name, e.season_number, e.episode_number
+        '''
+
+        return self.execute_query(query)
     
-    def get_pending_episodes(self, strict:bool = False, local:bool = False):
-        '''
-            strict: wether status is strictly "pending" or have other nonavailable statuses
-        '''
+    def get_pending_episodes_in_schedule(self, strict:bool = False, local:bool = False):
+        """
+        strict: wether status is strictly "pending" or have other nonavailable statuses, i.e. "failed" or "missing".
+        """
         conditions = []
         
         if strict:
@@ -263,16 +298,16 @@ class TVDatabase:
             SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY series_name, e.season_number, e.episode_number
         '''
 
         return self.execute_query(query)
         
     def get_scheduled_episodes(self):
-        '''
-        
-        '''
+        """
+        Note: Should be corrected to only include programs that is in the weekly schedule
+        """
         query = f'''
             SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
@@ -283,6 +318,8 @@ class TVDatabase:
         return self.execute_query(query)
     
     def get_available_episodes(self):
+        """Returns episodes that has "available"-status, i.e. episodes with a file ready for viewing."""
+
         query = '''
             SELECT e.*, s.name as series_name, s.source_url, s.directory
             FROM episodes e
@@ -293,17 +330,6 @@ class TVDatabase:
 
         return self.execute_query(query)
     
-    def get_nonavailable_episodes(self):
-        query = '''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory
-            FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            WHERE e.status != 'available'
-            ORDER BY e.series_id, e.season_number, e.episode_number
-        '''
-
-        return self.execute_query(query)
-
     def get_scheduled_episodes_by_id(self, series_id):
         query = '''
             SELECT e.* FROM episodes e
@@ -315,6 +341,7 @@ class TVDatabase:
         return self.execute_query(query, (series_id,))
     
     def get_obsolete_episodes(self):
+        """Returns available episodes that has already been viewed and is not planned to be viewes again."""
         query = '''
             SELECT e.*, s.directory FROM episodes as e
             JOIN series as s ON e.series_id = s.id
@@ -334,15 +361,17 @@ class TVDatabase:
     
     def update_episode_keeping_status(self, episode_id:int, keep:bool):
         ''''
-            Sets if the episode to be kept or not
+            Updates if the episode to be kept or not for the next week
 
-            episode_id: The id of the episode
+            episode_id (int): The primary id of the episode
             keep (boolean): Marks the episode for keeping (true) or deleting (false)
         '''
 
         self.sql.edit_cell(TABLE_EPISODES, episode_id, "keep_next_week", keep)
 
     def get_kept_episodes(self):
+        """Returns episodes that are kept from previous week."""
+
         query = '''
             SELECT e.* FROM episodes as e
             JOIN series s ON s.id = e.series_id
@@ -359,7 +388,7 @@ class TVDatabase:
     
     def get_episode_by_details(self, series_id: int, season:int , episode: int):
         """
-            Gets episodes based on series_id, season and episode number
+            Returns episodes from the "episode" table filtered by series_id, season and episode number
         """
 
         query = '''
@@ -392,6 +421,7 @@ class TVDatabase:
         return self.execute_query(query)
     
     def get_scheduled_movies(self):
+        """Returns movies from the weekly schedule"""
         query = f'''
             SELECT m.* FROM movies m
             JOIN weekly_schedule ws ON m.id = ws.movie_id
@@ -399,6 +429,7 @@ class TVDatabase:
         return self.execute_query(query)
     
     def get_obsolete_movies(self):
+        "Returns movies marked for deletion"
         query = '''
             SELECT m.* FROM movies as m
             WHERE status = 'available' AND last_aired IS NOT NULL
@@ -410,6 +441,7 @@ class TVDatabase:
     #WEEKLY SCHEDULE     
     
     def update_episode_count(self):
+        "Updates the number of episodes of the same series within a week"
         query = '''
             UPDATE series
             SET episode_count = (
@@ -420,26 +452,9 @@ class TVDatabase:
         '''
 
         self.execute_query(query)
-
-    def get_daily_schedule(self):
-        now = datetime.now()
-
-        #put this in helper function
-        current_day = int(now.strftime('%w'))
-
-        if current_day == 0:
-            current_day = 7
-
-        query = '''
-            SELECT * FROM weekly_schedule
-            WHERE day_of_week = ?
-            ORDER BY start_time
-        '''
-
-        return self.execute_query(query,(current_day,))
     
-    def get_weekly_schedule(self):
-        #Get all scheduled shows
+    def get_weekly_schedule(self) -> list[dict]:
+        """Returns all scheduled programs in the weekly schedule"""
         query = '''
             SELECT * FROM weekly_schedule
             ORDER BY day_of_week, start_time
@@ -447,7 +462,7 @@ class TVDatabase:
 
         return self.execute_query(query)
     
-    def get_weekly_schedule_with_episode(self):
+    def get_weekly_schedule_with_episode(self) -> list[dict]:
         query = '''
             SELECT ws.name, ws.day_of_week, ws.start_time, ws.is_rerun, e.episode_number, e.filename, e.keep_next_week FROM weekly_schedule AS ws
             JOIN episodes e ON e.id = ws.episode_id  
@@ -520,6 +535,9 @@ class TVDatabase:
         return self.execute_query(query)
     
     def increment_episode(self, series_id):
+        """Increments the current episode in the series table by 1
+        Note!: should be corrected for transission between seasons.
+        """
         query = '''
             UPDATE series
             SET episode = episode + 1
@@ -528,15 +546,6 @@ class TVDatabase:
 
         self.execute_query(query,(series_id,))
 
-    def decrement_episode(self, series_id):
-        query = '''
-            UPDATE series
-            SET episode = episode - 1
-            WHERE id = ?
-        '''
-
-        self.execute_query(query,(series_id,))
-        
     def update_episode_links(self, id, episode_id):
         query = '''
             UPDATE weekly_schedule
@@ -557,7 +566,7 @@ class TVDatabase:
     
     #AIRING OPERATIONS
     
-    def get_air_schedule(self):
+    def get_air_schedule(self) -> list[dict]:
         query = '''
             SELECT 
                 ws.id,
@@ -587,7 +596,11 @@ class TVDatabase:
 
         return self.execute_query(query)
 
-    def get_current_program(self, time = datetime.now(), daily=False):
+    def get_current_program(self, time = datetime.now()) -> dict:
+        """
+        Returns the program showing at a specified time
+        Note!: Should possibly be moved to programmanager/tvstreamer or be rewritten in SQL
+        """
         schedule = self.get_air_schedule()
 
         current_time = time.time()

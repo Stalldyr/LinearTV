@@ -4,9 +4,9 @@ from tvcore.tvconstants import *
 from tvcore.helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
 
 class ProgramManager:
-    '''
+    """
         Works as a manager between flask and the database
-    '''
+    """
     def __init__(self):
         self.db = TVDatabase()
         self.metadatafetcher = MetaDataFetcher()
@@ -88,12 +88,12 @@ class ProgramManager:
         
 
     def save_schedule(self, data:dict):
-        '''
+        """
             Save new entry in the weekly schedule
 
             Args:
                 data: input data schedule    
-        '''
+        """
 
         try:
             existing = self.db.get_schedule_by_time(data["day_of_week"], data["start_time"])
@@ -133,5 +133,16 @@ class ProgramManager:
         except Exception as e:
             return False, f"Database error: {str(e)}", 500
     
+    def initialize_admin_page(self):
+        schedule_data = self.db.get_weekly_schedule()
+        series_data = self.db.get_all_series()
+        movie_data = self.db.get_all_movies()
+
+        for series in series_data:
+            series['blocks'] = calculate_time_blocks(series['duration'])
+
+        return schedule_data, series_data, movie_data
     
+    def get_video_file(self):
+        pass
 

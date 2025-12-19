@@ -15,9 +15,9 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 class TVPreparer():
-    '''
+    """
         Preperation for new week in the schedule.
-    '''
+    """
 
     def __init__(self):
         self.paths = MediaPathManager()
@@ -26,10 +26,10 @@ class TVPreparer():
         self.handler = TVFileHandler()
 
     def increment_episodes(self):
-        '''
+        """
             Increment the current episode.
             Run only once at the start of the week.
-        '''
+        """
         scheduled_episodes = self.database.get_scheduled_episodes()
 
         for e in scheduled_episodes:
@@ -37,9 +37,9 @@ class TVPreparer():
             print(f"Series {e["series_name"]}: Episode number incremented.")
 
     def update_keeping_status(self):
-        '''
+        """
             Sets episodes that is kept from previous week to be deleted at the end of the week.
-        '''
+        """
 
         kept_files = self.database.get_kept_episodes()
 
@@ -127,7 +127,7 @@ class TVPreparer():
                 print(f"No metadata available for {series["name"]}")
 
     def download_weekly_schedule(self):
-        pending_episodes = self.database.get_pending_episodes()
+        pending_episodes = self.database.get_pending_episodes_in_schedule()
         if not pending_episodes:
             print("All episodes are already downloaded")
 

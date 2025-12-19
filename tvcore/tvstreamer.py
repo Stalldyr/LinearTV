@@ -2,15 +2,19 @@ from tvcore.tvdatabase import TVDatabase
 from tvcore.tvconstants import *
 from datetime import datetime, timedelta, time as time_class
 import threading
+import json
 
 class TVStreamManager:
-    def __init__(self, time=None):
+    def __init__(self, time=None, config_path = 'config.json'):
         self.current_stream = None
         self.monitoring = False
 
         self.test_time = time
 
         self.database = TVDatabase()
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            self.config =  json.load(f)
 
     def get_current_status(self):
         if self.current_stream:
@@ -23,9 +27,12 @@ class TVStreamManager:
         
         
     def monitor_current_program(self, time = datetime.now()):
-        current_hour = int(time.strftime("%H"))
+        current_hour = time.strftime("%H:%M")
+        start_time = self.config["broadcast_start"]
     
-        if current_hour < 18:
+        if current_hour < start_time:
+            #Checks if the scheduled have started yet.
+            #Need to be corrected for times past midnight
             return {
                 "status": "off_air",
                 "name": "Ingen sending",

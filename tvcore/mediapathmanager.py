@@ -22,7 +22,7 @@ class MediaPathManager:
             Path(path).mkdir(exist_ok=True)
 
     
-    def get_program_dir(self, media_type, directory):
+    def get_program_dir(self, media_type, directory) -> Path:
         """Get the full path to a program's directory"""
 
         if media_type == TYPE_SERIES:

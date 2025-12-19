@@ -1,7 +1,7 @@
 from tvcore.tvstreamer import TVStreamManager
 from tvcore.tvdatabase import TVDatabase
 from tvcore.programmanager import ProgramManager
-from tvcore.helper import calculate_time_blocks
+from tvcore.mediapathmanager import MediaPathManager
 from flask import Flask, jsonify, render_template, send_from_directory, request
 from datetime import datetime
 from flask_httpauth import HTTPBasicAuth
@@ -19,6 +19,7 @@ app = Flask(__name__)
 tv_stream = TVStreamManager()
 tv_db = TVDatabase()
 program_manager = ProgramManager()
+path_manager = MediaPathManager()
 
 logging.basicConfig(
     level=logging.ERROR,
@@ -91,14 +92,15 @@ def verify_password(username, password):
 @app.route('/admin')
 @auth.login_required
 def admin():  
-    schedule_data = tv_db.get_weekly_schedule()
-    series_data = tv_db.get_all_series()
-    movie_data = tv_db.get_all_movies()
+    schedule_data, series_data, movie_data = program_manager.initialize_admin_page()
+    
+    #Should be improved on eventually
+    import json
 
-    for series in series_data:
-        series['blocks'] = calculate_time_blocks(series['duration'])
+    with open("config.json", 'r', encoding='utf-8') as f:
+        tv_config =  json.load(f)
 
-    return render_template('admin.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data)
+    return render_template('admin.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data, tv_config=tv_config)
 
 @app.route('/admin/save_schedule', methods=['POST'])
 @auth.login_required
@@ -129,20 +131,16 @@ def delete_program():
 
 @app.route('/video/<content_type>/<directory>/<filename>')
 def serve_video(content_type, directory, filename):
-    return send_from_directory(f'downloads/{content_type}/{directory}', filename)
+    return send_from_directory(path_manager.get_program_dir(content_type, directory), filename) #Might reassign to programmanager or mediapathmanager
+
+@app.route('/api/config')
+def get_config():
+    return send_from_directory(".", 'config.json')
 
 @app.route('/api/current')
 def current_program():
     return jsonify(tv_stream.current_stream)
     
-@app.route('/api/next')
-def next_program():
-    program = tv_stream.get_next_program()
-    if program:
-        return jsonify(program)
-    else:
-        return jsonify({"error": "No program currently streaming"}), 404
-
 @app.route('/api/schedule')
 def get_schedule():
     schedule = tv_db.get_weekly_schedule()

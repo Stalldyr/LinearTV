@@ -19,7 +19,6 @@ function updateProgram() {
     fetch('/api/current')
         .then(response => response.json())
         .then(program => {
-            console.log("Fetched program:", program);
             if (JSON.stringify(program) !== JSON.stringify(currentProgram)) {
                 console.log("Program changed!", program);
                 currentProgram = program;
@@ -51,8 +50,9 @@ function updateProgram() {
         });
 }
 
-setInterval(updateProgram, 5000)
-
+function getCorrectTime(){
+  return "10:02"
+}
 
 video.addEventListener('pause', function() {
   video.play();
@@ -110,3 +110,8 @@ fullscreenBtn.addEventListener("click", function () {
     exitFullscreen();
   }
 });
+
+testBtn.addEventListener("click", function () {
+  video.currentTime = 60*10
+});
+setInterval(updateProgram, 5000)
