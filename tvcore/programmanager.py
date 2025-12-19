@@ -133,15 +133,6 @@ class ProgramManager:
         except Exception as e:
             return False, f"Database error: {str(e)}", 500
     
-    def initialize_admin_page(self):
-        schedule_data = self.db.get_weekly_schedule()
-        series_data = self.db.get_all_series()
-        movie_data = self.db.get_all_movies()
-
-        for series in series_data:
-            series['blocks'] = calculate_time_blocks(series['duration'])
-
-        return schedule_data, series_data, movie_data
     
     def get_video_file(self):
         pass

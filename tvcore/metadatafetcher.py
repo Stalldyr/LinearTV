@@ -21,12 +21,12 @@ class MetaDataFetcher:
         '''
             Docstring for get_ytdlp_season_metadata
             
-            Args:
-                media_type: Description
-                directory: Description
-                season: Description
-                video_url: Description
-                download_json: Description
+            :param self: Description
+            :param media_type: Description
+            :param directory: Description
+            :param season: Description
+            :param video_url: Description
+            :param download_json: Description
         '''
         
         json_name = self.paths.create_ytdlp_season_json_name(season)

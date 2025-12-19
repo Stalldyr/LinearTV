@@ -127,7 +127,7 @@ class TVPreparer():
                 print(f"No metadata available for {series["name"]}")
 
     def download_weekly_schedule(self):
-        pending_episodes = self.database.get_pending_episodes_in_schedule()
+        pending_episodes = self.database.get_pending_episodes()
         if not pending_episodes:
             print("All episodes are already downloaded")
 
