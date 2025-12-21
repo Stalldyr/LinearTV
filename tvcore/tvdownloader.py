@@ -1,5 +1,5 @@
-from tvcore.tvconstants import *
-from tvcore.tvdatabase import TVDatabase
+from .tvconstants import *
+from .tvdatabase import TVDatabase
 import yt_dlp
 
 class TVDownloader:

@@ -50,9 +50,6 @@ function updateProgram() {
         });
 }
 
-function getCorrectTime(){
-  return "10:02"
-}
 
 video.addEventListener('pause', function() {
   video.play();
@@ -111,7 +108,5 @@ fullscreenBtn.addEventListener("click", function () {
   }
 });
 
-testBtn.addEventListener("click", function () {
-  video.currentTime = 60*10
-});
-setInterval(updateProgram, 5000)
+updateProgram();
+setInterval(updateProgram, 10000);

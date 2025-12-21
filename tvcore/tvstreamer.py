@@ -1,8 +1,9 @@
-from tvcore.tvdatabase import TVDatabase
-from tvcore.tvconstants import *
+from .tvdatabase import TVDatabase
+from .tvconstants import *
 from datetime import datetime, timedelta, time as time_class
 import threading
 import json
+from pathlib import Path
 
 class TVStreamManager:
     def __init__(self, time=None, config_path = 'config.json'):
@@ -13,7 +14,7 @@ class TVStreamManager:
 
         self.database = TVDatabase()
 
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(Path(__file__).parent.parent.absolute()/config_path, 'r', encoding='utf-8') as f:
             self.config =  json.load(f)
 
     def get_current_status(self):

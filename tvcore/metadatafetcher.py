@@ -1,5 +1,5 @@
-from tvcore.mediapathmanager import MediaPathManager
-from tvcore.tvconstants import *
+from .mediapathmanager import MediaPathManager
+from .tvconstants import *
 import yt_dlp
 import json
 import tmdbsimple as tmdb
@@ -19,14 +19,14 @@ class MetaDataFetcher:
 
     def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None, download_json = True):
         '''
-            Docstring for get_ytdlp_season_metadata
-            
-            :param self: Description
-            :param media_type: Description
-            :param directory: Description
-            :param season: Description
-            :param video_url: Description
-            :param download_json: Description
+        Docstring for get_ytdlp_season_metadata
+        
+        Args:
+            media_type: Description
+            directory: Description
+            season: Description
+            video_url: Description
+            download_json: Description
         '''
         
         json_name = self.paths.create_ytdlp_season_json_name(season)

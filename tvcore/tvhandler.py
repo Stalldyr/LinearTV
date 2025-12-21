@@ -1,6 +1,6 @@
-from tvcore.tvdatabase import TVDatabase
-from tvcore.tvconstants import *
-from tvcore.mediapathmanager import MediaPathManager
+from .tvdatabase import TVDatabase
+from .tvconstants import *
+from .mediapathmanager import MediaPathManager
 from datetime import datetime
 from pathlib import Path
 import subprocess

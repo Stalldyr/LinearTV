@@ -1,7 +1,7 @@
-from tvcore.tvdatabase import TVDatabase
-from tvcore.metadatafetcher import MetaDataFetcher
-from tvcore.tvconstants import *
-from tvcore.helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
+from .tvdatabase import TVDatabase
+from .metadatafetcher import MetaDataFetcher
+from .tvconstants import *
+from .helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
 
 class ProgramManager:
     """
@@ -132,7 +132,17 @@ class ProgramManager:
             
         except Exception as e:
             return False, f"Database error: {str(e)}", 500
-    
+        
+    def initialize_admin_page(self):
+        schedule_data = self.db.get_weekly_schedule()
+        series_data = self.db.get_all_series()
+        movie_data = self.db.get_all_movies()
+
+        for series in series_data:
+            series['blocks'] = calculate_time_blocks(series['duration'])
+
+        return schedule_data, series_data, movie_data
+
     
     def get_video_file(self):
         pass

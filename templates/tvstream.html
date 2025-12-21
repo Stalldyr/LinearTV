@@ -1,17 +1,8 @@
-{% extends "base.html" %}
-
-{% block head %}
-{% endblock head %}
-
-{% block content %}
-<h1 class="mainheader">TV-STREAM</h1>
-
 <video id="tvPlayer" width="75%" height="auto" controls autoplay>
     <source type="video/mp4">
     Your browser does not support the video tag.
 </video>
 <button id="fullscreenBtn">Fullskjerm</button>
-<button id="testBtn">Test</button>
 
 <div id="info">
     <h2 id="programTitle"></h2>
@@ -24,9 +15,4 @@
 
 </div>
 
-{% endblock content %}
-
-{% block scripts %}
-<script src="static/scripts/tvStream.js"> </script>
-
-{% endblock scripts %}
+<script src="{{ url_for('streaming.static', filename='scripts/tvStream.js') }}"></script>

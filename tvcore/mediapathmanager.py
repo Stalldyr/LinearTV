@@ -1,4 +1,4 @@
-from tvcore.tvconstants import *
+from .tvconstants import *
 from pathlib import Path
 
 class MediaPathManager:

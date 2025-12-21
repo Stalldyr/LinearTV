@@ -6,7 +6,7 @@
     <meta name="description" content="Administrative panel for managing NostalgicTV broadcasting schedule">
     <meta name="keywords">
   </head>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles/admin.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('streaming.static', filename='styles/admin.css') }}" />
 
   <body>
     <h1>Sendeskjema Admin</h1>
@@ -164,6 +164,6 @@
     const movieData = {{movie_data | tojson | safe}};
     const tvConfig = {{tv_config | tojson | safe}};
   </script>
-  <script src="{{ url_for('static', filename='scripts/admin.js') }}"></script>
+  <script src="{{ url_for('streaming.static', filename='scripts/admin.js') }}"></script>
 
 </html>

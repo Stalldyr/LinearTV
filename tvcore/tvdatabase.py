@@ -1,13 +1,15 @@
-from tvcore.helper import calculate_end_time
-from tvcore.tvconstants import *
-from tvcore.SQLexecute import SQLexecute
-from tvcore.metadatafetcher import MetaDataFetcher
+from .helper import calculate_end_time
+from .tvconstants import *
+from .SQLexecute import SQLexecute
+from .metadatafetcher import MetaDataFetcher
 from pathlib import Path
 from datetime import datetime, timedelta, time as time_class
 import sys
 
 class TVDatabase:
-    def __init__(self, db_path="data/tv.db", test_time=None):
+    def __init__(self, test_time=None):
+        db_path = Path(__file__).parent.parent.absolute()/"data"/"tv.db" #Needs to be improved
+
         self.db_path = Path(db_path)
         self.test_time = test_time
 
