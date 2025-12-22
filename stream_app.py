@@ -1,10 +1,16 @@
-from .tvcore.tvstreamer import TVStreamManager
-from .tvcore.tvdatabase import TVDatabase
-from .tvcore.programmanager import ProgramManager
-from .tvcore.mediapathmanager import MediaPathManager
 from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint
 from pathlib import Path
-import os
+
+try:
+    from .tvcore.tvstreamer import TVStreamManager
+    from .tvcore.tvdatabase import TVDatabase
+    from .tvcore.programmanager import ProgramManager
+    from .tvcore.mediapathmanager import MediaPathManager
+except ImportError:
+    from tvcore.tvstreamer import TVStreamManager
+    from tvcore.tvdatabase import TVDatabase
+    from tvcore.programmanager import ProgramManager
+    from tvcore.mediapathmanager import MediaPathManager
 
 stream_app = Blueprint(
     'streaming', 
@@ -30,7 +36,7 @@ def stream():
 def admin():  
     schedule_data, series_data, movie_data = program_manager.initialize_admin_page()
     
-    #Should be improved on eventually
+    #config load should be improved on eventually
     import json
 
     with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
@@ -109,9 +115,22 @@ def return_status(success, message, error_code = None, debug=False):
         return jsonify({"status": "success", "message": message})
     else:
         return jsonify({"status": "error", "message": message}), error_code
-    
+
+tv_stream.start_monitoring()    
 
 if __name__ == '__main__':
-    stream_app.run(host='0.0.0.0', port=5000, debug=True)
+    app = Flask(__name__)
+    app.register_blueprint(stream_app)
 
-tv_stream.start_monitoring()
+    @app.route('/')
+    def setup_index():
+        return '''
+            <h1>TVStreamer Test Mode</h1>
+            <ul>
+                <li><a href="/tvstream">TV Stream</a></li>
+                <li><a href="/admin">Admin Panel</a></li>
+            </ul>
+        '''
+
+    app.run(host='0.0.0.0', port=5000, debug=True)
+

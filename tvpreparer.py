@@ -1,13 +1,19 @@
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try: 
+    from .tvcore.tvdownloader import TVDownloader
+    from .tvcore.metadatafetcher import MetaDataFetcher
+    from .tvcore.tvdatabase import TVDatabase
+    from .tvcore.tvhandler import TVFileHandler
+    from .tvcore.mediapathmanager import MediaPathManager
+    from .tvcore.tvconstants import *
+except ImportError:
+    from tvcore.tvdownloader import TVDownloader
+    from tvcore.metadatafetcher import MetaDataFetcher
+    from tvcore.tvdatabase import TVDatabase
+    from tvcore.tvhandler import TVFileHandler
+    from tvcore.mediapathmanager import MediaPathManager
+    from tvcore.tvconstants import *
 
-from tvcore.tvdownloader import TVDownloader
-from tvcore.metadatafetcher import MetaDataFetcher
-from tvcore.tvdatabase import TVDatabase
-from tvcore.tvhandler import TVFileHandler
-from tvcore.mediapathmanager import MediaPathManager
-from tvcore.tvconstants import *
+import sys
 from colorama import Fore, Style
 import time
 import logging
@@ -16,7 +22,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 class TVPreparer():
     """
-        Preperation for new week in the schedule.
+    Preperation for new week in the schedule.
     """
 
     def __init__(self):
