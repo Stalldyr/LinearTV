@@ -332,15 +332,16 @@ class TVDatabase:
 
         return self.execute_query(query)
     
-    def get_scheduled_episodes_by_id(self, series_id):
+    def get_scheduled_episodes_by_id(self, series_id, offset):
         query = '''
             SELECT e.* FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE series_id = ? AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            WHERE series_id = ? 
+            AND e.episode_number BETWEEN (s.episode - ?) AND (s.episode + s.episode_count - 1)
             ORDER BY e.season_number, e.episode_number
         '''
 
-        return self.execute_query(query, (series_id,))
+        return self.execute_query(query, (series_id, offset))
     
     def get_obsolete_episodes(self):
         """Returns available episodes that has already been viewed and is not planned to be viewes again."""
@@ -548,14 +549,14 @@ class TVDatabase:
 
         self.execute_query(query,(series_id,))
 
-    def update_episode_links(self, id, episode_id):
+    def update_episode_links(self, schedule_id, episode_id):
         query = '''
             UPDATE weekly_schedule
             SET episode_id = ?
             WHERE id = ?
         '''
 
-        self.execute_query(query,(episode_id,id))
+        self.execute_query(query,(episode_id,schedule_id))
 
     def update_movie_link(self, id, movie_id):
         query = '''

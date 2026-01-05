@@ -53,232 +53,198 @@ class TVPreparer():
             self.database.update_episode_keeping_status(episode['id'], False)
             print(f"{episode["filename"]} marked for deletion")
 
-    def cleanup_obsolete_episodes(self):
+    def cleanup_obsolete_media(self):
         obsolete_episodes = self.database.get_obsolete_episodes()
+        self._cleanup(obsolete_episodes, TYPE_SERIES)
 
-        if not obsolete_episodes:
-            print("No episodes to delete")
-
-        for e in obsolete_episodes:
-            if not e['last_aired']:
-                continue
-
-            path = self.paths.get_filepath(TYPE_SERIES, e["directory"], e["filename"])
-            self.handler.delete_media(e["id"], path, TYPE_SERIES)
-
-
-    def cleanup_obsolete_movies(self):
         obsolete_movies = self.database.get_obsolete_movies()
+        self._cleanup(obsolete_movies, TYPE_MOVIES)
 
-        if not obsolete_movies:
-            print("No movies to delete")
+    def _cleanup(self, data, media_type):
+        data = self.database.get_obsolete_movies()
+
+        if not data:
+            print("No media to delete")
         
-        for m in obsolete_movies:
-            if not m['last_aired']:
+        for entry in data:
+            if not entry['last_aired']:
                 continue
 
-            path = self.paths.get_filepath(TYPE_MOVIES, m["directory"], m["filename"])
-            self.handler.delete_media(m["id"], path, TYPE_MOVIES)
+            path = self.paths.get_filepath(media_type, entry["directory"], entry["filename"])
+            self.handler.delete_media(entry["id"], path, media_type)
+
 
     def create_pending_episodes(self):
         series_list = self.database.get_all_series()
         metadata_fetcher = MetaDataFetcher()
 
-        for series in series_list:    
+        for series in series_list:
+
             if series["source_url"]:
                 try:
                     yt_dlp_data = metadata_fetcher.get_ytdlp_season_metadata(TYPE_SERIES, series["directory"], series["season"], video_url=series["source_url"])
-                
-                    for entry in yt_dlp_data["entries"]:
-                        episode_data = metadata_fetcher.extract_episode_info_from_ytdlp(entry)
-
-                        if not episode_data["season_number"]:
-                            episode_data["season_number"] = series["season"]
-
-                        existing = self.database.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
-
-                        if existing:
-                            continue
-                        
-                        self.database.add_pending_episodes(**episode_data, series_id = series["id"], download_date = None)
-
-                        print(f"Pending episode added for {series["name"]}")
+                    self._create_pending(yt_dlp_data["entries"], series["season"], series["id"], series["name"])
 
                 except Exception as e:
-                    print(f"No metadata available for {series["name"]}")
+                    print(f"Error fetching metadata for {series["name"]}")
 
             elif series["tmdb_id"]:
                 try:
                     tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
 
-                    for entry in tmdb_data["episodes"]:
-                        episode_data = metadata_fetcher.extract_episode_info_from_tmdb(entry)
-
-                        if not episode_data["season_number"]:
-                            episode_data["season_number"] = series["season"]
-
-                        existing = self.database.get_episode_by_details(series["id"], episode_data["season_number"], episode_data["episode_number"])
-
-                        if existing:
-                            continue
-                        
-                        self.database.add_pending_episodes(**episode_data, series_id = series["id"], download_date = None)
-
-                        print(f"Pending episode added for {series["name"]}")
-
+                    self._create_pending(tmdb_data["episodes"], series["season"], series["id"], series["name"])
+                    
                 except Exception as e:
-                    print(f"No metadata available for {series["name"]}")
+                    print(f"Error fetching metadata for {series["name"]}")
 
             else:
                 print(f"No metadata available for {series["name"]}")
 
-    def download_weekly_schedule(self):
-        pending_episodes = self.database.get_pending_episodes()
-        if not pending_episodes:
-            print("All episodes are already downloaded")
 
-        for e in pending_episodes:
-            if e["source"] == SOURCE_LOCAL:
-                continue
-
-            filename = self.paths.create_episode_file_name(
-                e["directory"],
-                e["season_number"],
-                e["episode_number"]
-            )
-
-            file_path = self.paths.get_filepath(TYPE_SERIES, e["directory"], filename)
-            file_path_check = file_path.exists()
-
-            if file_path_check:
-                print(f"Local file found for {filename}, skipping download.")
+    def _create_pending(self, episodes, season, series_id, series_name, ytdlp=True):
+        metadata_fetcher = MetaDataFetcher()
+        for entry in episodes:
+            if ytdlp:
+                episode_data = metadata_fetcher.extract_episode_info_from_ytdlp(entry)
             else:
-                status = self.downloader.download_from_playlist(
-                    e["id"],
-                    TYPE_SERIES,
-                    file_path,
-                    e["source_url"],
-                    e["episode_number"],
-                    total_episodes=e["total_episodes"],
-                    reverse_order= e["reverse_order"]
-                )
+                episode_data = metadata_fetcher.extract_episode_info_from_tmdb(entry)
 
-                if status == STATUS_AVAILABLE:
-                    self.handler.update_file_info(e["id"], TYPE_SERIES, file_path)
+            if not episode_data["season_number"]:
+                episode_data["season_number"] = season
 
-            time.sleep(1)
+            existing = self.database.get_episode_by_details(series_id, episode_data["season_number"], episode_data["episode_number"])
 
-        pending_movies = self.database.get_scheduled_movies()
-        for m in pending_movies:
-            if m["source"] == SOURCE_LOCAL:
+            if existing:
                 continue
             
-            filename = self.paths.create_movie_file_name(m["directory"])
-            file_path_check = self.paths.get_filepath(TYPE_MOVIES, e["directory"], filename).exists()
+            self.database.add_pending_episodes(**episode_data, series_id =series_id, download_date = None)
+
+            print(f"Pending episode added for {series_name}")
+
+    def download_weekly_schedule(self):
+        pending_episodes = self.database.get_pending_episodes()
+        self._download(pending_episodes, TABLE_SERIES)
+
+        pending_movies = self.database.get_scheduled_movies()
+        self._download(pending_movies, TABLE_MOVIES)
+
+    def _download(self, pending, media_type):
+        for entry in pending:
+            if entry["source"] == SOURCE_LOCAL:
+                continue
+            
+            if media_type == TYPE_SERIES:                
+                filename = self.paths.create_episode_file_name(
+                    entry["directory"],
+                    entry["season_number"],
+                    entry["episode_number"]
+                )
+            elif media_type == TYPE_MOVIES:
+                filename = self.paths.create_movie_file_name(entry["directory"])
+            else:
+                break
+                
+            file_path = self.paths.get_filepath(media_type, entry["directory"], filename)
+            file_path_check = self.paths.get_filepath(media_type, entry["directory"], filename).exists()
 
             if file_path_check:
                 print(f"Local file found for {filename}, skipping download.")
-            else:
-                status = self.downloader.download_movie(m["id"], m["source_url"])
+            elif media_type == TYPE_SERIES:
+                status = self.downloader.download_from_playlist(
+                    entry["id"],
+                    TYPE_SERIES,
+                    file_path,
+                    entry["source_url"],
+                    entry["episode_number"],
+                    total_episodes=entry["total_episodes"],
+                    reverse_order= entry["reverse_order"]
+                )
+            elif media_type == TYPE_MOVIES:
+                status = self.downloader.download_movie(entry["id"], entry["source_url"])
 
             if status == STATUS_AVAILABLE:
-                self.handler.update_file_info(m["id"], TYPE_MOVIES, file_path)
+                self.handler.update_file_info(entry["id"], media_type, file_path)
             
             time.sleep(1)
 
     def verify_files_for_scheduled_media(self):
         episodes = self.database.get_scheduled_episodes()
-
-        for e in episodes:
-            if e["filename"]:
-                filename = e["filename"]
-            else:
-                filename = self.paths.create_episode_file_name(e["directory"],e["season_number"], e["episode_number"])
-
-            #series_dl._check_file_integrity()
-
-            file_path = self.paths.get_filepath(TYPE_SERIES, e["directory"], filename)
-            file_status = self.handler.verify_local_file(e["id"], file_path, TYPE_SERIES)
-
-            if file_status == STATUS_AVAILABLE:
-                print(Fore.GREEN + "File found: " + Style.RESET_ALL, filename)
-            else:
-                print(Fore.RED + "File missing: "+ Style.RESET_ALL, filename)
-
-            self.handler.update_file_info(e["id"], TYPE_SERIES, file_path)
-
+        self._verify(episodes, TYPE_SERIES)
+        
         movies = self.database.get_scheduled_movies()
+        self._verify(movies, TYPE_MOVIES)
 
-        for m in movies:
-            if m["filename"]:
-                filename = m["filename"]
+    def _verify(self, data, media_type):
+        for entry in data:
+            if entry["filename"]:
+                filename = entry["filename"]
             else:
-                filename = self.paths.create_movie_file_name(m["directory"])
+                if media_type == TYPE_MOVIES: 
+                    filename = self.paths.create_movie_file_name(entry["directory"])
+
+                elif media_type == TYPE_SERIES: 
+                    filename = self.paths.create_episode_file_name(entry["directory"], entry["season_number"], entry["episode_number"])
             
             #series_dl._check_file_integrity()
 
-            file_path = self.paths.get_filepath(TYPE_MOVIES, m["directory"], filename)
-            file_status = self.handler.verify_local_file(m["id"], file_path, TYPE_MOVIES)
+            file_path = self.paths.get_filepath(media_type, entry["directory"], filename)
+            file_status = self.handler.verify_local_file(entry["id"], file_path, media_type)
 
             if file_status == STATUS_AVAILABLE:
                 print(Fore.GREEN + "File found: " + Style.RESET_ALL, filename)
             else:
                 print(Fore.RED + "File missing: "+ Style.RESET_ALL, filename)
 
-            self.handler.update_file_info(m["id"], TYPE_MOVIES, file_path)
+            self.handler.update_file_info(entry["id"], media_type, file_path)
 
     def link_programs_to_schedule(self):
-        series = self.database.get_all_series()
+        scheduled_series = self.database.get_scheduled_series()
 
-        for program in series:
-            entry = self.database.get_program_schedule_by_series_id(program["id"])
-            scheduled_episodes = self.database.get_scheduled_episodes_by_id(program["id"])
-            
-            if not entry:
-                continue
-            
-            if not scheduled_episodes:
-                print(f"No scheduled episodes for {program['name']}")
+        for series in scheduled_series:
+            airings = self.database.get_program_schedule_by_series_id(series["id"])
+
+            if not airings:
                 continue
 
-            originals = [s for s in entry if s["is_rerun"] == 0]
-            reruns = [s for s in entry if s["is_rerun"] == 1]
+            first_is_rerun = airings[0]["is_rerun"] == 1
+            offset = 1 if first_is_rerun else 0
+            episodes = self.database.get_scheduled_episodes_by_id(series["id"], offset)
 
-            first_is_rerun = entry[0]["is_rerun"] == 1
-            episode_offset = 0
-            
-            if first_is_rerun and reruns and scheduled_episodes:
-                if scheduled_episodes[0]["status"] == STATUS_AVAILABLE:
-                    first_episode_id = scheduled_episodes[0]['id']
-                    self.database.update_episode_links(reruns[0]["id"], first_episode_id)
-                    self.database.update_episode_keeping_status(first_episode_id, True)
-                    print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked first re-run of {program['name']} to episode {scheduled_episodes[0]['episode_number']} (kept from last week)")
-                else:
-                    print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link first re-run of {program['name']} (S{scheduled_episodes[0]['season_number']}E{scheduled_episodes[0]['episode_number']}) scheduled to link to (day {rerun['day_of_week']}, {rerun['start_time']}). File is not available")
+            if not episodes:
+                continue
+
+            current_episode = None
+
+            for idx, entry in enumerate(airings):
+                if first_is_rerun and idx == 0:
+                    current_episode = episodes.pop(0)
+                    self.database.update_episode_keeping_status(current_episode["id"], True)
+                elif entry["is_rerun"] == 0 and episodes:
+                    current_episode = episodes.pop(0)
+                elif not current_episode:
+                    continue
                 
-                reruns.pop(0)
-                episode_offset = 1
+                self.update_episode_link(
+                    entry["name"], 
+                    entry["id"], 
+                    current_episode["id"], 
+                    current_episode["status"], 
+                    current_episode["season_number"], 
+                    current_episode["episode_number"], 
+                    current_episode["filename"], 
+                    entry["day_of_week"], 
+                    entry["start_time"], 
+                    rerun=(entry["is_rerun"] == 1)
+                )
 
-            for idx, original in enumerate(originals):
-                episode_idx = idx + episode_offset
-                if episode_idx < len(scheduled_episodes):
-                    if scheduled_episodes[episode_idx]["status"] == STATUS_AVAILABLE:
-                        episode_id = scheduled_episodes[episode_idx]['id']
-                        self.database.update_episode_links(original['id'], episode_id)
-                        print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked original run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}). {scheduled_episodes[episode_idx]['filename']} set to show at (day {original['day_of_week']}, {original['start_time']})")
-                    else:
-                        print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link original run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}), scheduled to show at (day {original['day_of_week']}, {original['start_time']}). File is not available")
+    def update_episode_link(self, series_name, schedule_id, episode_id, episode_status, season_number, episode_number, filename, day_of_week, start_time, rerun = False):
+        text = "re-run" if rerun else "original run"
 
-            for idx, rerun in enumerate(reruns):
-                episode_idx = idx + episode_offset
-                if episode_idx < len(scheduled_episodes):
-                    if scheduled_episodes[episode_idx]["status"] == STATUS_AVAILABLE:
-                        episode_id = scheduled_episodes[episode_idx]['id']
-                        self.database.update_episode_links(rerun['id'], episode_id)
-                        print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked re-run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}). {scheduled_episodes[episode_idx]['filename']} set to show at (day {rerun['day_of_week']}, {rerun['start_time']})")
-                    else:
-                        print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link re-run of {program['name']} (S{scheduled_episodes[episode_idx]['season_number']}E{scheduled_episodes[episode_idx]['episode_number']}), scheduled to show at (day {rerun['day_of_week']}, {rerun['start_time']}). File is not available")
-
+        if episode_status == STATUS_AVAILABLE:
+            self.database.update_episode_links(schedule_id, episode_id)
+            print(Fore.GREEN + "Success:" + Style.RESET_ALL, f"Linked {text} of {series_name} (S{season_number}E{episode_number}). {filename} set to show at (day {day_of_week}, {start_time})")
+        else:
+            print(Fore.RED + "Failure:" + Style.RESET_ALL, f"Failed to link  {text} of {series_name} (S{season_number}E{episode_number}). {filename} scheduled to show at (day {day_of_week}, {start_time}). File is not available")
 
 if __name__ == "__main__":
     prep = TVPreparer()
@@ -289,7 +255,7 @@ if __name__ == "__main__":
             prep.increment_episodes()
 
         elif operation == "delete":
-            prep.cleanup_obsolete_episodes()
+            prep.cleanup_obsolete_media()
 
         elif operation == "keep":
             prep.update_keeping_status()
@@ -307,7 +273,7 @@ if __name__ == "__main__":
             prep.link_programs_to_schedule()
 
         elif operation == "all":
-            prep.cleanup_obsolete_episodes()
+            prep.cleanup_obsolete_media()
             prep.update_keeping_status()
             prep.create_pending_episodes()
             prep.download_weekly_schedule()
