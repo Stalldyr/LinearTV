@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tvstreamer"
+version = "0.1.0"
+description = "Streaming server that recreates linear TV experience"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Simen", email = "stalldyr@proton.me"}
+]
+keywords = ["streaming", "tv", "nostalgic", "linear-tv"]
+
+dependencies = [
+    "Flask>=3.1.1",
+    "Werkzeug>=3.1.3",
+    "yt-dlp>=2025.10.22",
+    "tmdbsimple>=2.9.1",
+    "requests>=2.32.5",
+    "python-slugify>=8.0.4",
+    "python-dotenv>=1.2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "colorama>=0.4.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/stalldyr/lineartv"
+Repository = "https://github.com/stalldyr/lineartv"
+Issues = "https://github.com/stalldyr/lineartv/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tvcore*"]

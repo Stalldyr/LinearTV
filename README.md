@@ -15,7 +15,7 @@ Nostalgic linear TV streaming server that recreates the TV experience before on-
 ```
 # Clone repository
 git clone https://github.com/Stalldyr/LinearTV.git
-cd fortidstv
+cd LinearTV
 
 # Virtual environment
 python3 -m venv venv
@@ -23,6 +23,10 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+or 
+
+pip install -e ./tvstreamer
 ```
 
 2. Schedule administration and testing
