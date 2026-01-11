@@ -1,14 +1,4 @@
-<!DOCTYPE html>
-<html lang="no">
-  <head>
-    <title>NostalgicTV Admin</title>
-    <meta charset="UTF-8">
-    <meta name="description" content="Administrative panel for managing NostalgicTV broadcasting schedule">
-    <meta name="keywords">
-  </head>
-  <link rel="stylesheet" href="{{ url_for('streaming.static', filename='styles/admin.css') }}" />
-
-  <body>
+<body>
     <h1>Sendeskjema Admin</h1>
 
     <button id="addProgram">Legg til eller endre program</button>
@@ -28,7 +18,7 @@
       <input type="radio" name="scheduleType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">
       <label for="scheduleOption1">Film</label>
       
-      <form id="scheduleFormData">
+      <form id="scheduleFormData" method="post">
         <div class="form-group">
           <label>Program:</label>
           <select id="scheduleTitleSelect" onchange="updateDurationLabel()">
@@ -130,11 +120,9 @@
         <div  class="form-group">
           <label>Sjanger:</label>
           <select id="programGenre">
-            <option label="Drama">Drama</option>
-            <option label="Komedie">Comedy</option>
-            <option label="Reality">Reality</option>
-            <option label="Underholdning">Entertainment</option>
-            <option label="Dokumentar">Documentary</option>
+          {% for genre in genres %}
+            <option label="{{ genre }}"> {{ genre }}</option>
+          {% endfor %}
           </select>        
         </div>
 
@@ -162,8 +150,6 @@
     const scheduleData = {{schedule_data | tojson | safe}};
     const seriesData = {{series_data | tojson | safe}};
     const movieData = {{movie_data | tojson | safe}};
-    const tvConfig = {{tv_config | tojson | safe}};
+    const timeSlots = {{timeslots | tojson | safe}};
   </script>
-  <script src="{{ url_for('streaming.static', filename='scripts/admin.js') }}"></script>
-
-</html>
+  <script src="{{ url_for('streaming.static', filename='scripts/scheduleAdmin.js') }}"></script>

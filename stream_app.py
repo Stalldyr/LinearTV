@@ -1,16 +1,19 @@
 from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint
 from pathlib import Path
+import json
 
 try:
     from .tvcore.tvstreamer import TVStreamManager
     from .tvcore.tvdatabase import TVDatabase
     from .tvcore.programmanager import ProgramManager
     from .tvcore.mediapathmanager import MediaPathManager
+    from .tvcore.helper import calculate_time_slots
 except ImportError:
     from tvcore.tvstreamer import TVStreamManager
     from tvcore.tvdatabase import TVDatabase
     from tvcore.programmanager import ProgramManager
     from tvcore.mediapathmanager import MediaPathManager
+    from tvcore.helper import calculate_time_slots
 
 stream_app = Blueprint(
     'streaming', 
@@ -25,28 +28,50 @@ tv_db = TVDatabase()
 program_manager = ProgramManager()
 path_manager = MediaPathManager()
 
-#Stream page
+
+# ============ CONFIG FUNCTION ============
+#TODO Make into a class
+
+def get_time_slots():
+    with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
+        tv_config =  json.load(f)
+
+    timeslots = calculate_time_slots(
+        tv_config["broadcast_start"],
+        tv_config["broadcast_end"],
+        tv_config["broadcast_steps"]
+    )
+
+    return timeslots
+
+def get_genres():
+    with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
+        tv_config =  json.load(f)
+
+    return tv_config["genres"]
+
+
+# ============ STREAMING PAGES ============
 @stream_app.route('/tvstream')
 def stream():
     return render_template('tvstream.html')
 
 # ============ ADMIN PAGES ============
 
-@stream_app.route('/admin')
-def admin():  
+@stream_app.route('/admin/schedule')
+def admin():
     schedule_data, series_data, movie_data = program_manager.initialize_admin_page()
-    
-    #config load should be improved on eventually
-    import json
 
-    with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
-        tv_config =  json.load(f)
+    timeslots = get_time_slots()
+    genres = get_genres()
 
-    return render_template('admin.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data, tv_config=tv_config)
+    return render_template('admin_schedule.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data, genres=genres, timeslots=timeslots)
 
 @stream_app.route('/admin/save_schedule', methods=['POST'])
 def save_schedule():
-    data = request.get_json()
+    #data = request.get_json()
+
+    data = request.form
 
     print(f"Recived data for weekly schedule: {data}")
 
@@ -66,6 +91,9 @@ def delete_program():
 
     return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
 
+@stream_app.route('/admin/preparer')
+def prepare():
+    return render_template("admin_preparer.html")
 # ============ API ROUTES ============
 
 @stream_app.route('/video/<content_type>/<directory>/<filename>')
@@ -124,13 +152,7 @@ if __name__ == '__main__':
 
     @app.route('/')
     def setup_index():
-        return '''
-            <h1>TVStreamer Test Mode</h1>
-            <ul>
-                <li><a href="/tvstream">TV Stream</a></li>
-                <li><a href="/admin">Admin Panel</a></li>
-            </ul>
-        '''
+        return render_template("test_panel.html")
 
     app.run(host='0.0.0.0', port=5000, debug=True)
 

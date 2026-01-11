@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Preparer Admin</title>
+</head>
+<body>
+    <h1>TV Preparer - Systemvedlikehold</h1>
+
+    <section>
+        <h2>Status</h2>
+        <div id="statusInfo">
+            <p>Pending episodes: <span id="pendingCount">-</span></p>
+            <p>Scheduled episodes: <span id="scheduledCount">-</span></p>
+            <p>Kept episodes: <span id="keptCount">-</span></p>
+            <p>Obsolete episodes: <span id="obsoleteCount">-</span></p>
+        </div>
+    </section>
+
+    <section>
+        <h2>Operasjoner</h2>
+        
+        <div>
+            <h3>Enkeltoperasjoner</h3>
+            <button id="btnIncrement">Increment Episodes</button>
+            <button id="btnPending">Create Pending Episodes</button>
+            <button id="btnDownload">Download Weekly Schedule</button>
+            <button id="btnVerify">Verify Files</button>
+            <button id="btnLink">Link Programs to Schedule</button>
+            <button id="btnKeep">Update Keeping Status</button>
+            <button id="btnDelete">Clean Up Obsolete Media</button>
+        </div>
+
+        <div>
+            <h3>Kjør alle</h3>
+            <button id="btnAll">Run All Operations</button>
+        </div>
+    </section>
+
+    <section>
+        <h2>Resultat</h2>
+        <div id="resultArea">
+            <p>Ingen operasjoner kjørt ennå</p>
+        </div>
+    </section>
+
+    <script src="{{ url_for('streaming.static', filename='scripts/admin_preparer.js') }}"></script>
+</body>
+</html>

@@ -31,3 +31,15 @@ def calculate_end_time(start_time, duration_minutes):
 def calculate_time_blocks(duration, block_size=30):
     total_blocks = (duration + block_size - 1) // block_size
     return total_blocks
+
+def calculate_time_slots(start, end, steps):
+    start2 = datetime.strptime(start, "%H:%M")
+    end2 = datetime.strptime(end, "%H:%M")
+    
+    slots = []
+
+    while start2 < end2:
+        slots.append(datetime.strftime(start2, "%H:%M"))
+        start2 += timedelta(minutes=int(steps))
+
+    return slots

@@ -91,7 +91,6 @@ class TVStreamManager:
             else:
                 print("No current program to monitor.")
 
-            # Sleep for a while before checking again
             threading.Event().wait(10)
 
 
