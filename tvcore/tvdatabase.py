@@ -443,7 +443,7 @@ class TVDatabase:
 
     #WEEKLY SCHEDULE     
     
-    def update_episode_count(self):
+    def update_schedule_count(self):
         "Updates the number of episodes of the same series within a week"
         query = '''
             UPDATE series

@@ -5,7 +5,7 @@ from .helper import create_path_friendly_name, calculate_time_blocks, calculate_
 
 class ProgramManager:
     """
-        Works as a manager between flask and the database
+    Works as a manager between flask and the database
     """
     def __init__(self):
         self.db = TVDatabase()
@@ -118,6 +118,7 @@ class ProgramManager:
                     data.pop("duration", None)
 
                     self.db.edit_schedule(conditions, data)
+                    self.db.update_schedule_count()
 
                     return True, f"Edited program {data['name']} in schedule at {data['day_of_week']} {data['start_time']}"
             
@@ -127,6 +128,7 @@ class ProgramManager:
                 data.pop("duration", None)
                 
                 self.db.add_schedule_entry(data)
+                self.db.update_schedule_count()
 
                 return True, f"Saved new program {data['name']} to schedule at {data['day_of_week']} {data['start_time']}"
             

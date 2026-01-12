@@ -64,7 +64,7 @@ class TVPreparer():
         data = self.database.get_obsolete_movies()
 
         if not data:
-            print("No media to delete")
+            print(f"No {media_type} to delete")
         
         for entry in data:
             if not entry['last_aired']:
@@ -75,7 +75,7 @@ class TVPreparer():
 
 
     def create_pending_episodes(self):
-        series_list = self.database.get_all_series()
+        series_list = self.database.get_scheduled_series()
         metadata_fetcher = MetaDataFetcher()
 
         for series in series_list:
@@ -122,7 +122,7 @@ class TVPreparer():
             print(f"Pending episode added for {series_name}")
 
     def download_weekly_schedule(self):
-        pending_episodes = self.database.get_pending_episodes()
+        pending_episodes = self.database.get_scheduled_episodes()
         self._download(pending_episodes, TABLE_SERIES)
 
         pending_movies = self.database.get_scheduled_movies()
