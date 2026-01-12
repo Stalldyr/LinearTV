@@ -123,7 +123,6 @@ class TVPreparer():
 
     def download_weekly_schedule(self):
         pending_episodes = self.database.get_scheduled_episodes()
-        print(pending_episodes)
         self._download(pending_episodes, TABLE_SERIES)
 
         pending_movies = self.database.get_scheduled_movies()

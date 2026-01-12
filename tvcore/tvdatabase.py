@@ -314,6 +314,7 @@ class TVDatabase:
             SELECT e.*, s.name as series_name, s.source_url, s.directory, s.source, s.total_episodes, s.reverse_order
             FROM episodes e
             JOIN series s ON e.series_id = s.id
+            JOIN weekly_schedule ws ON ws.series_id = s.id
             WHERE e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY series_name, e.season_number, e.episode_number
         '''
