@@ -150,6 +150,7 @@ class TVPreparer():
 
             if file_path_check:
                 print(f"Local file found for {filename}, skipping download.")
+                status = STATUS_AVAILABLE
             elif media_type == TYPE_SERIES:
                 status = self.downloader.download_from_playlist(
                     entry["id"],
