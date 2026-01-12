@@ -311,7 +311,7 @@ class TVDatabase:
         Note: Should be corrected to only include programs that is in the weekly schedule
         """
         query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory
+            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.source, s.total_episodes, s.reverse_order
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             WHERE e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
