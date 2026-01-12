@@ -47,7 +47,7 @@
 .program-form,
 .schedule-form {
     display: none;
-    position: fixed;
+    position: absolute;
     top: 10%;
     left: 50%;
     transform: translate(-50%);

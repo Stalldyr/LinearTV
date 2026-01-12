@@ -26,6 +26,9 @@ class ProgramManager:
         program_id = data.pop("id")
         program_name = data.get("name", None)
 
+        print(data)
+        print(program_name)
+
         if not program_name:
             print("Missing program name")
             return False, "Missing program name"
@@ -59,7 +62,7 @@ class ProgramManager:
 
         if program_type == TYPE_SERIES:
             total_episodes = self.metadatafetcher.get_season_episode_count(directory, season, source_url, tmdb_id)
-            data["directory"] = total_episodes
+            data["total_episodes"] = total_episodes
 
         try:
             if program_id:
