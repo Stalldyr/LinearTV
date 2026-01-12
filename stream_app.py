@@ -69,9 +69,7 @@ def admin():
 
 @stream_app.route('/admin/save_schedule', methods=['POST'])
 def save_schedule():
-    #data = request.get_json()
-
-    data = request.form
+    data = request.get_json()
 
     print(f"Recived data for weekly schedule: {data}")
 

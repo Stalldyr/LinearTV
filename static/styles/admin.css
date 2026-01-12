@@ -47,8 +47,8 @@
 .program-form,
 .schedule-form {
     display: none;
-    position: absolute;
-    top: 00%;
+    position: fixed;
+    top: 10%;
     left: 50%;
     transform: translate(-50%);
     background: white;
@@ -59,7 +59,6 @@
     color: black;
     overflow: auto;
     box-sizing: border-box;
-
 }
 
 .form-overlay {
