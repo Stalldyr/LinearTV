@@ -3,9 +3,9 @@ from pathlib import Path
 
 class MediaPathManager:
     def __init__(self, download_path="downloads", series_subdir=TYPE_SERIES, movies_subdir=TYPE_MOVIES, **kwargs):
-        self.base_dir = Path()
+        self.base_dir = Path(__file__).parent.parent.resolve()
         
-        self.download_path = Path(download_path)
+        self.download_path = self.base_dir / download_path
         self.series_path = self.download_path/series_subdir
         self.movies_path = self.download_path/movies_subdir
 
@@ -21,7 +21,6 @@ class MediaPathManager:
         for path in [self.download_path, self.series_path, self.movies_path]:
             Path(path).mkdir(exist_ok=True)
 
-    
     def get_program_dir(self, media_type, directory) -> Path:
         """Get the full path to a program's directory"""
 

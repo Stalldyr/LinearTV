@@ -14,13 +14,13 @@ class TVDatabase:
         self.test_time = test_time
 
         self.metadatafetcher = MetaDataFetcher()
+
+        self.sql = SQLexecute(self.db_path)
+        self.execute_query = SQLexecute(self.db_path).execute_query
     
         if not self.db_path.exists():
             self.db_path.touch(exist_ok=True)
             self.setup_database()
-        
-        self.sql = SQLexecute(self.db_path)
-        self.execute_query = SQLexecute(self.db_path).execute_query
 
     #SETUP
 
@@ -95,7 +95,6 @@ class TVDatabase:
         self.execute_query('''
             CREATE TABLE IF NOT EXISTS weekly_schedule (
                 id INTEGER PRIMARY KEY,
-                content_type TEXT NOT NULL,
                 series_id INTEGER REFERENCES series(id),
                 episode_id INTEGER REFERENCES episodes(id),
                 movie_id INTEGER REFERENCES movies(id),
@@ -269,54 +268,34 @@ class TVDatabase:
             conditions.append(f's.source = {SOURCE_LOCAL}')
 
         if schedule:
-            join = "RIGHT JOIN weekly_schedule ws ON ws.series_id = e.series_id"
+            join = """AND EXISTS (
+                SELECT 1 FROM weekly_schedule ws 
+                WHERE ws.series_id = s.id
+            )"""
 
         query = f'''
             SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            {join}
             WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            {join}
             ORDER BY series_name, e.season_number, e.episode_number
         '''
 
         return self.execute_query(query)
-    
-    def get_pending_episodes_in_schedule(self, strict:bool = False, local:bool = False):
-        """
-        strict: wether status is strictly "pending" or have other nonavailable statuses, i.e. "failed" or "missing".
-        """
-        conditions = []
-        
-        if strict:
-            conditions.append(f'e.status IN ("{STATUS_PENDING}")')
-        else:
-            conditions.append(f'e.status IN ("{STATUS_PENDING}", "{STATUS_FAILED}", "{STATUS_MISSING}", "{STATUS_DOWNLOADING}", "{STATUS_DELETED}")')
-
-        if local:
-            conditions.append(f's.source = {SOURCE_LOCAL}')
-
-        query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
-            FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
-            ORDER BY series_name, e.season_number, e.episode_number
-        '''
-
-        return self.execute_query(query)
-        
+            
     def get_scheduled_episodes(self):
         """
-        Note: Should be corrected to only include programs that is in the weekly schedule
+        All episodes in the schedule for the current week
         """
+
         query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.source, s.total_episodes, s.reverse_order
+            SELECT DISTINCT e.*, s.*
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             JOIN weekly_schedule ws ON ws.series_id = s.id
             WHERE e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
-            ORDER BY series_name, e.season_number, e.episode_number
+            ORDER BY s.name, e.season_number, e.episode_number
         '''
         return self.execute_query(query)
     

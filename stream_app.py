@@ -21,13 +21,15 @@ stream_app = Blueprint(
     template_folder='templates',
     static_folder='static',
     static_url_path='/tvstreamer/static'      
-) 
+)
 
-tv_stream = TVStreamManager()
+from datetime import datetime
+test_time = datetime.strptime("2026-01-12 19:00", "%Y-%m-%d %H:%M")
+
+tv_stream = TVStreamManager(test_time)
 tv_db = TVDatabase()
 program_manager = ProgramManager()
 path_manager = MediaPathManager()
-
 
 # ============ CONFIG FUNCTION ============
 #TODO Make into a class
@@ -96,7 +98,9 @@ def prepare():
 
 @stream_app.route('/video/<content_type>/<directory>/<filename>')
 def serve_video(content_type, directory, filename):
-    return send_from_directory(path_manager.get_program_dir(content_type, directory), filename) #Might reassign to programmanager or mediapathmanager
+    print(path_manager.get_program_dir(content_type,directory))
+    print(path_manager.base_dir)
+    return send_from_directory(path_manager.get_program_dir(content_type, directory), filename) #TODO Might reassign to programmanager or mediapathmanager
 
 @stream_app.route('/api/config')
 def get_config():
@@ -132,7 +136,6 @@ def get_kept_episodes():
 def get_obsolete_episodes():
     return jsonify(tv_db.get_obsolete_episodes())
 
-
 def return_status(success, message, error_code = None, debug=False):
     if debug:
         print(message)
@@ -142,7 +145,7 @@ def return_status(success, message, error_code = None, debug=False):
     else:
         return jsonify({"status": "error", "message": message}), error_code
 
-tv_stream.start_monitoring()    
+tv_stream.start_monitoring()
 
 if __name__ == '__main__':
     app = Flask(__name__)

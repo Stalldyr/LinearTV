@@ -1,17 +1,6 @@
 let timeOnPage = 0;
 const video = document.getElementById('tvPlayer');
 
-setInterval(() => {
-    timeOnPage += 10;
-    
-    fetch('/api/traffic', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({seconds: timeOnPage})
-    });
-}, 10000); 
-
-
 //Fetches current program
 let currentProgram = null;
 

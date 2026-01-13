@@ -104,6 +104,7 @@ class ProgramManager:
             if len(existing) == 1:
                 if data["name"] == "[Ledig]":
                     self.db.delete_schedule_by_id(existing[0]["id"])
+                    self.db.update_schedule_count()
 
                     return True, f"Removed program {data['name']} from schedule at {data['day_of_week']} {data['start_time']}"
 

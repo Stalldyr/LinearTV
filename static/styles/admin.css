@@ -112,3 +112,10 @@
     background-color: #ccc;
     color: black;
 }
+
+.column {
+  float: left;
+  width: 45%;
+  margin-left: 5px;
+  margin-right: 5px;
+}

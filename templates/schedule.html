@@ -13,11 +13,16 @@
     <div class="schedule-form" id="scheduleForm">
       <h3>Velg program</h3>
 
-      <input type="radio" name="scheduleType" id="scheduleOption0" value="series" onclick="updateScheduleType()" checked>
-      <label for="scheduleOption0">Serie</label>
-      <input type="radio" name="scheduleType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">
-      <label for="scheduleOption1">Film</label>
       
+      <label for="scheduleOption0" class="radio-inline">
+        <input type="radio" name="scheduleType" id="scheduleOption0" value="series" onclick="updateScheduleType()" checked>
+        Serie
+      </label>
+      <label for="scheduleOption1" class="radio-inline">
+        <input type="radio" name="scheduleType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">        
+        Film
+      </label>
+
       <form id="scheduleFormData" method="post">
         <div class="form-group">
           <label>Program:</label>
@@ -56,84 +61,87 @@
       <label for="programOption1">Film</label>
 
       <form id="programFormData">
-        <div class="form-group">
-          <label id="programTitleSelectLabel">Velg serie:</label>
-          <select id="programTitleSelect" onclick="updateProgramForm()">
-            <option selected>--Ny serie--</option>
-            {% for e in series_data %}
-              <option id="{{ e.id }}">{{ e.name }}</option>
+        <div class="column">
+          <div class="form-group">
+            <label id="programTitleSelectLabel">Velg serie:</label>
+            <select id="programTitleSelect" onclick="updateProgramForm()">
+              <option selected>--Ny serie--</option>
+              {% for e in series_data %}
+                <option id="{{ e.id }}">{{ e.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Tittel:</label>
+            <input type="text" id="programTitle" required/>
+          </div>
+
+          <div class="form-group">
+            <label>Kilde:</label>
+            <select id="programSource">
+              <option label="NRK">NRK</option>
+              <option label="TV2">TV2</option>
+              <option label="YouTube">YouTube</option>
+              <option label="Lokalt">Local</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>URL:</label>
+            <input type="text" id="programUrl"/>
+          </div>
+
+          <div class="form-group">
+            <label id="programSeasonLabel">Startsesong:</label>
+            <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
+          </div>
+
+          <div class="form-group">
+            <label id="programEpisodeLabel">Startepisode:</label>
+            <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
+          </div>
+        </div>
+        <div class="column">
+          <div class="form-group">
+            <label>Beskrivelse:</label>
+            <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Utgivelsesår:</label>
+            <input type="text" id="programYear" placeholder="e.g 2001"/>
+          </div>
+
+          <div class="form-group">
+            <label>Lengde:</label>
+            <select id="programDuration">
+              <option label="30 minutter">30</option>
+              <option label="60 minutter">60</option>
+              <option label="90 minutter">90</option>
+              <option label="120 minutter">120</option>
+              <option label="150 minutter">150</option>
+            </select>
+          </div>
+
+          <div  class="form-group">
+            <label>Sjanger:</label>
+            <select id="programGenre">
+            {% for genre in genres %}
+              <option label="{{ genre }}"> {{ genre }}</option>
             {% endfor %}
-          </select>
-        </div>
+            </select>        
+          </div>
 
-        <div class="form-group">
-          <label>Tittel:</label>
-          <input type="text" id="programTitle" required/>
-        </div>
+          <div  class="form-group">
+            <label>TMDB-id:</label>
+              <input type="text" id="programTmdbId">
+          </div>
 
-        <div class="form-group">
-          <label>Kilde:</label>
-          <select id="programSource">
-            <option label="NRK">NRK</option>
-            <option label="TV2">TV2</option>
-            <option label="YouTube">YouTube</option>
-            <option label="Lokalt">Local</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>URL:</label>
-          <input type="text" id="programUrl"/>
-        </div>
-
-        <div class="form-group">
-          <label id="programSeasonLabel">Startsesong:</label>
-          <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
-        </div>
-
-        <div class="form-group">
-          <label id="programEpisodeLabel">Startepisode:</label>
-          <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
-        </div>
-
-        <div class="form-group">
-          <label>Beskrivelse:</label>
-          <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>Utgivelsesår:</label>
-          <input type="text" id="programYear" placeholder="e.g 2001"/>
-        </div>
-
-        <div class="form-group">
-          <label>Lengde:</label>
-          <select id="programDuration">
-            <option label="30 minutter">30</option>
-            <option label="60 minutter">60</option>
-            <option label="90 minutter">90</option>
-            <option label="120 minutter">120</option>
-            <option label="150 minutter">150</option>
-          </select>
-        </div>
-
-        <div  class="form-group">
-          <label>Sjanger:</label>
-          <select id="programGenre">
-          {% for genre in genres %}
-            <option label="{{ genre }}"> {{ genre }}</option>
-          {% endfor %}
-          </select>        
-        </div>
-
-        <div  class="form-group">
-          <label>TMDB-id:</label>
-            <input type="text" id="programTmdbId">
-        </div>
-
-        <div class="form-group">
-          <label id="programIsReverseLabel">Omvendt spilleliste:</label>
-          <input type="checkbox" id="programIsReverse">
+          <div class="form-group">
+            <label id="programIsReverseLabel">Omvendt spilleliste:</label>
+            <input type="checkbox" id="programIsReverse">
+          </div>
         </div>
 
         <div class="form-buttons">
