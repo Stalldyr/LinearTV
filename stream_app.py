@@ -23,10 +23,10 @@ stream_app = Blueprint(
     static_url_path='/tvstreamer/static'      
 )
 
-from datetime import datetime
-test_time = datetime.strptime("2026-01-12 19:00", "%Y-%m-%d %H:%M")
+#from datetime import datetime
+#test_time = datetime.strptime("2026-01-12 19:00", "%Y-%m-%d %H:%M")
 
-tv_stream = TVStreamManager(test_time)
+tv_stream = TVStreamManager()
 tv_db = TVDatabase()
 program_manager = ProgramManager()
 path_manager = MediaPathManager()
@@ -98,8 +98,6 @@ def prepare():
 
 @stream_app.route('/video/<content_type>/<directory>/<filename>')
 def serve_video(content_type, directory, filename):
-    print(path_manager.get_program_dir(content_type,directory))
-    print(path_manager.base_dir)
     return send_from_directory(path_manager.get_program_dir(content_type, directory), filename) #TODO Might reassign to programmanager or mediapathmanager
 
 @stream_app.route('/api/config')
