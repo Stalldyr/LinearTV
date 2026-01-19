@@ -209,7 +209,7 @@ class TVPreparer():
 
             first_is_rerun = airings[0]["is_rerun"] == 1
             offset = 1 if first_is_rerun else 0
-            episodes = self.database.get_scheduled_episodes_by_id(series["id"], offset)
+            episodes = self.database.get_scheduled_episodes_by_id(series["id"], series["season"], offset)
 
             if not episodes:
                 continue

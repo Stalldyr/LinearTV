@@ -312,7 +312,7 @@ class TVDatabase:
 
         return self.execute_query(query)
     
-    def get_scheduled_episodes_by_id(self, series_id, offset):
+    def get_scheduled_episodes_by_id(self, series_id, season, offset):
         """
         Returns episodes from the episodes table that are scheduled to be shown in the weekly schedule
         """
@@ -321,11 +321,11 @@ class TVDatabase:
             SELECT e.* FROM episodes e
             JOIN series s ON e.series_id = s.id
             WHERE series_id = ? 
-            AND e.episode_number BETWEEN (s.episode - ?) AND (s.episode + s.episode_count - 1)
+            AND e.season_number = ? AND e.episode_number BETWEEN (s.episode - ?) AND (s.episode + s.episode_count - 1)
             ORDER BY e.season_number, e.episode_number
         '''
 
-        return self.execute_query(query, (series_id, offset))
+        return self.execute_query(query, (series_id, season, offset))
     
     def get_obsolete_episodes(self):
         """Returns available episodes that has already been viewed and is not planned to be viewes again."""
