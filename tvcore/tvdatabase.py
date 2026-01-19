@@ -313,6 +313,10 @@ class TVDatabase:
         return self.execute_query(query)
     
     def get_scheduled_episodes_by_id(self, series_id, offset):
+        """
+        Returns episodes from the episodes table that are scheduled to be shown in the weekly schedule
+        """
+
         query = '''
             SELECT e.* FROM episodes e
             JOIN series s ON e.series_id = s.id

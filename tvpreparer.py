@@ -40,7 +40,7 @@ class TVPreparer():
 
         for e in scheduled_episodes:
             self.database.increment_episode(e['series_id'])
-            print(f"Series {e["series_name"]}: Episode number incremented.")
+            print(f"Series {e["name"]}: Episode number incremented.")
 
     def update_keeping_status(self):
         """
@@ -122,7 +122,7 @@ class TVPreparer():
             print(f"Pending episode added for {series_name}")
 
     def download_weekly_schedule(self):
-        pending_episodes = self.database.get_scheduled_episodes()
+        pending_episodes = self.database.get_pending_episodes()
         self._download(pending_episodes, TABLE_SERIES)
 
         pending_movies = self.database.get_scheduled_movies()
