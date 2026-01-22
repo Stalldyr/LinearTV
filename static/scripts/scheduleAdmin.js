@@ -242,7 +242,6 @@ function updateScheduleTable(name, isRerun, startTime, blocks, day) {
     }
 }
 
-
 //Saves schedule to database
 function saveSchedule() {
     const programType = document.querySelector('input[name="scheduleType"]:checked').value;
@@ -376,4 +375,27 @@ function deleteProgram() {
         .finally(() => {
             location.reload();
         });
+}
+
+function fetchMetaData() {
+    data = {
+        program_type: document.querySelector('input[name="programType"]:checked').value,
+        tmdb_id: document.getElementById('programTmdbId').value,
+        season: document.getElementById('programSeason').value
+    }
+
+    console.log(data)
+
+    fetch('/admin/fetch_metadata', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error while fetching metadata');
+        })
 }

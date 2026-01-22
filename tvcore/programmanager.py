@@ -11,7 +11,7 @@ class ProgramManager:
         self.db = TVDatabase()
         self.metadatafetcher = MetaDataFetcher()
 
-    def create_or_update_program(self, data:dict):
+    def add_or_update_program(self, data:dict):
         """
             Handle the complete workflow of adding or updating a program.
             
@@ -25,9 +25,6 @@ class ProgramManager:
         program_type = data.pop("program_type")
         program_id = data.pop("id")
         program_name = data.get("name", None)
-
-        print(data)
-        print(program_name)
 
         if not program_name:
             print("Missing program name")
@@ -149,6 +146,45 @@ class ProgramManager:
 
         return schedule_data, series_data, movie_data
 
+    def fetch_metadata(self, media_type, tmdb_id):
+        try:
+            if media_type == TYPE_SERIES:
+                metadata = self.metadatafetcher.fetch_tmdb_series_info(tmdb_id)
+
+                data = {
+                    "name": metadata["name"],
+                    "first_air_date": metadata["first_air_date"],
+                    "overview": metadata["overview"],
+                    "tagline": metadata["tagline"],
+                    "genre": metadata["genres"],
+                    "original_language": metadata["original_language"]
+                }
+
+                print(data)
+
+                return data
+            
+            elif media_type == TYPE_MOVIES:
+                metadata = self.metadatafetcher.fetch_tmdb_data(media_type, tmdb_id)
+
+                print(metadata)
+
+                data = {
+                    "title": metadata["title"],
+                    "original_title": metadata["original_title"],
+                    "release_date": metadata["release_date"],
+                    "overview": metadata["overview"],
+                    "genre": metadata["genres"],
+                    "original_language": metadata["original_language"]
+                }
+
+                print(data)
+
+                return data
+            
+        except Exception as e:
+            print(f"Error recieving tmdb metadata: {e}")
+            return True
     
     def get_video_file(self):
         pass

@@ -71,6 +71,101 @@
               {% endfor %}
             </select>
           </div>
+          
+          <div class="form-group">
+            <label id="programSeasonLabel">Startsesong:</label>
+            <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
+          </div>
+      
+          <div class="form-group">
+            <label>TMDB-id:</label>
+              <input type="text" id="programTmdbId">
+          </div>
+          <button class="mini-button" id="fetchMetaDataButton" onclick="fetchMetaData()">
+            Fetch
+          </button>
+
+          <div class="form-group">
+            <label>Tittel:</label>
+            <input type="text" id="programTitle"/>
+          </div>
+
+          <div class="form-group">
+            <label>URL:</label>
+            <input type="text" id="programUrl"/>
+          </div>
+
+          <div class="form-group">
+            <label id="programEpisodeLabel">Startepisode:</label>
+            <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
+          </div>
+        </div>
+        <div class="column">
+          <div class="form-group">
+            <label>Beskrivelse:</label>
+            <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Utgivelsesår:</label>
+            <input type="text" id="programYear" placeholder="e.g 2001"/>
+          </div>
+
+          <div class="form-group">
+            <label>Lengde:</label>
+            <select id="programDuration">
+              <option label="30 minutter">30</option>
+              <option label="60 minutter">60</option>
+              <option label="90 minutter">90</option>
+              <option label="120 minutter">120</option>
+              <option label="150 minutter">150</option>
+            </select>
+          </div>
+
+          <div  class="form-group">
+            <label>Sjanger:</label>
+            <select id="programGenre">
+            {% for genre in genres %}
+              <option label="{{ genre }}"> {{ genre }}</option>
+            {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label id="programIsReverseLabel">Omvendt spilleliste:</label>
+            <input type="checkbox" id="programIsReverse">
+          </div>
+        </div>
+
+        <div class="form-buttons">
+          <button type="button" class="cancel-btn" onclick="closeProgramForm()">Avbryt</button>
+          <button type="button" class="delete-btn" onclick="deleteProgram()">Slett</button>
+          <button type="button" class="save-btn" onclick="saveProgram()">Lagre</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Program Form -->
+    <div class="program-form" id="programFormOriginal">
+      <h3>Legg til nytt program</h3>
+
+      <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
+      <label for="programOption0">Serie</label>
+
+      <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
+      <label for="programOption1">Film</label>
+
+      <form id="programFormData">
+        <div class="column">
+          <div class="form-group">
+            <label id="programTitleSelectLabel">Velg serie:</label>
+            <select id="programTitleSelect" onclick="updateProgramForm()">
+              <option selected>--Ny serie--</option>
+              {% for e in series_data %}
+                <option id="{{ e.id }}">{{ e.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
 
           <div class="form-group">
             <label>Tittel:</label>

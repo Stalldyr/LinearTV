@@ -80,15 +80,7 @@ class TVPreparer():
 
         for series in series_list:
 
-            if series["source_url"]:
-                try:
-                    yt_dlp_data = metadata_fetcher.get_ytdlp_season_metadata(TYPE_SERIES, series["directory"], series["season"], video_url=series["source_url"])
-                    self._create_pending(yt_dlp_data["entries"], series["season"], series["id"], series["name"])
-
-                except Exception as e:
-                    print(f"Error fetching metadata for {series["name"]}")
-
-            elif series["tmdb_id"]:
+            if series["tmdb_id"]:
                 try:
                     tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
 
@@ -97,9 +89,16 @@ class TVPreparer():
                 except Exception as e:
                     print(f"Error fetching metadata for {series["name"]}")
 
+            elif series["source_url"]:
+                try:
+                    yt_dlp_data = metadata_fetcher.get_ytdlp_season_metadata(TYPE_SERIES, series["directory"], series["season"], video_url=series["source_url"])
+                    self._create_pending(yt_dlp_data["entries"], series["season"], series["id"], series["name"])
+
+                except Exception as e:
+                    print(f"Error fetching metadata for {series["name"]}")
+
             else:
                 print(f"No metadata available for {series["name"]}")
-
 
     def _create_pending(self, episodes, season, series_id, series_name, ytdlp=True):
         metadata_fetcher = MetaDataFetcher()
@@ -130,7 +129,7 @@ class TVPreparer():
 
     def _download(self, pending, media_type):
         for entry in pending:
-            if entry["source"] == SOURCE_LOCAL:
+            if not entry["source_url"]:
                 continue
             
             if media_type == TYPE_SERIES:                

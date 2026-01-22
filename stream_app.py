@@ -32,25 +32,28 @@ program_manager = ProgramManager()
 path_manager = MediaPathManager()
 
 # ============ CONFIG FUNCTION ============
-#TODO Make into a class
 
-def get_time_slots():
-    with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
-        tv_config =  json.load(f)
+class TVConfig:
+    def __init__(self, config_path=""):
+        if not config_path:
+            with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
+                self.config =  json.load(f)
 
-    timeslots = calculate_time_slots(
-        tv_config["broadcast_start"],
-        tv_config["broadcast_end"],
-        tv_config["broadcast_steps"]
-    )
+        else:
+            with open(Path(config_path), 'r', encoding='utf-8') as f:
+                self.config =  json.load(f)
 
-    return timeslots
+    def get_time_slots(self):
+        timeslots = calculate_time_slots(
+            self.config["broadcast_start"],
+            self.config["broadcast_end"],
+            self.config["broadcast_steps"]
+        )
 
-def get_genres():
-    with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
-        tv_config =  json.load(f)
+        return timeslots
 
-    return tv_config["genres"]
+    def get_genres(self):
+        return self.config["genres"]
 
 
 # ============ STREAMING PAGES ============
@@ -63,9 +66,10 @@ def stream():
 @stream_app.route('/admin/schedule')
 def admin():
     schedule_data, series_data, movie_data = program_manager.initialize_admin_page()
-
-    timeslots = get_time_slots()
-    genres = get_genres()
+    
+    tv_config = TVConfig()
+    timeslots = tv_config.get_time_slots()
+    genres = tv_config.get_genres()
 
     return render_template('admin_schedule.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data, genres=genres, timeslots=timeslots)
 
@@ -83,7 +87,7 @@ def add_program():
 
     print(f"Recieved data for new program: {data}")
 
-    return return_status(*program_manager.create_or_update_program(data))
+    return return_status(*program_manager.add_or_update_program(data))
 
 @stream_app.route('/admin/delete_program', methods=['POST'])
 def delete_program():
@@ -91,9 +95,18 @@ def delete_program():
 
     return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
 
+@stream_app.route('/admin/fetch_metadata', methods=['POST'])
+def fetch_metadata():
+    data = request.get_json()
+
+    metadata = program_manager.fetch_metadata(data["program_type"], data["tmdb_id"])
+
+    return return_status(True, "succes")
+
 @stream_app.route('/admin/preparer')
 def prepare():
     return render_template("admin_preparer.html")
+
 # ============ API ROUTES ============
 
 @stream_app.route('/video/<content_type>/<directory>/<filename>')
@@ -126,6 +139,10 @@ def get_pending_episodes():
 def get_scheduled_episodes():
     return jsonify(tv_db.get_scheduled_episodes())
 
+@stream_app.route('/api/scheduled_movies')
+def get_scheduled_movies():
+    return jsonify(tv_db.get_scheduled_movies())
+
 @stream_app.route('/api/kept_episodes')
 def get_kept_episodes():
     return jsonify(tv_db.get_kept_episodes())
@@ -135,6 +152,7 @@ def get_obsolete_episodes():
     return jsonify(tv_db.get_obsolete_episodes())
 
 def return_status(success, message, error_code = None, debug=False):
+    """Helper function for status"""
     if debug:
         print(message)
 
@@ -142,6 +160,7 @@ def return_status(success, message, error_code = None, debug=False):
         return jsonify({"status": "success", "message": message})
     else:
         return jsonify({"status": "error", "message": message}), error_code
+
 
 tv_stream.start_monitoring()
 

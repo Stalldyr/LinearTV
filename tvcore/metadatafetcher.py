@@ -15,7 +15,7 @@ class MetaDataFetcher:
         self.paths = MediaPathManager()
         tmdb.API_KEY = tmdb_api_key
 
-    #YTDLP
+    # ============ YTDLP ============
 
     def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None, download_json = True):
         '''
@@ -64,9 +64,9 @@ class MetaDataFetcher:
                 print(f"Failed to fetch YTDLP metadata from {url}: {e}")
                 return {}
 
-    #TMDB
+    # ============ TMDB ============
 
-    def get_tmdb_metadata(self, media_type:str, directory:str,  tmdb_id:int, season:int=None, language:str="no"):
+    def get_tmdb_metadata(self, media_type:str, directory:str,  tmdb_id:int, season:int=None, language:str="no", cached=True, write_to_json = True) -> dict:
         '''
             Get metadata from TMDB (with caching)
             
@@ -76,48 +76,101 @@ class MetaDataFetcher:
             language: Language for metadata
         '''
 
+        if cached:
+            return self.load_tmdb_json(media_type, directory, season)
+        
+        metadata = self.fetch_tmdb_data(media_type, tmdb_id, season, language)
+            
+        if write_to_json:
+            json_path = self.get_json_path(media_type, directory, season)
+
+            with open(json_path, 'w') as f:
+                json.dump(metadata, f, indent=4)
+
+        return metadata
+    
+    def get_json_path(self,  media_type:str, directory:str, season:int=None):
         if media_type == TYPE_SERIES:
             if season is None:
                 print("Need to provide season for series")
                 return None
         
             json_name = self.paths.create_tmbd_season_json_name(season)
-            params = (tmdb_id, season)
-            fetcher = tmdb.TV_Seasons
             
         elif media_type == TYPE_MOVIES:
             json_name = self.paths.create_tmbd_movie_json_name(directory)
-            params = (tmdb_id,)
-            fetcher = tmdb.Movies
         else:
             print("Invalid media type")
             return None
         
         json_path = self.paths.get_metadata_path(media_type, directory, json_name)
 
+        return json_path
+    
+    def load_tmdb_json(self, media_type:str, directory:str, season:int=None):
+        """
+        Load TMDB-metadata from cache
+            
+        media_type: "movies" of "series"
+        """        
+        json_path = self.get_json_path(media_type, directory, season)
+
         if json_path.exists():
             with open(json_path) as f:
                 return json.load(f)
+        else:
+            print("File not found")
+            return None
+    
+
+    def fetch_tmdb_data(self, media_type:str, tmdb_id:int, season:int=None, language:str="no"):
+        if media_type == TYPE_SERIES:
+            if season is None:
+                print("Need to provide season for series")
+                return None
+        
+            params = (tmdb_id, season)
+            fetcher = tmdb.TV_Seasons
             
+        elif media_type == TYPE_MOVIES:
+            params = (tmdb_id,)
+            fetcher = tmdb.Movies
+        else:
+            print("Invalid media type")
+            return None
+        
         fetch_options  = {
             "language": language
-        }       
+        }
 
         try:
             metadata = self._fetch_tmdb_info(fetcher, params, fetch_options)
+            return metadata
         except Exception as e:
-            print(f"Failed to download tmdb metadata: {e}")
+            print(f"Failed to fetch tmdb metadata: {e}")
             return None
 
-        with open(json_path, 'w') as f:
-            json.dump(metadata, f, indent=4)
-
-        return metadata
 
     def _fetch_tmdb_info(self, fetcher, params, fetch_options):
         return fetcher(*params).info(**fetch_options)
     
-    #EXTRACT INFO
+    # ============ SERIES INFO ============
+    
+    def fetch_tmdb_series_info(self, tmdb_id):
+        params = (tmdb_id,)
+
+        fetch_options  = {
+            "language": "no"
+        }
+
+        try:
+            metadata = self._fetch_tmdb_info(tmdb.TV, params, fetch_options)
+            return metadata
+        except Exception as e:
+            print(f"Failed to fetch tmdb metadata: {e}")
+            return None
+
+    # ============ EXTRACT METADATA ============
 
     def get_season_episode_count(self, directory, season, source_url=None, tmdb_id=None):
         """Get total episode count for a season from either source"""
@@ -167,3 +220,14 @@ class MetaDataFetcher:
             "description": movie_data.get("overview"),
             "duration": movie_data.get("runtime")
         }
+    
+
+    def _media_type_checker(self, media_type):
+        #TODO A wrapper that is able to check for either "series" or "movies", and otherwise return None
+
+        if media_type == TYPE_SERIES:
+            base = self.series_path
+        elif media_type == TYPE_MOVIES:
+            base = self.movies_path
+        else:
+            raise ValueError(f"Invalid media type: {media_type}")

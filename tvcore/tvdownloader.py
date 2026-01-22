@@ -86,10 +86,10 @@ class Downloader:
         '''
         Downloads from playlist
         
-        :param url: Description
-        :param output_path: Description
-        :param index: Description
-        :param kwargs: Description
+        url: Download url
+        output_path: Download path
+        index: The index to download for a playlist
+        kwargs: Optional ytdlp options
         '''
 
         quality = quality or self.default_quality

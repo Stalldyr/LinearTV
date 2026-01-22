@@ -35,8 +35,7 @@ class TVDatabase:
                 name TEXT UNIQUE NOT NULL,
                 tmdb_id INT,          
                 season INTEGER DEFAULT 1,       
-                episode INTEGER DEFAULT 1,          
-                source TEXT,                         
+                episode INTEGER DEFAULT 1,       
                 source_url TEXT,                     -- "https://play.tv2.no/programmer/serier/hotel-caesar/sesong-{season}"
                 directory TEXT,                      -- "hotel_caesar_s{season}E{episode}"
                 total_episodes INTEGER,              
@@ -87,7 +86,6 @@ class TVDatabase:
                 status TEXT DEFAULT 'pending',
                 last_aired DATE,
                 views INT,
-                source TEXT,
                 source_url TEXT
             )                                    
         ''')
@@ -144,7 +142,6 @@ class TVDatabase:
             
         Required fields in program_data:
             name: Program name
-            source: Source platform (NRK, TV2, YouTube, etc)
             season (for series)
             episode (for series)
         
@@ -265,7 +262,7 @@ class TVDatabase:
             conditions.append(f'e.status IN ("{STATUS_PENDING}", "{STATUS_FAILED}", "{STATUS_MISSING}", "{STATUS_DOWNLOADING}", "{STATUS_DELETED}")')
 
         if local:
-            conditions.append(f's.source = {SOURCE_LOCAL}')
+            conditions.append(f's.source_url = None')
 
         if schedule:
             join = """AND EXISTS (
@@ -274,7 +271,7 @@ class TVDatabase:
             )"""
 
         query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.source, s.reverse_order, s.episode_count
+            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.reverse_order, s.episode_count
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
@@ -406,7 +403,7 @@ class TVDatabase:
             WHERE status = "available"
         '''
         return self.execute_query(query)
-    
+        
     def get_scheduled_movies(self):
         """Returns movies from the weekly schedule"""
         query = f'''
@@ -513,7 +510,7 @@ class TVDatabase:
         '''
 
         query = f'''
-            SELECT s.id as series_id, s.name, s.season, s.episode, s.source, s.source_url, s.tmdb_id, s.directory, s.total_episodes, s.reverse_order as reverse, c.count
+            SELECT s.id as series_id, s.name, s.season, s.episode, s.source_url, s.tmdb_id, s.directory, s.total_episodes, s.reverse_order as reverse, c.count
             FROM series s
             LEFT JOIN ({count}) c ON c.series_id = s.id
             WHERE c.count > 0
