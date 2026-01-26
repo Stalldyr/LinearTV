@@ -53,10 +53,11 @@ class TVPreparer():
             self.database.update_episode_keeping_status(episode['id'], False)
             print(f"{episode["filename"]} marked for deletion")
 
-    def cleanup_obsolete_media(self):
+    def cleanup_obsolete_episodes(self):
         obsolete_episodes = self.database.get_obsolete_episodes()
         self._cleanup(obsolete_episodes, TYPE_SERIES)
 
+    def cleanup_obsolete_movies(self):
         obsolete_movies = self.database.get_obsolete_movies()
         self._cleanup(obsolete_movies, TYPE_MOVIES)
 
@@ -255,7 +256,10 @@ if __name__ == "__main__":
             prep.increment_episodes()
 
         elif operation == "delete":
-            prep.cleanup_obsolete_media()
+            prep.cleanup_obsolete_episodes()
+
+        elif operation == "delete_movies":
+            prep.cleanup_obsolete_movies()
 
         elif operation == "keep":
             prep.update_keeping_status()
@@ -273,7 +277,7 @@ if __name__ == "__main__":
             prep.link_programs_to_schedule()
 
         elif operation == "all":
-            prep.cleanup_obsolete_media()
+            prep.cleanup_obsolete_episodes()
             prep.update_keeping_status()
             prep.create_pending_episodes()
             prep.download_weekly_schedule()

@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint
 from pathlib import Path
 import json
+import sys 
+from datetime import datetime
 
 try:
     from .tvcore.tvstreamer import TVStreamManager
@@ -23,10 +25,12 @@ stream_app = Blueprint(
     static_url_path='/tvstreamer/static'      
 )
 
-#from datetime import datetime
-#test_time = datetime.strptime("2026-01-12 19:00", "%Y-%m-%d %H:%M")
+test_time = None
+if len(sys.argv)>1:
+    test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
 
-tv_stream = TVStreamManager()
+
+tv_stream = TVStreamManager(time=test_time)
 tv_db = TVDatabase()
 program_manager = ProgramManager()
 path_manager = MediaPathManager()
@@ -58,10 +62,9 @@ class TVConfig:
 
 # ============ STREAMING PAGES ============
 @stream_app.route('/tvstream')
-def stream():
+def tvstream():
     return render_template('tvstream.html')
-
-# ============ ADMIN PAGES ============
+# ============= ADMIN PAGES =============
 
 @stream_app.route('/admin/schedule')
 def admin():
@@ -97,6 +100,7 @@ def delete_program():
 
 @stream_app.route('/admin/fetch_metadata', methods=['POST'])
 def fetch_metadata():
+    #TODO Return fetched metadata
     data = request.get_json()
 
     metadata = program_manager.fetch_metadata(data["program_type"], data["tmdb_id"])
@@ -165,6 +169,8 @@ def return_status(success, message, error_code = None, debug=False):
 tv_stream.start_monitoring()
 
 if __name__ == '__main__':
+
+
     app = Flask(__name__)
     app.register_blueprint(stream_app)
 

@@ -1,18 +1,132 @@
-<video id="tvPlayer" width="75%" height="auto" controls autoplay>
-    <source type="video/mp4">
-    Your browser does not support the video tag.
-</video>
-<button id="fullscreenBtn">Fullskjerm</button>
+<head>
+  <link href="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video-js.min.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.css">
 
-<div id="info">
+  <script src="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video.min.js') }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.min.js"></script>
+  <script src="{{ url_for('streaming.static', filename='node_modules/videojs-offset/dist/videojs-offset.min.js') }}"></script>
+
+  <style>
+  .video-js {
+    width: 100%;
+    aspect-ratio: 4/3;
+  }
+  </style>
+</head>
+
+<div id="streamContainer">
+  <video
+      id="tvPlayer"
+      class="video-js"
+      preload="auto"
+      controls
+      data-setup='{}'
+      poster='{{ url_for("streaming.static", filename="PM5544.png" ) }}'
+    >
+    
+    <source type="video/mp4">
+    <track kind="captions">
+    
+    <p class="vjs-no-js">
+      To view this video please enable JavaScript, and consider upgrading to a
+      web browser that
+      <a href="https://videojs.com/html5-video-support/" target="_blank">
+        supports HTML5 video
+      </a>
+    </p>
+  </video>
+  
+  <div id="info">
     <h2 id="programTitle"></h2>
     <p id="programTime"></p>
     <p id="programDescription"></p>
     <p id="nextProgram"></p>
+  </div>
+
+  <div id="dailySchedule">
+  </div>
 </div>
 
-<div id="dailySchedule">
+<script>
+  const options = {
+    preload:"auto",
+    autoplay:true,
+    controlBar: {
+        playToggle: false,
+        progressControl: false, 
+        remainingTimeDisplay: false,
+        volumePanel: true,  
+        fullscreenToggle: true
+    }
+  };
 
-</div>
+  var player = videojs('tvPlayer', options)
 
-<script src="{{ url_for('streaming.static', filename='scripts/tvStream.js') }}"></script>
+  player.logo({
+    image: '', //Insert link to logo here
+    width: 30,
+    height: 30,
+    fadeDelay: null
+  });
+
+  let currentProgram = null;
+  function updateProgram() {
+    fetch('/api/current')
+      .then(response => response.json())
+      .then(program => {
+          if (JSON.stringify(program) !== JSON.stringify(currentProgram)) {
+              console.log("Program changed!", program);
+              currentProgram = program;
+              
+              if (program.status === "off_air" || program.status === "no_program" || program.status === "unavailable") {
+                  player.src(``);
+                  document.getElementById('programTitle').innerText = program.name;
+                  document.getElementById('programTime').innerText = "";
+                  document.getElementById('programDescription').innerText = program.description;
+              } else {
+                  player.src(`/video/${program.content_type}/${program.directory}/${program.filename}`);
+                  document.getElementById('programTitle').innerText = program.name;
+                  document.getElementById('programTime').innerText = `${program.start_time} - ${program.end_time}`;
+                  if (program.episode_description){
+                      if (program.episode_number){
+                          document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.episode_description}`;
+                      } else {
+                          document.getElementById('programDescription').innerText = program.episode_description;
+                      }
+                  } else {
+                      document.getElementById('programDescription').innerText = program.program_description;
+                  }
+
+                var offset = calculateOffset(program.start_time)
+                console.log(offset)
+              
+                player.offset({
+                  start: offset,
+                  restart_beginning: false 
+                });
+              }
+
+              if (program.is_rerun){
+                  document.getElementById('programTitle').innerText += " (R)"
+              }
+          }
+      });
+  }
+
+  function calculateOffset(programStart) {
+    var now = new Date();
+    nowHour = now.getHours();
+    nowMinutes = now.getMinutes();
+    nowSeconds = now.getSeconds();
+
+    startHour = programStart.slice(0,2);
+    startMinute = programStart.slice(3,5);
+
+    offset = 3600*(nowHour-startHour) + 60*(nowMinutes-startMinute) + nowSeconds - 10;
+
+    return Math.max(0, offset)
+  }
+
+  updateProgram();
+  setInterval(updateProgram, 10000);
+</script>

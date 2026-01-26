@@ -6,8 +6,8 @@ class MediaPathManager:
         self.base_dir = Path(__file__).parent.parent.resolve()
         
         self.download_path = self.base_dir / download_path
-        self.series_path = self.download_path/series_subdir
-        self.movies_path = self.download_path/movies_subdir
+        self.series_path = self.download_path / series_subdir
+        self.movies_path = self.download_path / movies_subdir
 
         self.paths = []
         for path in kwargs:
