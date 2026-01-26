@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint
 from pathlib import Path
 import json
-import sys 
+import os 
 from datetime import datetime
 
 try:
@@ -26,8 +26,8 @@ stream_app = Blueprint(
 )
 
 test_time = None
-if len(sys.argv)>1:
-    test_time = datetime.strptime(sys.argv[1], "%Y-%m-%d %H:%M")
+if os.getenv('TEST_TIME'):
+    test_time = datetime.strptime(os.getenv('TEST_TIME'), "%Y-%m-%d %H:%M")
 
 
 tv_stream = TVStreamManager(time=test_time)
