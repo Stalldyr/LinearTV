@@ -48,7 +48,7 @@ class TVDownloader:
 
         return status
     
-    def download_movie(self, media_id, media_type, download_url, output_path):
+    def download_single(self, media_id, media_type, download_url, output_path):
         self.database.update_media_status(media_id, media_type, STATUS_DOWNLOADING)
         
         success = self.downloader.download(

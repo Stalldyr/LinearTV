@@ -25,13 +25,13 @@ class MediaPathManager:
         """Get the full path to a program's directory"""
 
         if media_type == TYPE_SERIES:
-            base = self.series_path
+            media_dir = self.series_path
         elif media_type == TYPE_MOVIES:
-            base = self.movies_path
+            media_dir = self.movies_path
         else:
             raise ValueError(f"Invalid media type: {media_type}")
         
-        program_dir = Path(base)/directory
+        program_dir = self.base_dir / media_dir / directory
         
         # Create if doesn't exist
         program_dir.mkdir(exist_ok = True)

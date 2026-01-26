@@ -17,6 +17,8 @@ import sys
 from colorama import Fore, Style
 import time
 import logging
+import re
+from pathlib import Path
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -55,6 +57,7 @@ class TVPreparer():
 
     def cleanup_obsolete_episodes(self):
         obsolete_episodes = self.database.get_obsolete_episodes()
+        print(obsolete_episodes)
         self._cleanup(obsolete_episodes, TYPE_SERIES)
 
     def cleanup_obsolete_movies(self):
@@ -62,8 +65,6 @@ class TVPreparer():
         self._cleanup(obsolete_movies, TYPE_MOVIES)
 
     def _cleanup(self, data, media_type):
-        data = self.database.get_obsolete_movies()
-
         if not data:
             print(f"No {media_type} to delete")
         
@@ -161,7 +162,7 @@ class TVPreparer():
                     reverse_order= entry["reverse_order"]
                 )
             elif media_type == TYPE_MOVIES:
-                status = self.downloader.download_movie(entry["id"], entry["source_url"])
+                status = self.downloader.download_single(entry["id"], TYPE_MOVIES, entry["source_url"], file_path)
 
             if status == STATUS_AVAILABLE:
                 self.handler.update_file_info(entry["id"], media_type, file_path)
@@ -174,6 +175,87 @@ class TVPreparer():
         
         movies = self.database.get_scheduled_movies()
         self._verify(movies, TYPE_MOVIES)
+
+    def verify_all_local_files(self):
+        """
+        Verifiserer ALLE lokale filer på disk, ikke bare scheduled episoder.
+        Finner orphan-filer som eksisterer på disk men har feil status i database.
+        """
+        print("\n=== Verifiserer lokale filer ===\n")
+        
+        # Hent alle serier
+        all_series = self.database.get_all_series()
+        
+        for series in all_series:
+            if not series['source_url']:
+                continue
+                
+            series_dir = self.paths.get_program_dir(TYPE_SERIES, series['directory'])
+            
+            if not series_dir.exists():
+                print(f"Serie-mappe ikke funnet: {series_dir}")
+                continue
+            
+            # Finn alle .mp4 filer i serien sin mappe
+            video_files = list(series_dir.glob("*.mp4"))
+            
+            if not video_files:
+                continue
+                
+            print(f"\n--- {series['name']} ---")
+            
+            for video_file in video_files:
+                self._verify_single_file(video_file, series)
+        
+        print("\n=== Verifisering fullført ===\n")
+
+
+    def _verify_single_file(self, video_file: Path, series: dict):
+        """
+        Verifiserer en enkelt videofil og oppdaterer riktig episode i database.
+        
+        Args:
+            video_file: Path til videofilen
+            series: Serie-info fra database
+        """
+        filename = video_file.name
+        
+        # Parse filnavn for å finne season og episode
+        # Format: serienavn_s##e##.mp4 eller serienavn_s####e##.mp4
+        pattern = r's(\d+)e(\d+)\.mp4$'
+        match = re.search(pattern, filename, re.IGNORECASE)
+        
+        if not match:
+            print(Fore.YELLOW + f"Kunne ikke parse: {filename}" + Style.RESET_ALL)
+            return
+        
+        season = int(match.group(1))
+        episode = int(match.group(2))
+        
+        # Finn episode i database
+        db_episode = self.database.get_episode_by_details(
+            series['id'], 
+            season, 
+            episode
+        )
+        
+        if not db_episode:
+            print(Fore.YELLOW + f"Ingen database-oppføring for {filename} (S{season}E{episode})" + Style.RESET_ALL)
+            return
+        
+        # Oppdater episode info
+        file_status = self.handler.verify_local_file(
+            db_episode['id'], 
+            video_file, 
+            TYPE_SERIES
+        )
+        
+        if file_status == STATUS_AVAILABLE:
+            self.handler.update_file_info(db_episode['id'], TYPE_SERIES, video_file)
+            print(Fore.GREEN + f"✓ {filename} (S{season}E{episode})" + Style.RESET_ALL)
+        else:
+            print(Fore.RED + f"✗ {filename} - status: {file_status}" + Style.RESET_ALL)
+
 
     def _verify(self, data, media_type):
         for entry in data:
