@@ -29,6 +29,12 @@ or
 pip install -e ./tvstreamer
 ```
 
+In order to install npm dependecies run this in root folder
+```
+cd static
+npm install
+```
+
 2. Schedule administration and testing
 
 Administrate and test the viewing schedule by running:

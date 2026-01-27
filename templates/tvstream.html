@@ -22,13 +22,6 @@
       width: 100%;
       aspect-ratio: 4/3;
     }
-
-    /* Skjul den globale Cast-knappen øverst i venstre hjørnet */
-    .cast-media-button,
-    #__cast_button {
-        display: none !important;
-    }
-
   </style>
 </head>
 
@@ -41,8 +34,7 @@
       data-setup='{}'
       poster='{{ url_for("streaming.static", filename="PM5544.png" ) }}'
     >
-    
-    <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4">
+
     <track kind="captions">
     
     <p class="vjs-no-js">
@@ -150,6 +142,6 @@
     return Math.max(0, offset)
   }
 
-  //updateProgram();
-  //setInterval(updateProgram, 10000);
+  updateProgram();
+  setInterval(updateProgram, 10000);
 </script>
