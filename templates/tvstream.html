@@ -31,10 +31,10 @@
       class="video-js"
       preload="auto"
       controls
-      data-setup='{}'
       poster='{{ url_for("streaming.static", filename="PM5544.png" ) }}'
     >
 
+    <source type="video/mp4">
     <track kind="captions">
     
     <p class="vjs-no-js">
@@ -55,7 +55,8 @@
 </div>
 
 <script>
-  var options = {
+  const options = {
+    muted:false,
     preload:"auto",
     autoplay:true,
     controls: true,
@@ -85,15 +86,16 @@
       player.controls(false);
   });
 
-  let currentProgram = null;
+  let currentProgram = "";
   function updateProgram() {
     fetch('/api/current')
       .then(response => response.json())
       .then(program => {
-          if (JSON.stringify(program) !== JSON.stringify(currentProgram)) {
+          if (program.filename !== currentProgram) {
               console.log("Program changed!", program);
-              currentProgram = program;
-              
+              currentProgram = program.filename;
+
+
               if (program.status === "off_air" || program.status === "no_program" || program.status === "unavailable") {
                   player.src(``);
                   document.getElementById('programTitle').innerText = program.name;
@@ -112,14 +114,12 @@
                   } else {
                       document.getElementById('programDescription').innerText = program.program_description;
                   }
-
-                var offset = calculateOffset(program.start_time)
-              
-                player.offset({
-                  start: offset,
-                  restart_beginning: false 
-                });
               }
+
+              player.offset({
+                start: calculateOffset(program.start_time) || 0,
+                restart_beginning: false 
+              });
 
               if (program.is_rerun){
                   document.getElementById('programTitle').innerText += " (R)"
@@ -143,5 +143,5 @@
   }
 
   updateProgram();
-  setInterval(updateProgram, 10000);
+  setInterval(updateProgram, 1000);
 </script>
