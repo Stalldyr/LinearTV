@@ -1,16 +1,34 @@
 <head>
-  <link href="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video-js.min.css') }}" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.css">
 
+  <link href="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video-js.min.css') }}" rel="stylesheet">
   <script src="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video.min.js') }}"></script>
-  <script src="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.min.js"></script>
+
   <script src="{{ url_for('streaming.static', filename='node_modules/videojs-offset/dist/videojs-offset.min.js') }}"></script>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.css">
+  <script src="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.min.js"></script>
+  
+  <script>
+    window.SILVERMINE_VIDEOJS_CHROMECAST_CONFIG = {
+        preloadWebComponents: true,
+    };
+  </script>
+  <link href="{{ url_for('streaming.static', filename='node_modules/@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css') }}" rel="stylesheet">
+  <script src="{{ url_for('streaming.static', filename='node_modules/@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.min.js') }}"></script>
+  <script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
 
   <style>
-  .video-js {
-    width: 100%;
-    aspect-ratio: 4/3;
-  }
+    .video-js {
+      width: 100%;
+      aspect-ratio: 4/3;
+    }
+
+    /* Skjul den globale Cast-knappen øverst i venstre hjørnet */
+    .cast-media-button,
+    #__cast_button {
+        display: none !important;
+    }
+
   </style>
 </head>
 
@@ -24,7 +42,7 @@
       poster='{{ url_for("streaming.static", filename="PM5544.png" ) }}'
     >
     
-    <source type="video/mp4">
+    <source src="//vjs.zencdn.net/v/oceans.mp4" type="video/mp4">
     <track kind="captions">
     
     <p class="vjs-no-js">
@@ -42,21 +60,23 @@
     <p id="programDescription"></p>
     <p id="nextProgram"></p>
   </div>
-
-  <div id="dailySchedule">
-  </div>
 </div>
 
 <script>
-  const options = {
+  var options = {
     preload:"auto",
     autoplay:true,
+    controls: true,
     controlBar: {
-        playToggle: false,
-        progressControl: false, 
-        remainingTimeDisplay: false,
-        volumePanel: true,  
-        fullscreenToggle: true
+      playToggle: false,
+      progressControl: false, 
+      remainingTimeDisplay: false,
+      volumePanel: true,  
+      fullscreenToggle: true
+    },
+    techOrder: [ 'chromecast', 'html5' ],
+    plugins: {
+      chromecast: {}
     }
   };
 
@@ -67,6 +87,10 @@
     width: 30,
     height: 30,
     fadeDelay: null
+  });
+
+  player.on('ended', function() {
+      player.controls(false);
   });
 
   let currentProgram = null;
@@ -98,7 +122,6 @@
                   }
 
                 var offset = calculateOffset(program.start_time)
-                console.log(offset)
               
                 player.offset({
                   start: offset,
@@ -127,6 +150,6 @@
     return Math.max(0, offset)
   }
 
-  updateProgram();
-  setInterval(updateProgram, 10000);
+  //updateProgram();
+  //setInterval(updateProgram, 10000);
 </script>
