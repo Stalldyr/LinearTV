@@ -34,12 +34,12 @@ class TVFileHandler:
 
         return file_info
 
-    def verify_local_file(self, file_id, filepath, media_type):
+    def verify_local_file(self, media_id, filepath, media_type):
         if Path(filepath).exists():
-            self.tv_db.update_media_status(file_id, media_type, STATUS_AVAILABLE)
+            self.tv_db.update_media_status(media_id, media_type, STATUS_AVAILABLE)
             return STATUS_AVAILABLE
         else:
-            self.tv_db.update_media_status(file_id, media_type, STATUS_MISSING)
+            self.tv_db.update_media_status(media_id, media_type, STATUS_MISSING)
             return STATUS_MISSING
 
     def _check_file_integrity(self, path):

@@ -77,7 +77,9 @@ class MetaDataFetcher:
         '''
 
         if cached:
-            return self.load_tmdb_json(media_type, directory, season)
+            metadata = self.load_tmdb_json(media_type, directory, season)
+            if metadata:
+                return metadata
         
         metadata = self.fetch_tmdb_data(media_type, tmdb_id, season, language)
             
@@ -201,7 +203,7 @@ class MetaDataFetcher:
         age_limit = episode_data.get("age_limit", None) #Might be unecessary info
         ext = episode_data.get("ext", None) #This too
         
-    def extract_episode_info_from_tmdb(self, episode_data):
+    def extract_episode_info_from_tmdb(self, episode_data:dict):
         """Extract relevant episode info from TMDB data"""
         return {
             "tmdb_id": episode_data.get("id"),
@@ -212,7 +214,7 @@ class MetaDataFetcher:
             "duration": episode_data.get("runtime")
         }
         
-    def extract_movie_info_from_tmdb(self, movie_data):
+    def extract_movie_info_from_tmdb(self, movie_data:dict):
         """Extract relevant movie info from TMDB data"""
         return {
             "tmdb_id": movie_data.get("id"),

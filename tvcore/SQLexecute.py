@@ -127,14 +127,14 @@ class SQLexecute:
         self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
         print(f"Slettet oppføring {id} i {table}")
 
-    def edit_row_by_id(self, table:str, series_id:int, **kwargs):        
+    def edit_row_by_id(self, table:str, row_id:int, **kwargs):        
         fields = []
         values = []
         for key, value in kwargs.items():
             fields.append(f"{key} = ?")
             values.append(value)
         
-        values.append(series_id)
+        values.append(row_id)
         
         query = f"UPDATE {table} SET {', '.join(fields)} WHERE id = ?"
         self.execute_query(query,values)

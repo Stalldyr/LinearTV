@@ -287,7 +287,7 @@ class TVDatabase:
         """
 
         query = f'''
-            SELECT DISTINCT e.*, s.*
+            SELECT DISTINCT e.*, s.directory, s.name
             FROM episodes e
             JOIN series s ON e.series_id = s.id
             JOIN weekly_schedule ws ON ws.series_id = s.id
@@ -342,6 +342,9 @@ class TVDatabase:
     
     def add_pending_episodes(self, **kwargs):
         self.sql.insert_row(TABLE_EPISODES, status = STATUS_PENDING, **kwargs)
+
+    def edit_pending_episodes(self, episode_id, **kwargs):
+        self.sql.edit_row_by_id(TABLE_EPISODES, episode_id, **kwargs)
     
     def update_episode_keeping_status(self, episode_id:int, keep:bool):
         ''''

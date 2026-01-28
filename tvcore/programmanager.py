@@ -13,13 +13,13 @@ class ProgramManager:
 
     def add_or_update_program(self, data:dict):
         """
-            Handle the complete workflow of adding or updating a program.
+        Handle the complete workflow of adding or updating a program.
+        
+        Args:
+            program_data: Dict with all program information from web form
             
-            Args:
-                program_data: Dict with all program information from web form
-                
-            Returns:
-                tuple: (success: bool, message: str)
+        Returns:
+            tuple: (success: bool, message: str)
         """
         
         program_type = data.pop("program_type")

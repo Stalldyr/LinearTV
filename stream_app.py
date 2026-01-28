@@ -63,7 +63,7 @@ class TVConfig:
 # ============ STREAMING PAGES ============
 @stream_app.route('/tvstream')
 def tvstream():
-    return render_template('tvstream.html')
+    return render_template('tvstream.html', offset=tv_stream.offset)
 # ============= ADMIN PAGES =============
 
 @stream_app.route('/admin/schedule')

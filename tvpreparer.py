@@ -81,12 +81,11 @@ class TVPreparer():
         metadata_fetcher = MetaDataFetcher()
 
         for series in series_list:
-
             if series["tmdb_id"]:
                 try:
                     tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
 
-                    self._create_pending(tmdb_data["episodes"], series["season"], series["id"], series["name"])
+                    self._create_pending(tmdb_data["episodes"], series["season"], series["id"], series["name"], ytdlp = False)
                     
                 except Exception as e:
                     print(f"Error fetching metadata for {series["name"]}")
@@ -116,11 +115,11 @@ class TVPreparer():
             existing = self.database.get_episode_by_details(series_id, episode_data["season_number"], episode_data["episode_number"])
 
             if existing:
-                continue
+                self.database.edit_pending_episodes(existing["id"], **episode_data)
+            else:
+                self.database.add_pending_episodes(**episode_data, series_id=series_id, download_date = None)
             
-            self.database.add_pending_episodes(**episode_data, series_id =series_id, download_date = None)
-
-            print(f"Pending episode added for {series_name}")
+        print(f"Pending episodes added for {series_name}")
 
     def download_weekly_schedule(self):
         pending_episodes = self.database.get_pending_episodes()
@@ -175,87 +174,6 @@ class TVPreparer():
         
         movies = self.database.get_scheduled_movies()
         self._verify(movies, TYPE_MOVIES)
-
-    def verify_all_local_files(self):
-        """
-        Verifiserer ALLE lokale filer på disk, ikke bare scheduled episoder.
-        Finner orphan-filer som eksisterer på disk men har feil status i database.
-        """
-        print("\n=== Verifiserer lokale filer ===\n")
-        
-        # Hent alle serier
-        all_series = self.database.get_all_series()
-        
-        for series in all_series:
-            if not series['source_url']:
-                continue
-                
-            series_dir = self.paths.get_program_dir(TYPE_SERIES, series['directory'])
-            
-            if not series_dir.exists():
-                print(f"Serie-mappe ikke funnet: {series_dir}")
-                continue
-            
-            # Finn alle .mp4 filer i serien sin mappe
-            video_files = list(series_dir.glob("*.mp4"))
-            
-            if not video_files:
-                continue
-                
-            print(f"\n--- {series['name']} ---")
-            
-            for video_file in video_files:
-                self._verify_single_file(video_file, series)
-        
-        print("\n=== Verifisering fullført ===\n")
-
-
-    def _verify_single_file(self, video_file: Path, series: dict):
-        """
-        Verifiserer en enkelt videofil og oppdaterer riktig episode i database.
-        
-        Args:
-            video_file: Path til videofilen
-            series: Serie-info fra database
-        """
-        filename = video_file.name
-        
-        # Parse filnavn for å finne season og episode
-        # Format: serienavn_s##e##.mp4 eller serienavn_s####e##.mp4
-        pattern = r's(\d+)e(\d+)\.mp4$'
-        match = re.search(pattern, filename, re.IGNORECASE)
-        
-        if not match:
-            print(Fore.YELLOW + f"Kunne ikke parse: {filename}" + Style.RESET_ALL)
-            return
-        
-        season = int(match.group(1))
-        episode = int(match.group(2))
-        
-        # Finn episode i database
-        db_episode = self.database.get_episode_by_details(
-            series['id'], 
-            season, 
-            episode
-        )
-        
-        if not db_episode:
-            print(Fore.YELLOW + f"Ingen database-oppføring for {filename} (S{season}E{episode})" + Style.RESET_ALL)
-            return
-        
-        # Oppdater episode info
-        file_status = self.handler.verify_local_file(
-            db_episode['id'], 
-            video_file, 
-            TYPE_SERIES
-        )
-        
-        if file_status == STATUS_AVAILABLE:
-            self.handler.update_file_info(db_episode['id'], TYPE_SERIES, video_file)
-            print(Fore.GREEN + f"✓ {filename} (S{season}E{episode})" + Style.RESET_ALL)
-        else:
-            print(Fore.RED + f"✗ {filename} - status: {file_status}" + Style.RESET_ALL)
-
 
     def _verify(self, data, media_type):
         for entry in data:
