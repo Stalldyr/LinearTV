@@ -25,12 +25,6 @@ stream_app = Blueprint(
     static_url_path='/tvstreamer/static'      
 )
 
-test_time = None
-if os.getenv('TEST_TIME'):
-    test_time = datetime.strptime(os.getenv('TEST_TIME'), "%Y-%m-%d %H:%M")
-
-
-tv_stream = TVStreamManager(time=test_time)
 tv_db = TVDatabase()
 program_manager = ProgramManager()
 path_manager = MediaPathManager()
@@ -165,14 +159,16 @@ def return_status(success, message, error_code = None, debug=False):
     else:
         return jsonify({"status": "error", "message": message}), error_code
 
-
-tv_stream.start_monitoring()
-
 if __name__ == '__main__':
-
-
     app = Flask(__name__)
     app.register_blueprint(stream_app)
+
+    test_time = None 
+    if os.getenv('TEST_TIME'):
+        test_time = datetime.strptime(os.getenv('TEST_TIME'), "%Y-%m-%d %H:%M")
+
+    tv_stream = TVStreamManager(time=test_time)
+    tv_stream.start_monitoring()
 
     @app.route('/')
     def setup_index():

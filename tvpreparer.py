@@ -57,7 +57,6 @@ class TVPreparer():
 
     def cleanup_obsolete_episodes(self):
         obsolete_episodes = self.database.get_obsolete_episodes()
-        print(obsolete_episodes)
         self._cleanup(obsolete_episodes, TYPE_SERIES)
 
     def cleanup_obsolete_movies(self):

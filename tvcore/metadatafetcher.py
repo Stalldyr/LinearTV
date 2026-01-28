@@ -189,7 +189,7 @@ class MetaDataFetcher:
             print("Need either source_url or tmdb_id to get episode_count")
             return 0
         
-    def extract_episode_info_from_ytdlp(self, episode_data):
+    def extract_episode_info_from_ytdlp(self, episode_data: dict):
         """Extract relevant episode info from yt-dlp data"""
         return {
             "yt_dlp_id": episode_data.get("id"),
@@ -211,7 +211,7 @@ class MetaDataFetcher:
             "episode_number": episode_data.get("episode_number"),
             "title": episode_data.get("name"),
             "description": episode_data.get("overview"),
-            "duration": episode_data.get("runtime")
+            "duration": episode_data.get("runtime")*60
         }
         
     def extract_movie_info_from_tmdb(self, movie_data:dict):
@@ -220,7 +220,7 @@ class MetaDataFetcher:
             "tmdb_id": movie_data.get("id"),
             "title": movie_data.get("name"),
             "description": movie_data.get("overview"),
-            "duration": movie_data.get("runtime")
+            "duration": movie_data.get("runtime")*60
         }
     
 

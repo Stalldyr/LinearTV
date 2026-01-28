@@ -348,10 +348,10 @@ class TVDatabase:
     
     def update_episode_keeping_status(self, episode_id:int, keep:bool):
         ''''
-            Updates if the episode to be kept or not for the next week
+        Updates if the episode to be kept or not for the next week
 
-            episode_id (int): The primary id of the episode
-            keep (boolean): Marks the episode for keeping (true) or deleting (false)
+        episode_id (int): The primary id of the episode
+        keep (boolean): Marks the episode for keeping (true) or deleting (false)
         '''
 
         self.sql.edit_cell(TABLE_EPISODES, episode_id, "keep_next_week", keep)
@@ -375,7 +375,7 @@ class TVDatabase:
     
     def get_episode_by_details(self, series_id: int, season:int , episode: int):
         """
-            Returns episodes from the "episode" table filtered by series_id, season and episode number
+        Returns episodes from the "episode" table filtered by series_id, season and episode number
         """
 
         query = '''
@@ -563,13 +563,12 @@ class TVDatabase:
                 ws.end_time,
                 ws.is_rerun,
                 COALESCE(e.filename, m.filename) as filename,
-                COALESCE(e.description, m.description) as description,
+                COALESCE(m.description, e.description, s.description) as description,
                 COALESCE(e.status, m.status) as status,
-                COALESCE(m.duration, s.duration) as duration,
+                COALESCE(m.duration, e.duration, s.duration) as duration,
                 COALESCE(m.last_aired, e.last_aired) as last_aired,
                 e.episode_number,
                 COALESCE(m.directory, s.directory) as directory,
-                COALESCE(s.description, m.description) as program_description,
                 COALESCE(e.id, m.id) as media_id,
                 CASE 
                     WHEN m.id IS NOT NULL THEN 'movies'
