@@ -221,7 +221,8 @@ class TVDatabase:
     
     def delete_schedule_by_id(self, schedule_id):
         """Deletes entry from schedule based on the primary ID"""
-        self.sql.delete_row(TABLE_SCHEDULE, schedule_id)
+        return self.sql.delete_row(TABLE_SCHEDULE, schedule_id)
+
 
     def edit_schedule(self, conditions, data):
         """Deletes entry from schedule based on custom conditions"""

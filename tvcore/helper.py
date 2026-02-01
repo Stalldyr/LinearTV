@@ -33,13 +33,21 @@ def calculate_time_blocks(duration, block_size=30):
     return total_blocks
 
 def calculate_time_slots(start, end, steps):
-    start2 = datetime.strptime(start, "%H:%M")
-    end2 = datetime.strptime(end, "%H:%M")
+    """
+    Calculates time slots for schedule table
+
+    start: schedule start time
+    end: schedule end time
+    steps: schedule steps (in minutes)
+    """
+
+    start_dt = datetime.strptime(start, "%H:%M")
+    end_dt = datetime.strptime(end, "%H:%M")
     
     slots = []
 
-    while start2 < end2:
-        slots.append(datetime.strftime(start2, "%H:%M"))
-        start2 += timedelta(minutes=int(steps))
+    while start_dt < end_dt:
+        slots.append(datetime.strftime(start_dt, "%H:%M"))
+        start_dt += timedelta(minutes=int(steps))
 
     return slots

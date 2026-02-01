@@ -124,8 +124,12 @@ class SQLexecute:
         if id == -1:
             id = "(SELECT MAX(id))"
 
-        self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
-        print(f"Slettet oppføring {id} i {table}")
+        try:
+            self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
+            print(f"Slettet oppføring {id} i {table}")
+            return True
+        except:
+            return False
 
     def edit_row_by_id(self, table:str, row_id:int, **kwargs):        
         fields = []

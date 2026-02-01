@@ -7,9 +7,9 @@ class ProgramManager:
     """
     Works as a manager between flask and the database
     """
-    def __init__(self):
+    def __init__(self, language="en"):
         self.db = TVDatabase()
-        self.metadatafetcher = MetaDataFetcher()
+        self.metadatafetcher = MetaDataFetcher(language=language)
 
     def add_or_update_program(self, data:dict):
         """
@@ -99,27 +99,20 @@ class ProgramManager:
             existing = self.db.get_schedule_by_time(data["day_of_week"], data["start_time"])
 
             if len(existing) == 1:
-                if data["name"] == "[Ledig]":
-                    self.db.delete_schedule_by_id(existing[0]["id"])
-                    self.db.update_schedule_count()
+                conditions = {
+                    "day_of_week": data["day_of_week"], 
+                    "start_time": data["start_time"]
+                }
 
-                    return True, f"Removed program {data['name']} from schedule at {data['day_of_week']} {data['start_time']}"
+                data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
+                data["blocks"] = calculate_time_blocks(data["duration"])
+                data.pop("duration", None)
 
-                else:
-                    conditions = {
-                        "day_of_week": data["day_of_week"], 
-                        "start_time": data["start_time"]
-                    }
+                self.db.edit_schedule(conditions, data)
+                self.db.update_schedule_count()
 
-                    data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
-                    data["blocks"] = calculate_time_blocks(data["duration"])
-                    data.pop("duration", None)
-
-                    self.db.edit_schedule(conditions, data)
-                    self.db.update_schedule_count()
-
-                    return True, f"Edited program {data['name']} in schedule at {data['day_of_week']} {data['start_time']}"
-            
+                return True, f"Edited program {data['name']} in schedule at {data['day_of_week']} {data['start_time']}"
+        
             elif len(existing) == 0:
                 data["end_time"] = calculate_end_time(data["start_time"], data["duration"])
                 data["blocks"] = calculate_time_blocks(data["duration"])
@@ -131,10 +124,28 @@ class ProgramManager:
                 return True, f"Saved new program {data['name']} to schedule at {data['day_of_week']} {data['start_time']}"
             
             else:
-                return False, "Error: Multiple programs are saved to the same time"
+                return False, "Multiple programs are saved to the same time slot"
             
         except Exception as e:
             return False, f"Database error: {str(e)}", 500
+        
+
+    def delete_schedule(self, day, time):
+        try:
+            existing = self.db.get_schedule_by_time(day, time)
+
+            success = None
+            if len(existing) == 1:
+                success = self.db.delete_schedule_by_id(existing[0]["id"])
+
+            if success:
+                return True, f"Removed program from schedule at {day} {time}"
+            
+            else:
+                return False, "Invalid program type"
+        
+        except Exception as e:
+            return False, f"Database error: {str(e)}", 500 
         
     def initialize_admin_page(self):
         schedule_data = self.db.get_weekly_schedule()
@@ -149,36 +160,32 @@ class ProgramManager:
     def fetch_metadata(self, media_type, tmdb_id):
         try:
             if media_type == TYPE_SERIES:
-                metadata = self.metadatafetcher.fetch_tmdb_series_info(tmdb_id)
+                metadata = self.metadatafetcher.fetch_tmdb_data(TYPE_SERIES, tmdb_id)
 
                 data = {
-                    "name": metadata["name"],
-                    "first_air_date": metadata["first_air_date"],
+                    "title": metadata["name"],
+                    "release": metadata["first_air_date"],
                     "overview": metadata["overview"],
                     "tagline": metadata["tagline"],
                     "genre": metadata["genres"],
-                    "original_language": metadata["original_language"]
+                    "original_language": metadata["original_language"],
+                    "run_time": next(iter(metadata["episode_run_time"]), None)
                 }
-
-                print(data)
 
                 return data
             
             elif media_type == TYPE_MOVIES:
                 metadata = self.metadatafetcher.fetch_tmdb_data(media_type, tmdb_id)
 
-                print(metadata)
-
                 data = {
                     "title": metadata["title"],
                     "original_title": metadata["original_title"],
-                    "release_date": metadata["release_date"],
+                    "release": metadata["release_date"],
                     "overview": metadata["overview"],
                     "genre": metadata["genres"],
-                    "original_language": metadata["original_language"]
+                    "original_language": metadata["original_language"],
+                    "run_time": metadata["runtime"]
                 }
-
-                print(data)
 
                 return data
             

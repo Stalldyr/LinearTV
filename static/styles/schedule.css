@@ -1,0 +1,75 @@
+.schedule-calendar {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 20px;
+}
+
+.schedule-calendar th, .schedule-calendar td 
+{
+    border: 1px solid #aab5b8;
+    padding: 12px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.schedule-calendar th:first-child,
+.schedule-calendar td:first-child {
+  width: 40px;
+  overflow-wrap: initial;
+}
+
+.schedule-calendar th {
+    background-color: #add6e0;
+    font-size: 1.3em;
+}
+
+.schedule-calendar td {
+    min-height: 50px; 
+    height: 50px;
+    overflow-wrap: break-word;
+}
+
+.time-slot {
+    background-color: #d1ecf5;
+}
+
+.program-slot {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.program-slot.empty {
+    color: #999;
+    background-color: aliceblue;
+}
+
+.program-slot.empty:hover {
+    background-color: rgb(225, 233, 240);
+}
+
+.program-slot.original {
+  background-color: #c6e2ff;
+}
+
+.program-slot.original:hover {
+  background-color: #b7d7fa;
+}
+
+.program-slot.rerun {
+    background-color: rgb(217, 237, 253);
+}
+
+.program-slot.rerun:hover {
+    background-color: rgb(207, 230, 248);
+}
+
+.program-title {
+    font-weight: 800;
+    font-size: 0.9em;
+}
+
+.program-status {
+    font-size: small;
+    color: gray;
+}

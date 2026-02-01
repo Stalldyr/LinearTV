@@ -1,7 +1,10 @@
-{
-    "broadcast_start": "18:00",
-    "broadcast_end": "23:00",
-    "broadcast_steps": 30,
+{   
+    "language": "no",
+    "schedule": {
+        "broadcast_start": "18:00",
+        "broadcast_end": "23:00",
+        "broadcast_steps": 30
+    },
     "paths": {
         "download_path": "downloads",
         "series_path": "downloads/series",

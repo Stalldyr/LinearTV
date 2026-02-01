@@ -1,6 +1,7 @@
 from .tvdatabase import TVDatabase
 from .tvconstants import *
 from datetime import datetime, timedelta, time as time_class
+from .tvconfig import TVConfig
 import threading
 import json
 from pathlib import Path
@@ -29,9 +30,7 @@ class TVStreamManager:
         self.offset = 0
 
         self.database = TVDatabase()
-
-        with open(Path(__file__).parent.parent.absolute()/config_path, 'r', encoding='utf-8') as f:
-            self.config =  json.load(f)
+        self.config = TVConfig()
 
         self._initialized = True
 
@@ -66,7 +65,7 @@ class TVStreamManager:
         
     def monitor_current_program(self):
         current_hour = self.current_time.strftime("%H:%M")
-        start_time = self.config["broadcast_start"]
+        start_time = self.config.config["schedule"]["broadcast_start"]
     
         if current_hour < start_time:
             #Checks if the scheduled have started yet.
@@ -76,7 +75,6 @@ class TVStreamManager:
                 "name": "Ingen sending",
                 "description": "Sendingen starter kl. 18:00",
                 "filename": None,
-                #"offset": self.offset
             }
 
         program = self.database.get_current_program(time = self.current_time)
@@ -87,7 +85,6 @@ class TVStreamManager:
                 "name": "Ingen program",
                 "description": "Ingen program på dette tidspunktet",
                 "filename": None,
-                #"offset": self.offset
             }
         
         if program.get('status') != 'available':
@@ -96,7 +93,6 @@ class TVStreamManager:
                 "name": program.get('name', 'Ukjent program'),
                 "description": "Programmet er ikke tilgjengelig for avspilling",
                 "filename": None,
-                #"offset": self.offset
             }
         
 

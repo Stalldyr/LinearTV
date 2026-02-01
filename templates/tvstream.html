@@ -126,20 +126,6 @@
       });
   }
 
-  function calculateOffset(programStart) {
-    var now = new Date();
-    nowHour = now.getHours();
-    nowMinutes = now.getMinutes();
-    nowSeconds = now.getSeconds();
-
-    startHour = programStart.slice(0,2);
-    startMinute = programStart.slice(3,5);
-
-    offset = 3600*(nowHour-startHour) + 60*(nowMinutes-startMinute) + nowSeconds - 10;
-
-    return Math.max(0, offset)
-  }
-
   updateProgram();
   setInterval(updateProgram, 1000);
 </script>

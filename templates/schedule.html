@@ -1,7 +1,7 @@
 <body>
-    <h1>Sendeskjema Admin</h1>
+    <h1>Schedule Admin</h1>
 
-    <button id="addProgram">Legg til eller endre program</button>
+    <button id="addProgram">Add or edit program</button>
 
     <table class="schedule-calendar">
     </table>
@@ -11,12 +11,11 @@
 
     <!-- Schedule Form -->
     <div class="schedule-form" id="scheduleForm">
-      <h3>Velg program</h3>
-
+      <h3>Choose program</h3>
       
       <label for="scheduleOption0" class="radio-inline">
         <input type="radio" name="scheduleType" id="scheduleOption0" value="series" onclick="updateScheduleType()" checked>
-        Serie
+        Series
       </label>
       <label for="scheduleOption1" class="radio-inline">
         <input type="radio" name="scheduleType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">        
@@ -39,13 +38,14 @@
         </div>
 
         <div class="form-group" id="rerunGroup">
-          <label>Reprise:</label>
+          <label>Re-run:</label>
           <input type="checkbox" id="isRerun" />
         </div>
 
         <div class="form-buttons">
-          <button type="button" class="cancel-btn" onclick="closeScheduleForm()">Avbryt</button>
-          <button type="button" class="save-btn" onclick="saveSchedule()">Lagre</button>
+          <button type="button" class="cancel-btn" onclick="closeScheduleForm()">Cancel</button>
+          <button type="button" class="delete-btn" onclick="deleteFromSchedule()">Delete</button>
+          <button type="button" class="save-btn" onclick="saveSchedule()">Save</button>
         </div>
       </form>
     </div>
@@ -54,76 +54,72 @@
     <div class="program-form" id="programForm">
       <h3>Legg til nytt program</h3>
 
-      <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
-      <label for="programOption0">Serie</label>
+      <div class="media-select">
+        <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
+        <label for="programOption0">Series</label>
 
-      <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
-      <label for="programOption1">Film</label>
+        <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
+        <label for="programOption1">Film</label>
+      </div>
 
       <form id="programFormData">
         <div class="column">
           <div class="form-group">
-            <label id="programTitleSelectLabel">Velg serie:</label>
+            <label id="programTitleSelectLabel">Choose series:</label>
             <select id="programTitleSelect" onclick="updateProgramForm()">
-              <option selected>--Ny serie--</option>
+              <option selected>--New series--</option>
               {% for e in series_data %}
                 <option id="{{ e.id }}">{{ e.name }}</option>
               {% endfor %}
             </select>
-          </div>
-          
-          <div class="form-group">
-            <label id="programSeasonLabel">Startsesong:</label>
-            <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
           </div>
       
           <div class="form-group">
             <label>TMDB-id:</label>
               <input type="text" id="programTmdbId">
           </div>
-          <button class="mini-button" id="fetchMetaDataButton" onclick="fetchMetaData()">
+          <button type="button" class="mini-button" id="fetchMetaDataButton" onclick="fetchMetaData()">
             Fetch
           </button>
 
           <div class="form-group">
-            <label>Tittel:</label>
+            <label>Title:</label>
             <input type="text" id="programTitle"/>
           </div>
 
           <div class="form-group">
-            <label>URL:</label>
-            <input type="text" id="programUrl"/>
+            <label id="programSeasonLabel">Season:</label>
+            <input type="text" id="programSeason" required/>
           </div>
 
           <div class="form-group">
-            <label id="programEpisodeLabel">Startepisode:</label>
-            <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
+            <label id="programEpisodeLabel">Episode:</label>
+            <input type="text" id="programEpisode"/>
+          </div>
+
+          <div class="form-group">
+            <label>URL:</label>
+            <input type="text" id="programUrl"/>
           </div>
         </div>
         <div class="column">
           <div class="form-group">
-            <label>Beskrivelse:</label>
+            <label>Description:</label>
             <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
           </div>
 
           <div class="form-group">
-            <label>Utgivelsesår:</label>
-            <input type="text" id="programYear" placeholder="e.g 2001"/>
+            <label>Release:</label>
+            <input type="text" id="programRelease"/>
           </div>
 
           <div class="form-group">
-            <label>Lengde:</label>
-            <select id="programDuration">
-              <option label="30 minutter">30</option>
-              <option label="60 minutter">60</option>
-              <option label="90 minutter">90</option>
-              <option label="120 minutter">120</option>
-              <option label="150 minutter">150</option>
-            </select>
+            <label>Duration:</label>
+            <input type="text" id="programDuration"/>
           </div>
 
           <div  class="form-group">
-            <label>Sjanger:</label>
+            <label>Genre:</label>
             <select id="programGenre">
             {% for genre in genres %}
               <option label="{{ genre }}"> {{ genre }}</option>
@@ -132,121 +128,18 @@
           </div>
 
           <div class="form-group">
-            <label id="programIsReverseLabel">Omvendt spilleliste:</label>
+            <label id="programIsReverseLabel">Reverse playlist:</label>
             <input type="checkbox" id="programIsReverse">
           </div>
-        </div>
 
-        <div class="form-buttons">
-          <button type="button" class="cancel-btn" onclick="closeProgramForm()">Avbryt</button>
-          <button type="button" class="delete-btn" onclick="deleteProgram()">Slett</button>
-          <button type="button" class="save-btn" onclick="saveProgram()">Lagre</button>
+          <div class="form-buttons">
+            <button type="button" class="cancel-btn" onclick="closeProgramForm()">Cancel</button>
+            <button type="button" class="delete-btn" onclick="deleteProgram()">Delete</button>
+            <button type="button" class="save-btn" onclick="saveProgram()">Save</button>
+          </div>
         </div>
       </form>
     </div>
-
-    <!-- Program Form -->
-    <div class="program-form" id="programFormOriginal">
-      <h3>Legg til nytt program</h3>
-
-      <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
-      <label for="programOption0">Serie</label>
-
-      <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
-      <label for="programOption1">Film</label>
-
-      <form id="programFormData">
-        <div class="column">
-          <div class="form-group">
-            <label id="programTitleSelectLabel">Velg serie:</label>
-            <select id="programTitleSelect" onclick="updateProgramForm()">
-              <option selected>--Ny serie--</option>
-              {% for e in series_data %}
-                <option id="{{ e.id }}">{{ e.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Tittel:</label>
-            <input type="text" id="programTitle" required/>
-          </div>
-
-          <div class="form-group">
-            <label>Kilde:</label>
-            <select id="programSource">
-              <option label="NRK">NRK</option>
-              <option label="TV2">TV2</option>
-              <option label="YouTube">YouTube</option>
-              <option label="Lokalt">Local</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>URL:</label>
-            <input type="text" id="programUrl"/>
-          </div>
-
-          <div class="form-group">
-            <label id="programSeasonLabel">Startsesong:</label>
-            <input type="text" id="programSeason" placeholder="f.eks. 1, 2001" required/>
-          </div>
-
-          <div class="form-group">
-            <label id="programEpisodeLabel">Startepisode:</label>
-            <input type="text" id="programEpisode" placeholder="f.eks. 1"/>
-          </div>
-        </div>
-        <div class="column">
-          <div class="form-group">
-            <label>Beskrivelse:</label>
-            <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>Utgivelsesår:</label>
-            <input type="text" id="programYear" placeholder="e.g 2001"/>
-          </div>
-
-          <div class="form-group">
-            <label>Lengde:</label>
-            <select id="programDuration">
-              <option label="30 minutter">30</option>
-              <option label="60 minutter">60</option>
-              <option label="90 minutter">90</option>
-              <option label="120 minutter">120</option>
-              <option label="150 minutter">150</option>
-            </select>
-          </div>
-
-          <div  class="form-group">
-            <label>Sjanger:</label>
-            <select id="programGenre">
-            {% for genre in genres %}
-              <option label="{{ genre }}"> {{ genre }}</option>
-            {% endfor %}
-            </select>        
-          </div>
-
-          <div  class="form-group">
-            <label>TMDB-id:</label>
-              <input type="text" id="programTmdbId">
-          </div>
-
-          <div class="form-group">
-            <label id="programIsReverseLabel">Omvendt spilleliste:</label>
-            <input type="checkbox" id="programIsReverse">
-          </div>
-        </div>
-
-        <div class="form-buttons">
-          <button type="button" class="cancel-btn" onclick="closeProgramForm()">Avbryt</button>
-          <button type="button" class="delete-btn" onclick="deleteProgram()">Slett</button>
-          <button type="button" class="save-btn" onclick="saveProgram()">Lagre</button>
-        </div>
-      </form>
-    </div>
-
   </body>
 
   <script>
@@ -255,4 +148,9 @@
     const movieData = {{movie_data | tojson | safe}};
     const timeSlots = {{timeslots | tojson | safe}};
   </script>
+  <script src="{{ url_for('streaming.static', filename='scripts/createSchedule.js') }}"></script>
   <script src="{{ url_for('streaming.static', filename='scripts/scheduleAdmin.js') }}"></script>
+
+  <script>
+    createScheduleTable(scheduleData, timeSlots, 7, openscheduleForm)
+  </script>

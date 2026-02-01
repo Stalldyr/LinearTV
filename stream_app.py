@@ -9,13 +9,14 @@ try:
     from .tvcore.tvdatabase import TVDatabase
     from .tvcore.programmanager import ProgramManager
     from .tvcore.mediapathmanager import MediaPathManager
-    from .tvcore.helper import calculate_time_slots
+    from .tvcore.tvconfig import TVConfig
 except ImportError:
     from tvcore.tvstreamer import TVStreamManager
     from tvcore.tvdatabase import TVDatabase
     from tvcore.programmanager import ProgramManager
     from tvcore.mediapathmanager import MediaPathManager
-    from tvcore.helper import calculate_time_slots
+    from tvcore.tvconfig import TVConfig
+
 
 stream_app = Blueprint(
     'streaming', 
@@ -25,37 +26,14 @@ stream_app = Blueprint(
     static_url_path='/tvstreamer/static'      
 )
 
-
 tv_stream = TVStreamManager()
 tv_stream.start_monitoring()
 
+
+tv_config = TVConfig()
 tv_db = TVDatabase()
-program_manager = ProgramManager()
+program_manager = ProgramManager(language=tv_config.get_language())
 path_manager = MediaPathManager()
-
-# ============ CONFIG FUNCTION ============
-
-class TVConfig:
-    def __init__(self, config_path=""):
-        if not config_path:
-            with open(Path(__file__).parent.absolute()/"config.json", 'r', encoding='utf-8') as f:
-                self.config =  json.load(f)
-
-        else:
-            with open(Path(config_path), 'r', encoding='utf-8') as f:
-                self.config =  json.load(f)
-
-    def get_time_slots(self):
-        timeslots = calculate_time_slots(
-            self.config["broadcast_start"],
-            self.config["broadcast_end"],
-            self.config["broadcast_steps"]
-        )
-
-        return timeslots
-
-    def get_genres(self):
-        return self.config["genres"]
 
 
 # ============ STREAMING PAGES ============
@@ -68,9 +46,8 @@ def tvstream():
 def admin():
     schedule_data, series_data, movie_data = program_manager.initialize_admin_page()
     
-    tv_config = TVConfig()
     timeslots = tv_config.get_time_slots()
-    genres = tv_config.get_genres()
+    genres = sorted(tv_config.get_genres())
 
     return render_template('admin_schedule.html', schedule_data=schedule_data, series_data=series_data, movie_data=movie_data, genres=genres, timeslots=timeslots)
 
@@ -78,15 +55,17 @@ def admin():
 def save_schedule():
     data = request.get_json()
 
-    print(f"Recived data for weekly schedule: {data}")
-
     return return_status(*program_manager.save_schedule(data))
+
+@stream_app.route('/admin/delete_schedule', methods=['POST'])
+def delete_schedule():
+    data = request.get_json()
+
+    return return_status(*program_manager.delete_schedule(data["day"], data["time"]))
     
 @stream_app.route('/admin/add_program', methods=['POST'])
 def add_program():
     data = request.get_json()
-
-    print(f"Recieved data for new program: {data}")
 
     return return_status(*program_manager.add_or_update_program(data))
 
@@ -96,14 +75,11 @@ def delete_program():
 
     return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
 
-@stream_app.route('/admin/fetch_metadata', methods=['POST'])
-def fetch_metadata():
-    #TODO Return fetched metadata
-    data = request.get_json()
+@stream_app.route('/admin/fetch_metadata/<program_type>/<int:tmdb_id>', methods=['GET'])
+def fetch_metadata(program_type,tmdb_id):
+    metadata = program_manager.fetch_metadata(program_type, tmdb_id)
 
-    metadata = program_manager.fetch_metadata(data["program_type"], data["tmdb_id"])
-
-    return return_status(True, "succes")
+    return jsonify(metadata)
 
 @stream_app.route('/admin/preparer')
 def prepare():
@@ -126,7 +102,6 @@ def current_program():
 @stream_app.route('/api/schedule')
 def get_schedule():
     schedule = tv_db.get_weekly_schedule()
-    print(f"Schedule requested: {schedule}")
     return jsonify(schedule)
 
 @stream_app.route('/api/status')
@@ -179,4 +154,4 @@ if __name__ == '__main__':
     def setup_index():
         return render_template("test_panel.html")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

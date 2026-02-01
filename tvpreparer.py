@@ -74,7 +74,6 @@ class TVPreparer():
             path = self.paths.get_filepath(media_type, entry["directory"], entry["filename"])
             self.handler.delete_media(entry["id"], path, media_type)
 
-
     def create_pending_episodes(self):
         series_list = self.database.get_scheduled_series()
         metadata_fetcher = MetaDataFetcher()
@@ -83,11 +82,10 @@ class TVPreparer():
             if series["tmdb_id"]:
                 try:
                     tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
-
                     self._create_pending(tmdb_data["episodes"], series["season"], series["id"], series["name"], ytdlp = False)
                     
                 except Exception as e:
-                    print(f"Error fetching metadata for {series["name"]}")
+                    print(f"Error fetching tmdb metadata for {series["name"]}: {e}")
 
             elif series["source_url"]:
                 try:
@@ -95,7 +93,7 @@ class TVPreparer():
                     self._create_pending(yt_dlp_data["entries"], series["season"], series["id"], series["name"])
 
                 except Exception as e:
-                    print(f"Error fetching metadata for {series["name"]}")
+                    print(f"Error fetching ytdlp metadata for {series["name"]}: {e}")
 
             else:
                 print(f"No metadata available for {series["name"]}")
