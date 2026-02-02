@@ -1,156 +1,163 @@
 <body>
-    <h1>Schedule Admin</h1>
+  <h1>Schedule Admin</h1>
 
-    <button id="addProgram">Add or edit program</button>
+  <button class="program-button" id="programBtn">Add or edit program</button>
 
-    <table class="schedule-calendar">
-    </table>
+  <table class="schedule-calendar">
+  </table>
 
-    <!-- Program Form Overlay -->
-    <div class="form-overlay" id="formOverlay" onclick="closeScheduleForm()"></div>
+  <!-- Program Form Overlay -->
+  <div class="overlay" id="overlay"></div>
 
-    <!-- Schedule Form -->
-    <div class="schedule-form" id="scheduleForm">
-      <h3>Choose program</h3>
-      
-      <label for="scheduleOption0" class="radio-inline">
-        <input type="radio" name="scheduleType" id="scheduleOption0" value="series" onclick="updateScheduleType()" checked>
-        Series
-      </label>
-      <label for="scheduleOption1" class="radio-inline">
-        <input type="radio" name="scheduleType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">        
-        Film
-      </label>
+  <!-- Schedule Form -->
+  <div class="schedule-form" id="scheduleForm">
+    <h3>Choose program</h3>
+    
+    <label for="scheduleOption0" class="radio-inline">
+      <input type="radio" name="scheduleType" id="scheduleOption0" value="series" onclick="updateScheduleType()" checked>
+      Series
+    </label>
+    <label for="scheduleOption1" class="radio-inline">
+      <input type="radio" name="scheduleType" id="scheduleOption1" value="movies" onclick="updateScheduleType()">        
+      Film
+    </label>
 
-      <form id="scheduleFormData" method="post">
+    <form id="scheduleFormData" method="post">
+      <div class="form-group">
+        <label>Program:</label>
+        <select id="scheduleTitleSelect" onchange="updateDurationLabel()">
+          <option selected value>[Ledig]</option>
+          {% for e in series_data %}
+            <option id="{{ e.id }}" data-duration="{{ e.duration }}" data-rerun="{{ e.is_rerun }}">{{ e.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group" id="durationGroup">
+        <label id="duration"></label>
+      </div>
+
+      <div class="form-group" id="rerunGroup">
+        <label>Re-run:</label>
+        <input type="checkbox" id="isRerun" />
+      </div>
+
+      <div class="form-buttons">
+        <button type="button" class="cancel-btn" onclick="closeScheduleForm()">Cancel</button>
+        <button type="button" class="delete-btn" onclick="deleteFromSchedule()">Delete</button>
+        <button type="button" class="save-btn" onclick="saveSchedule()">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Program Form -->
+  <div class="program-form" id="programForm">
+    <h3>Legg til nytt program</h3>
+
+    <div class="media-select">
+      <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
+      <label for="programOption0">Series</label>
+
+      <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
+      <label for="programOption1">Film</label>
+    </div>
+
+    <form id="programFormData">
+      <div class="column">
         <div class="form-group">
-          <label>Program:</label>
-          <select id="scheduleTitleSelect" onchange="updateDurationLabel()">
-            <option selected value>[Ledig]</option>
+          <label id="programTitleSelectLabel">Choose series:</label>
+          <select id="programTitleSelect" onchange="updateProgramForm()">
+            <option disabled selected>--New series--</option>
             {% for e in series_data %}
-              <option id="{{ e.id }}" data-duration="{{ e.duration }}" data-rerun="{{ e.is_rerun }}">{{ e.name }}</option>
+              <option id="{{ e.id }}">{{ e.name }}</option>
             {% endfor %}
           </select>
         </div>
+    
+        <div class="form-group">
+          <label>TMDB-id:</label>
+            <input type="text" id="programTmdbId">
+        </div>
+        <button type="button" class="mini-button" id="fetchMetaDataButton" onclick="fetchMetaData()">
+          Fetch
+        </button>
 
-        <div class="form-group" id="durationGroup">
-          <label id="duration"></label>
+        <div class="form-group">
+          <label>Title*:</label>
+          <input type="text" id="programTitle"/>
         </div>
 
-        <div class="form-group" id="rerunGroup">
-          <label>Re-run:</label>
-          <input type="checkbox" id="isRerun" />
+        <div class="form-group">
+          <label id="programSeasonLabel">Season*:</label>
+          <input type="text" id="programSeason" required/>
+        </div>
+
+        <div class="form-group">
+          <label id="programEpisodeLabel">Episode*:</label>
+          <input type="text" id="programEpisode"/>
+        </div>
+
+        <div class="form-group">
+          <label>URL:</label>
+          <input type="text" id="programUrl"/>
+        </div>
+      </div>
+      <div class="column">
+        <div class="form-group">
+          <label>Description:</label>
+          <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Release:</label>
+          <input type="text" id="programRelease"/>
+        </div>
+
+        <div class="form-group">
+          <label>Duration*:</label>
+          <input type="text" id="programDuration" required/>
+        </div>
+
+        <div  class="form-group">
+          <label>Genre:</label>
+          <select id="programGenre">
+          {% for genre in genres %}
+            <option label="{{ genre }}"> {{ genre }}</option>
+          {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label id="programIsReverseLabel">Reverse playlist:</label>
+          <input type="checkbox" id="programIsReverse">
         </div>
 
         <div class="form-buttons">
-          <button type="button" class="cancel-btn" onclick="closeScheduleForm()">Cancel</button>
-          <button type="button" class="delete-btn" onclick="deleteFromSchedule()">Delete</button>
-          <button type="button" class="save-btn" onclick="saveSchedule()">Save</button>
+          <button type="button" class="cancel-btn" onclick="closeProgramForm()">Cancel</button>
+          <button type="button" class="delete-btn" onclick="deleteProgram()">Delete</button>
+          <button type="button" class="save-btn" onclick="saveProgram()">Save</button>
         </div>
-      </form>
-    </div>
-
-    <!-- Program Form -->
-    <div class="program-form" id="programForm">
-      <h3>Legg til nytt program</h3>
-
-      <div class="media-select">
-        <input type="radio" name="programType" id="programOption0" value="series" onclick="updateProgramType()" checked>
-        <label for="programOption0">Series</label>
-
-        <input type="radio" name="programType" id="programOption1" value="movies" onclick="updateProgramType()">
-        <label for="programOption1">Film</label>
       </div>
+    </form>
+  </div>
+</body>
 
-      <form id="programFormData">
-        <div class="column">
-          <div class="form-group">
-            <label id="programTitleSelectLabel">Choose series:</label>
-            <select id="programTitleSelect" onclick="updateProgramForm()">
-              <option selected>--New series--</option>
-              {% for e in series_data %}
-                <option id="{{ e.id }}">{{ e.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-      
-          <div class="form-group">
-            <label>TMDB-id:</label>
-              <input type="text" id="programTmdbId">
-          </div>
-          <button type="button" class="mini-button" id="fetchMetaDataButton" onclick="fetchMetaData()">
-            Fetch
-          </button>
+<script>
+  const scheduleData = {{schedule_data | tojson | safe}};
+  const seriesData = {{series_data | tojson | safe}};
+  const movieData = {{movie_data | tojson | safe}};
+  const timeSlots = {{timeslots | tojson | safe}};
+</script>
+<script src="{{ url_for('streaming.static', filename='scripts/schedule.js') }}"></script>
+<script src="{{ url_for('streaming.static', filename='scripts/program.js') }}"></script>
 
-          <div class="form-group">
-            <label>Title:</label>
-            <input type="text" id="programTitle"/>
-          </div>
-
-          <div class="form-group">
-            <label id="programSeasonLabel">Season:</label>
-            <input type="text" id="programSeason" required/>
-          </div>
-
-          <div class="form-group">
-            <label id="programEpisodeLabel">Episode:</label>
-            <input type="text" id="programEpisode"/>
-          </div>
-
-          <div class="form-group">
-            <label>URL:</label>
-            <input type="text" id="programUrl"/>
-          </div>
-        </div>
-        <div class="column">
-          <div class="form-group">
-            <label>Description:</label>
-            <textarea id="programDescription" placeholder="Beskrivelse av programmet" rows="4"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>Release:</label>
-            <input type="text" id="programRelease"/>
-          </div>
-
-          <div class="form-group">
-            <label>Duration:</label>
-            <input type="text" id="programDuration"/>
-          </div>
-
-          <div  class="form-group">
-            <label>Genre:</label>
-            <select id="programGenre">
-            {% for genre in genres %}
-              <option label="{{ genre }}"> {{ genre }}</option>
-            {% endfor %}
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label id="programIsReverseLabel">Reverse playlist:</label>
-            <input type="checkbox" id="programIsReverse">
-          </div>
-
-          <div class="form-buttons">
-            <button type="button" class="cancel-btn" onclick="closeProgramForm()">Cancel</button>
-            <button type="button" class="delete-btn" onclick="deleteProgram()">Delete</button>
-            <button type="button" class="save-btn" onclick="saveProgram()">Save</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </body>
-
-  <script>
-    const scheduleData = {{schedule_data | tojson | safe}};
-    const seriesData = {{series_data | tojson | safe}};
-    const movieData = {{movie_data | tojson | safe}};
-    const timeSlots = {{timeslots | tojson | safe}};
-  </script>
-  <script src="{{ url_for('streaming.static', filename='scripts/createSchedule.js') }}"></script>
-  <script src="{{ url_for('streaming.static', filename='scripts/scheduleAdmin.js') }}"></script>
-
-  <script>
-    createScheduleTable(scheduleData, timeSlots, 7, openscheduleForm)
-  </script>
+<script>
+  createScheduleTable(scheduleData, timeSlots, 7, openscheduleForm);
+  document.getElementById('programBtn').addEventListener("click", () => {
+    openProgramForm();
+  });
+  document.getElementById('overlay').addEventListener("click", () => {
+    closeProgramForm();
+    closeScheduleForm();
+  });
+</script>

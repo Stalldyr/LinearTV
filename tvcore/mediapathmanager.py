@@ -56,11 +56,11 @@ class MediaPathManager:
     def create_movie_file_name(self, directory):
         return f"{directory}.mp4"
 
-    def create_ytdlp_season_json_name(self, season):
-        return f'ytdlp_data_season_{season}.json'
+    def create_ytdlp_season_json_name(self, season, language):
+        return f'ytdlp_data_season_{season}_{language}.json'
     
-    def create_tmbd_season_json_name(self, season):
-        return f'tmdb_data_season_{season}.json'
+    def create_tmbd_season_json_name(self, season, language):
+        return f'tmdb_data_season_{season}_{language}.json'
     
-    def create_tmbd_movie_json_name(self, film_name):
-        return f'{film_name}_tmdb_data.json'
+    def create_tmbd_movie_json_name(self, film_name, language):
+        return f'tmdb_data_{film_name}_{language}.json'

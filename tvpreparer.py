@@ -17,8 +17,6 @@ import sys
 from colorama import Fore, Style
 import time
 import logging
-import re
-from pathlib import Path
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -32,6 +30,7 @@ class TVPreparer():
         self.database = TVDatabase()
         self.downloader = TVDownloader()
         self.handler = TVFileHandler()
+        self.metadata = MetaDataFetcher()
 
     def increment_episodes(self):
         """
@@ -76,12 +75,11 @@ class TVPreparer():
 
     def create_pending_episodes(self):
         series_list = self.database.get_scheduled_series()
-        metadata_fetcher = MetaDataFetcher()
 
         for series in series_list:
             if series["tmdb_id"]:
                 try:
-                    tmdb_data = metadata_fetcher.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
+                    tmdb_data = self.metadata.get_tmdb_metadata(TYPE_SERIES, series["directory"], series["tmdb_id"], series["season"])
                     self._create_pending(tmdb_data["episodes"], series["season"], series["id"], series["name"], ytdlp = False)
                     
                 except Exception as e:
@@ -89,7 +87,7 @@ class TVPreparer():
 
             elif series["source_url"]:
                 try:
-                    yt_dlp_data = metadata_fetcher.get_ytdlp_season_metadata(TYPE_SERIES, series["directory"], series["season"], video_url=series["source_url"])
+                    yt_dlp_data = self.metadata.get_ytdlp_season_metadata(TYPE_SERIES, series["directory"], series["season"], video_url=series["source_url"])
                     self._create_pending(yt_dlp_data["entries"], series["season"], series["id"], series["name"])
 
                 except Exception as e:
@@ -99,12 +97,11 @@ class TVPreparer():
                 print(f"No metadata available for {series["name"]}")
 
     def _create_pending(self, episodes, season, series_id, series_name, ytdlp=True):
-        metadata_fetcher = MetaDataFetcher()
         for entry in episodes:
             if ytdlp:
-                episode_data = metadata_fetcher.extract_episode_info_from_ytdlp(entry)
+                episode_data = self.metadata.extract_episode_info_from_ytdlp(entry)
             else:
-                episode_data = metadata_fetcher.extract_episode_info_from_tmdb(entry)
+                episode_data = self.metadata.extract_episode_info_from_tmdb(entry)
 
             if not episode_data["season_number"]:
                 episode_data["season_number"] = season

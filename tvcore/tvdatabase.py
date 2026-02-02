@@ -1,7 +1,6 @@
 from .helper import calculate_end_time
 from .tvconstants import *
 from .SQLexecute import SQLexecute
-from .metadatafetcher import MetaDataFetcher
 from pathlib import Path
 from datetime import datetime, timedelta, time as time_class
 import sys
@@ -13,10 +12,8 @@ class TVDatabase:
         self.db_path = Path(db_path)
         self.test_time = test_time
 
-        self.metadatafetcher = MetaDataFetcher()
-
         self.sql = SQLexecute(self.db_path)
-        self.execute_query = SQLexecute(self.db_path).execute_query
+        self.execute_query = self.sql.execute_query
     
         if not self.db_path.exists():
             self.db_path.touch(exist_ok=True)
@@ -36,14 +33,14 @@ class TVDatabase:
                 tmdb_id INT,          
                 season INTEGER DEFAULT 1,       
                 episode INTEGER DEFAULT 1,       
-                source_url TEXT,                     -- "https://play.tv2.no/programmer/serier/hotel-caesar/sesong-{season}"
-                directory TEXT,                      -- "hotel_caesar_s{season}E{episode}"
+                source_url TEXT,               
+                directory TEXT,                
                 total_episodes INTEGER,              
                 description TEXT,
                 duration INT,
                 reverse_order BOOLEAN,                    
                 genre TEXT,
-                year INT,
+                release TEXT,
                 episode_count INT DEFAULT 0
             )
         ''')
@@ -77,13 +74,13 @@ class TVDatabase:
                 yt_dlp_id TEXT,
                 description TEXT,
                 duration INTEGER,
-                year INT,
+                release INT,
                 genre TEXT,
                 directory TEXT,
                 filename TEXT,
                 download_date DATE,
                 file_size INTEGER,
-                status TEXT DEFAULT 'pending',
+                status TEXT DEFAULT 'pending',  -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
                 last_aired DATE,
                 views INT,
                 source_url TEXT
@@ -96,9 +93,9 @@ class TVDatabase:
                 series_id INTEGER REFERENCES series(id),
                 episode_id INTEGER REFERENCES episodes(id),
                 movie_id INTEGER REFERENCES movies(id),
-                name TEXT NOT NULL,       -- "Hotel Cæsar"
-                day_of_week INTEGER NOT NULL,  -- 1=mandag, 7=søndag
-                start_time TIME NOT NULL,      -- "19:30"
+                name TEXT NOT NULL,      
+                day_of_week INTEGER NOT NULL,           -- 1=mandag, 7=søndag
+                start_time TIME NOT NULL,     
                 end_time TIME,
                 blocks INT,
                 is_rerun BOOLEAN DEFAULT 0
@@ -146,7 +143,7 @@ class TVDatabase:
             episode (for series)
         
         Optional (via program_data or kwargs):
-            source_url, year, description, duration, genre, tmdb_id,
+            source_url, release, description, duration, genre, tmdb_id,
             season, episode, directory, total_episodes, etc.
         """
 
@@ -165,7 +162,7 @@ class TVDatabase:
             program_data: Fields to update
                         
         Optional (via program_data or kwargs):
-            source_url, year, description, duration, genre, tmdb_id,
+            source_url, release, description, duration, genre, tmdb_id,
             season, episode, directory, total_episodes, etc.
         """
 
@@ -295,6 +292,7 @@ class TVDatabase:
             WHERE e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
             ORDER BY s.name, e.season_number, e.episode_number
         '''
+        
         return self.execute_query(query)
     
     def get_available_episodes(self):
@@ -450,7 +448,7 @@ class TVDatabase:
 
         return self.execute_query(query)
     
-    def get_weekly_schedule_with_episode(self) -> list[dict]:
+    def get_weekly_schedule_with_details(self) -> list[dict]:
         query = '''
             SELECT ws.name, ws.day_of_week, ws.start_time, ws.is_rerun, e.episode_number, e.filename, e.keep_next_week FROM weekly_schedule AS ws
             JOIN episodes e ON e.id = ws.episode_id  

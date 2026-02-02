@@ -38,4 +38,4 @@ class TVConfig:
             print("Language not supported")
 
     def get_language(self):
-        return self.config["language"]
+        return self.config.get("language", "")

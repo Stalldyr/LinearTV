@@ -1,6 +1,4 @@
 from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint
-from pathlib import Path
-import json
 import os 
 from datetime import datetime
 
@@ -32,7 +30,7 @@ tv_stream.start_monitoring()
 
 tv_config = TVConfig()
 tv_db = TVDatabase()
-program_manager = ProgramManager(language=tv_config.get_language())
+program_manager = ProgramManager()
 path_manager = MediaPathManager()
 
 
@@ -40,12 +38,13 @@ path_manager = MediaPathManager()
 @stream_app.route('/tvstream')
 def tvstream():
     return render_template('tvstream.html', offset=tv_stream.offset)
+
 # ============= ADMIN PAGES =============
 
 @stream_app.route('/admin/schedule')
 def admin():
     schedule_data, series_data, movie_data = program_manager.initialize_admin_page()
-    
+
     timeslots = tv_config.get_time_slots()
     genres = sorted(tv_config.get_genres())
 
@@ -74,12 +73,6 @@ def delete_program():
     data = request.get_json()
 
     return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
-
-@stream_app.route('/admin/fetch_metadata/<program_type>/<int:tmdb_id>', methods=['GET'])
-def fetch_metadata(program_type,tmdb_id):
-    metadata = program_manager.fetch_metadata(program_type, tmdb_id)
-
-    return jsonify(metadata)
 
 @stream_app.route('/admin/preparer')
 def prepare():
@@ -128,6 +121,12 @@ def get_kept_episodes():
 def get_obsolete_episodes():
     return jsonify(tv_db.get_obsolete_episodes())
 
+@stream_app.route('/api/fetch_metadata/<program_type>/<int:tmdb_id>', methods=['GET'])
+def fetch_metadata(program_type,tmdb_id):
+    metadata = program_manager.fetch_metadata(program_type, tmdb_id)
+
+    return jsonify(metadata)
+
 def return_status(success, message, error_code = None, debug=False):
     """Helper function for status"""
     if debug:
@@ -152,6 +151,6 @@ if __name__ == '__main__':
 
     @app.route('/')
     def setup_index():
-        return render_template("test_panel.html")
+        return render_template("admin_panel.html")
 
     app.run(host='0.0.0.0', port=5001, debug=True)

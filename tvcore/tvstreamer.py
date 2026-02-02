@@ -17,7 +17,7 @@ class TVStreamManager:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, time=None, time_acceleration=1, config_path = 'config.json'):
+    def __init__(self, time=None, time_acceleration=1, config_path='config.json'):
         if hasattr(self, '_initialized'):
             return
 
@@ -37,8 +37,7 @@ class TVStreamManager:
 
     def get_current_time(self):
         """
-        Returnerer enten ekte tid eller simulert tid.
-        Hvis time_acceleration = 60, går 1 minutt i virkeligheten = 1 time i simuleringen
+        Return either real time or simulated time. For testing purposes mainly
         """
         if self.test_time is None:
             return datetime.now()

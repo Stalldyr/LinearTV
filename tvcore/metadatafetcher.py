@@ -1,5 +1,6 @@
 from .mediapathmanager import MediaPathManager
 from .tvconstants import *
+from .tvconfig import TVConfig
 import yt_dlp
 import json
 import tmdbsimple as tmdb
@@ -11,14 +12,22 @@ load_dotenv()
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 class MetaDataFetcher:
-    def __init__(self, tmdb_api_key=TMDB_API_KEY, language="en"):
+    def __init__(self, tmdb_api_key=TMDB_API_KEY, translate=True):
         self.paths = MediaPathManager()
         tmdb.API_KEY = tmdb_api_key
-        self.language = language
+
+        config = TVConfig()
+        language = config.get_language()
+        if language: 
+            self.language = language
+        else:
+            self.language = "en"
+
+        self.translate = translate
 
     # ============ YTDLP ============
 
-    def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None, download_json = True):
+    def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None):
         '''
         Docstring for get_ytdlp_season_metadata
         
@@ -30,7 +39,7 @@ class MetaDataFetcher:
             download_json: Description
         '''
         
-        json_name = self.paths.create_ytdlp_season_json_name(season)
+        json_name = self.paths.create_ytdlp_season_json_name(season, self.language)
         json_path = self.paths.get_metadata_path(media_type, directory, json_name)
 
         if json_path.exists():
@@ -97,10 +106,10 @@ class MetaDataFetcher:
                 print("Need to provide season for series")
                 return None
         
-            json_name = self.paths.create_tmbd_season_json_name(season)
+            json_name = self.paths.create_tmbd_season_json_name(season, self.language)
             
         elif media_type == TYPE_MOVIES:
-            json_name = self.paths.create_tmbd_movie_json_name(directory)
+            json_name = self.paths.create_tmbd_movie_json_name(directory, self.language)
         else:
             print("Invalid media type")
             return None

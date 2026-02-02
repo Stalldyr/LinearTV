@@ -1,6 +1,6 @@
 
 .program-form,
-.schedule-form {
+.schedule-form{
     display: none;
     position: fixed;
     top: 2%;
@@ -16,7 +16,7 @@
     max-width: 90%;
 }
 
-.form-overlay {
+.overlay {
     display: none;
     position: fixed;
     top: 0;
@@ -34,12 +34,12 @@
     padding: 10px 10px;;
 }
 
-
-
+.info-group,
 .form-group {
     margin: 10px 0;
 }
 
+.info-group label,
 .form-group label {
     display: block;
     margin-bottom: 5px;
@@ -54,11 +54,13 @@
     border-radius: 3px;
 }
 
+.info-buttons,
 .form-buttons {
   margin-top: 15px;
   text-align: right;
 }
 
+.info-buttons button,
 .form-buttons button {
   margin-left: 2px;
   padding: 8px 15px;
@@ -80,8 +82,12 @@
     color: black;
 }
 
-input[type="radio"] {
+.media-select input[type="radio"] {
   display: inline;
+}
+
+.media-select label {
+    font-weight: bold;
 }
 
 button {

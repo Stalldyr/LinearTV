@@ -2,14 +2,16 @@ from .tvdatabase import TVDatabase
 from .metadatafetcher import MetaDataFetcher
 from .tvconstants import *
 from .helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
+from .tvconfig import TVConfig
 
 class ProgramManager:
     """
     Works as a manager between flask and the database
     """
-    def __init__(self, language="en"):
+    def __init__(self):
         self.db = TVDatabase()
-        self.metadatafetcher = MetaDataFetcher(language=language)
+        self.config = TVConfig()
+        self.metadatafetcher = MetaDataFetcher()
 
     def add_or_update_program(self, data:dict):
         """
@@ -29,6 +31,11 @@ class ProgramManager:
         if not program_name:
             print("Missing program name")
             return False, "Missing program name"
+        
+        duration = data.get("duration", 0)
+        if not duration:
+            print("Missing program duration")
+            return False, "Missing program duration"
 
         if program_type == TYPE_SERIES:
             season = data.get("season")
@@ -192,6 +199,13 @@ class ProgramManager:
         except Exception as e:
             print(f"Error recieving tmdb metadata: {e}")
             return True
+        
+
+    def get_tv_guide(self):
+        timeslots = self.config.get_time_slots()
+        schedule = self.db.get_air_schedule()
+
+        return timeslots, schedule
     
     def get_video_file(self):
         pass
