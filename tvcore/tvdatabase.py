@@ -56,6 +56,7 @@ class TVDatabase:
                 title TEXT,
                 description TEXT,
                 duration INTEGER,
+                original_air_data DATE,
                 filename TEXT,
                 download_date DATE,
                 file_size INTEGER,

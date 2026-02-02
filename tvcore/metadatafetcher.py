@@ -39,7 +39,7 @@ class MetaDataFetcher:
             download_json: Description
         '''
         
-        json_name = self.paths.create_ytdlp_season_json_name(season, self.language)
+        json_name = self.paths.create_ytdlp_season_json_name(season)
         json_path = self.paths.get_metadata_path(media_type, directory, json_name)
 
         if json_path.exists():
