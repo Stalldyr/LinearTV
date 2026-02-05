@@ -13,7 +13,9 @@ class ProgramManager:
         self.config = TVConfig()
         self.metadatafetcher = MetaDataFetcher()
 
-    def add_or_update_program(self, data:dict):
+    # ============ CRUD OPERATION ============
+
+    def save_program(self, data:dict):
         """
         Handle the complete workflow of adding or updating a program.
         
@@ -37,6 +39,7 @@ class ProgramManager:
             print("Missing program duration")
             return False, "Missing program duration"
 
+        season = None
         if program_type == TYPE_SERIES:
             season = data.get("season")
             episode = data.get("episode")
@@ -152,7 +155,10 @@ class ProgramManager:
                 return False, "Invalid program type"
         
         except Exception as e:
-            return False, f"Database error: {str(e)}", 500 
+            return False, f"Database error: {str(e)}", 500
+        
+
+    # ============ PAGE INITIALIZATION DATA ============
         
     def initialize_admin_page(self):
         schedule_data = self.db.get_weekly_schedule()
@@ -162,51 +168,26 @@ class ProgramManager:
         for series in series_data:
             series['blocks'] = calculate_time_blocks(series['duration'])
 
-        return schedule_data, series_data, movie_data
+        timeslots = self.config.get_time_slots()
+        genres = sorted(self.config.get_genres())
 
-    def fetch_metadata(self, media_type, tmdb_id):
-        try:
-            if media_type == TYPE_SERIES:
-                metadata = self.metadatafetcher.fetch_tmdb_data(TYPE_SERIES, tmdb_id)
+        data = {
+            "schedule_data": schedule_data,
+            "series_data": series_data,
+            "movie_data": movie_data,
+            "timeslots": timeslots,
+            "genres": genres
+        }
 
-                data = {
-                    "title": metadata["name"],
-                    "release": metadata["first_air_date"],
-                    "overview": metadata["overview"],
-                    "tagline": metadata["tagline"],
-                    "genre": metadata["genres"],
-                    "original_language": metadata["original_language"],
-                    "run_time": next(iter(metadata["episode_run_time"]), None)
-                }
-
-                return data
-            
-            elif media_type == TYPE_MOVIES:
-                metadata = self.metadatafetcher.fetch_tmdb_data(media_type, tmdb_id)
-
-                data = {
-                    "title": metadata["title"],
-                    "original_title": metadata["original_title"],
-                    "release": metadata["release_date"],
-                    "overview": metadata["overview"],
-                    "genre": metadata["genres"],
-                    "original_language": metadata["original_language"],
-                    "run_time": metadata["runtime"]
-                }
-
-                return data
-            
-        except Exception as e:
-            print(f"Error recieving tmdb metadata: {e}")
-            return True
-        
-
-    def get_tv_guide(self):
+        return data
+    
+    def initialize_tv_guide(self):
         timeslots = self.config.get_time_slots()
         schedule = self.db.get_air_schedule()
 
-        return timeslots, schedule
-    
-    def get_video_file(self):
-        pass
+        data = {
+            "timeslots": timeslots,
+            "schedule": schedule
+        }
 
+        return data

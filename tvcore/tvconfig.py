@@ -1,6 +1,10 @@
 import json
 from pathlib import Path
-from .helper import calculate_time_slots
+
+try:
+    from .helper import calculate_time_slots
+except:
+    from helper import calculate_time_slots
 
 class TVConfig:
     def __init__(self, config_path=""):

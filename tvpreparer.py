@@ -2,14 +2,14 @@ try:
     from .tvcore.tvdownloader import TVDownloader
     from .tvcore.metadatafetcher import MetaDataFetcher
     from .tvcore.tvdatabase import TVDatabase
-    from .tvcore.tvhandler import TVFileHandler
+    from .tvcore.filehandler import TVFileHandler
     from .tvcore.mediapathmanager import MediaPathManager
     from .tvcore.tvconstants import *
 except ImportError:
     from tvcore.tvdownloader import TVDownloader
     from tvcore.metadatafetcher import MetaDataFetcher
     from tvcore.tvdatabase import TVDatabase
-    from tvcore.tvhandler import TVFileHandler
+    from tvcore.filehandler import TVFileHandler
     from tvcore.mediapathmanager import MediaPathManager
     from tvcore.tvconstants import *
 
@@ -43,17 +43,6 @@ class TVPreparer():
             self.database.increment_episode(e['series_id'])
             print(f"Series {e["name"]}: Episode number incremented.")
 
-    def update_keeping_status(self):
-        """
-            Sets episodes that is kept from previous week to be deleted at the end of the week.
-        """
-
-        kept_files = self.database.get_kept_episodes()
-
-        for episode in kept_files:
-            self.database.update_episode_keeping_status(episode['id'], False)
-            print(f"{episode["filename"]} marked for deletion")
-
     def cleanup_obsolete_episodes(self):
         obsolete_episodes = self.database.get_obsolete_episodes()
         self._cleanup(obsolete_episodes, TYPE_SERIES)
@@ -67,11 +56,19 @@ class TVPreparer():
             print(f"No {media_type} to delete")
         
         for entry in data:
-            if not entry['last_aired']:
-                continue
-
             path = self.paths.get_filepath(media_type, entry["directory"], entry["filename"])
             self.handler.delete_media(entry["id"], path, media_type)
+
+    def update_keeping_status(self):
+        """
+        Sets episodes that is kept from previous week to be deleted at the end of the week.
+        """
+
+        kept_files = self.database.get_kept_episodes()
+
+        for episode in kept_files:
+            self.database.update_episode_keeping_status(episode['id'], False)
+            print(f"{episode["filename"]} marked for deletion")
 
     def create_pending_episodes(self):
         series_list = self.database.get_scheduled_series()
@@ -180,7 +177,7 @@ class TVPreparer():
                 elif media_type == TYPE_SERIES: 
                     filename = self.paths.create_episode_file_name(entry["directory"], entry["season_number"], entry["episode_number"])
             
-            #series_dl._check_file_integrity()
+            #TODO Check file integrity series_dl._check_file_integrity()
 
             file_path = self.paths.get_filepath(media_type, entry["directory"], filename)
             file_status = self.handler.verify_local_file(entry["id"], file_path, media_type)
@@ -209,17 +206,19 @@ class TVPreparer():
                 continue
 
             current_episode = None
-
             for idx, entry in enumerate(airings):
                 if first_is_rerun and idx == 0:
                     current_episode = episodes.pop(0)
-                    self.database.update_episode_keeping_status(current_episode["id"], True)
                 elif entry["is_rerun"] == 0 and episodes:
                     current_episode = episodes.pop(0)
-                elif not current_episode:
+                
+                if first_is_rerun and idx == len(airings)-1:
+                    self.database.update_episode_keeping_status(current_episode["id"], True)
+                
+                if not current_episode:
                     continue
                 
-                self.update_episode_link(
+                self._update_episode_link(
                     entry["name"], 
                     entry["id"], 
                     current_episode["id"], 
@@ -232,7 +231,7 @@ class TVPreparer():
                     rerun=(entry["is_rerun"] == 1)
                 )
 
-    def update_episode_link(self, series_name, schedule_id, episode_id, episode_status, season_number, episode_number, filename, day_of_week, start_time, rerun = False):
+    def _update_episode_link(self, series_name, schedule_id, episode_id, episode_status, season_number, episode_number, filename, day_of_week, start_time, rerun = False):
         text = "re-run" if rerun else "original run"
 
         if episode_status == STATUS_AVAILABLE:
@@ -271,8 +270,15 @@ if __name__ == "__main__":
             prep.link_programs_to_schedule()
 
         elif operation == "all":
+            prep.increment_episodes()
             prep.cleanup_obsolete_episodes()
             prep.update_keeping_status()
+            prep.create_pending_episodes()
+            prep.download_weekly_schedule()
+            prep.verify_files_for_scheduled_media()
+            prep.link_programs_to_schedule()
+
+        elif operation == "media_upd":
             prep.create_pending_episodes()
             prep.download_weekly_schedule()
             prep.verify_files_for_scheduled_media()

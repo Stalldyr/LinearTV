@@ -284,7 +284,7 @@ function fetchMetaData() {
         return;
     }
     
-    let url =`/api/fetch_metadata/${programType}/${tmdbId}`
+    let url =`/tmdb/${programType}/${tmdbId}`
     
     fetch(url)
         .then(response => response.json())

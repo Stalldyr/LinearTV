@@ -11,7 +11,7 @@ class TVDownloader:
         self.database = TVDatabase()
         
 
-    def download_from_playlist(self, media_id, media_type, output_path, download_url, episode, total_episodes=0, reverse_order=False):
+    def download_from_playlist(self, media_id:int, media_type:str, output_path, download_url, episode, total_episodes=0, reverse_order=False):
         """
         Download a TV episode
         
@@ -30,10 +30,8 @@ class TVDownloader:
             str: Status (STATUS_AVAILABLE, STATUS_FAILED, etc.)
         """
 
-        #print(f"Started downloading episode {episode} of season {season}") Move to TVpreparer?
         self.database.update_media_status(media_id, media_type, STATUS_DOWNLOADING)
         
-        # Calculate playlist index
         playlist_idx = self._calculate_playlist_index(
             episode, total_episodes, reverse_order
         )
@@ -74,8 +72,6 @@ class TVDownloader:
             return total_episodes - episode + 1
         return episode
     
-
-
     
 class Downloader:
     def __init__(self):
@@ -101,7 +97,6 @@ class Downloader:
             self.ydl_opts = {
                 'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]',
                 'outtmpl': str(output_path), 
-                #'download_archive': os.path.join(directory, '.archive.txt'),
                 'playlist_items': str(index),
                 'merge_output_format': 'mp4'
             }

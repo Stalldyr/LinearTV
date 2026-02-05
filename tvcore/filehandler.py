@@ -7,6 +7,9 @@ import subprocess
 
 
 class TVFileHandler:
+    """
+    Class that deals with all sorts of file handling, such as deleting, recive file metadata, etc. 
+    """
     def __init__(self):
         self.paths = MediaPathManager()
         self.tv_db = TVDatabase()
@@ -27,9 +30,7 @@ class TVFileHandler:
 
 
     def update_file_info(self, media_id, media_type, file_path):
-        
         file_info = self.get_file_info(file_path)
-
         self.tv_db.update_program_info(media_type, media_id, **file_info)
 
         return file_info

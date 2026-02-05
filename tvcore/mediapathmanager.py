@@ -4,6 +4,7 @@ from pathlib import Path
 class MediaPathManager:
     def __init__(self, download_path="downloads", series_subdir=TYPE_SERIES, movies_subdir=TYPE_MOVIES, **kwargs):
         self.base_dir = Path(__file__).parent.parent.resolve()
+
         
         self.download_path = self.base_dir / download_path
         self.series_path = self.download_path / series_subdir

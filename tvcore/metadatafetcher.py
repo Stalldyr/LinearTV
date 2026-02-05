@@ -27,7 +27,7 @@ class MetaDataFetcher:
 
     # ============ YTDLP ============
 
-    def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None):
+    def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None, cached=True, write_to_json=True) -> dict:
         '''
         Docstring for get_ytdlp_season_metadata
         
@@ -41,8 +41,8 @@ class MetaDataFetcher:
         
         json_name = self.paths.create_ytdlp_season_json_name(season)
         json_path = self.paths.get_metadata_path(media_type, directory, json_name)
-
-        if json_path.exists():
+        
+        if cached and json_path.exists():
             with open(json_path, 'r') as f:
                 return json.load(f)
 
@@ -50,10 +50,11 @@ class MetaDataFetcher:
             raise ValueError("video_url must be provided if metadata cache does not exist.")
         
         metadata = self._fetch_ytdlp_info(video_url)
-
-        with open(json_path, 'w') as f:
-            json.dump(metadata, f, indent=4)
         
+        if write_to_json:
+            with open(json_path, 'w') as f:
+                json.dump(metadata, f, indent=4)
+            
         return metadata
     
     def _fetch_ytdlp_info(self, url):
@@ -76,7 +77,7 @@ class MetaDataFetcher:
 
     # ============ TMDB ============
 
-    def get_tmdb_metadata(self, media_type:str, directory:str,  tmdb_id:int, season:int=None, cached=True, write_to_json = True) -> dict:
+    def get_tmdb_metadata(self, media_type:str, directory:str,  tmdb_id:int=None, season:int=None, cached=True, write_to_json = True) -> dict:
         '''
             Get metadata from TMDB (with caching)
             
@@ -89,6 +90,10 @@ class MetaDataFetcher:
             metadata = self.load_tmdb_json(media_type, directory, season)
             if metadata:
                 return metadata
+            
+
+        if not tmdb_id:
+            raise ValueError("video_url must be provided if metadata cache does not exist.")
         
         metadata = self.fetch_tmdb_data(media_type, tmdb_id, season)
             
@@ -130,10 +135,8 @@ class MetaDataFetcher:
             with open(json_path) as f:
                 return json.load(f)
         else:
-            print("File not found")
             return None
     
-
     def fetch_tmdb_data(self, media_type:str, tmdb_id:int, season:int=None):
         if media_type == TYPE_SERIES:
             if season:
@@ -201,7 +204,7 @@ class MetaDataFetcher:
             "episode_number": episode_data.get("episode_number"),
             "title": episode_data.get("name"),
             "description": episode_data.get("overview"),
-            "duration": episode_data.get("runtime")*60
+            "duration": episode_data.get("runtime")
         }
         
     def extract_movie_info_from_tmdb(self, movie_data:dict):
@@ -210,9 +213,55 @@ class MetaDataFetcher:
             "tmdb_id": movie_data.get("id"),
             "title": movie_data.get("name"),
             "description": movie_data.get("overview"),
-            "duration": movie_data.get("runtime")*60
+            "duration": movie_data.get("runtime")
         }
     
+    # ============ API ============
+
+    def fetch_tmdb_metadata(self, media_type, tmdb_id):
+        """
+        Automatically fetches relevant metadata in the admin schedule
+        """
+
+        try:
+            if media_type == TYPE_SERIES:
+                metadata = self.fetch_tmdb_data(TYPE_SERIES, tmdb_id)
+
+                #TODO: Implement extract_series_info_from_tmdb
+                data = {
+                    "title": metadata["name"],
+                    "release": metadata["first_air_date"],
+                    "overview": metadata["overview"],
+                    "tagline": metadata["tagline"],
+                    "genre": metadata["genres"],
+                    "original_language": metadata["original_language"],
+                    "run_time": next(iter(metadata["episode_run_time"]), None)
+                }
+
+                return data
+            
+            elif media_type == TYPE_MOVIES:
+                metadata = self.fetch_tmdb_data(media_type, tmdb_id)
+
+                #TODO: Implement extract_movie_info_from_tmdb
+                data = {
+                    "title": metadata["title"],
+                    "original_title": metadata["original_title"],
+                    "release": metadata["release_date"],
+                    "overview": metadata["overview"],
+                    "genre": metadata["genres"],
+                    "original_language": metadata["original_language"],
+                    "run_time": metadata["runtime"]
+                }
+
+                return data
+            
+        except Exception as e:
+            print(f"Error recieving tmdb metadata: {e}")
+            return True
+    
+
+    # ============ WRAPPER ============
 
     def _media_type_checker(self, media_type):
         #TODO A wrapper that is able to check for either "series" or "movies", and otherwise return None

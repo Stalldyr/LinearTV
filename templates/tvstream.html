@@ -82,50 +82,46 @@
     fadeDelay: null
   });
 
-  let currentProgram = "";
-  function updateProgram() {
-    fetch('/api/current')
-      .then(response => response.json())
-      .then(program => {
-          if (program.filename !== currentProgram) {
-              console.log("Program changed!", program);
-              currentProgram = program.filename;
-              
-              if (program.status === "off_air" || program.status === "no_program" || program.status === "unavailable") {
-                  player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
-                  document.getElementById('programTitle').innerText = program.name;
-                  document.getElementById('programTime').innerText = "";
-                  document.getElementById('programDescription').innerText = program.description;
-              } else {
-                  console.log(parseInt(program.offset));
-                  console.log(parseInt(program.duration));
-                  if (parseInt(program.offset) > parseInt(program.duration)){
-                    player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
-                  } else {
-                    player.src(`/video/${program.content_type}/${program.directory}/${program.filename}`);
-                  }
-                  document.getElementById('programTitle').innerText = program.name;
-                  document.getElementById('programTime').innerText = `${program.start_time} - ${program.end_time}`;
-                  if (program.description){
-                      if (program.episode_number){
-                          document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.description}`;
-                      } else {
-                          document.getElementById('programDescription').innerText = program.description;
-                      }
-                  } else {
-                      document.getElementById('programDescription').innerText = program.description;
-                  }
-              }
-
-              player.currentTime(program.offset)
-
-              if (program.is_rerun){
-                  document.getElementById('programTitle').innerText += " (R)"
-              }
+  function onProgramChanged(program){
+    if (program.status === "available"){
+      if (parseInt(program.offset) > parseInt(program.duration)){
+        player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
+      } else {
+        player.src(`/video/${program.content_type}/${program.directory}/${program.filename}`);
+      }
+      document.getElementById('programTitle').innerText = program.name;
+      document.getElementById('programTime').innerText = `${program.start_time} - ${program.end_time}`;
+      if (program.description){
+          if (program.episode_number){
+              document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.description}`;
+          } else {
+              document.getElementById('programDescription').innerText = program.description;
           }
-      });
+      } else {
+          document.getElementById('programDescription').innerText = program.description;
+      }
+    } else {
+      player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
+      document.getElementById('programTitle').innerText = program.name;
+      document.getElementById('programTime').innerText = "";
+      document.getElementById('programDescription').innerText = program.description;
+    }
+
+    player.currentTime(program.offset)
+
+    if (program.is_rerun){
+        document.getElementById('programTitle').innerText += " (R)"
+    }
+  }
+  
+  function SSE(){
+    const evtSource = new EventSource("stream/current");
+
+    evtSource.onmessage = (e) => {
+      const program = JSON.parse(e.data);
+      onProgramChanged(program);
+    };
   }
 
-  updateProgram();
-  setInterval(updateProgram, 1000);
+  SSE()
 </script>

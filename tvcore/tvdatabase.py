@@ -1,13 +1,14 @@
-from .helper import calculate_end_time
-from .tvconstants import *
-from .SQLexecute import SQLexecute
+try:
+    from .tvconstants import *
+except:
+    from tvconstants import *
+
 from pathlib import Path
-from datetime import datetime, timedelta, time as time_class
 import sys
 
 class TVDatabase:
     def __init__(self, test_time=None):
-        db_path = Path(__file__).parent.parent.absolute()/"data"/"tv.db" #Needs to be improved
+        db_path = Path(__file__).parent.parent.absolute()/"data"/"tv.db" #TODO: Needs to be improved
 
         self.db_path = Path(db_path)
         self.test_time = test_time
@@ -57,6 +58,7 @@ class TVDatabase:
                 description TEXT,
                 duration INTEGER,
                 original_air_data DATE,
+                subtitle ,
                 filename TEXT,
                 download_date DATE,
                 file_size INTEGER,
@@ -95,7 +97,7 @@ class TVDatabase:
                 episode_id INTEGER REFERENCES episodes(id),
                 movie_id INTEGER REFERENCES movies(id),
                 name TEXT NOT NULL,      
-                day_of_week INTEGER NOT NULL,           -- 1=mandag, 7=søndag
+                day_of_week INTEGER NOT NULL,           -- 1=monday, 7=sunday
                 start_time TIME NOT NULL,     
                 end_time TIME,
                 blocks INT,
@@ -330,8 +332,7 @@ class TVDatabase:
             SELECT e.*, s.directory FROM episodes as e
             JOIN series as s ON e.series_id = s.id
             WHERE keep_next_week = 0 
-                AND status = 'available' 
-                AND last_aired IS NOT NULL 
+                AND status = 'available'
                 AND (
                     e.season_number < s.season
                     OR (e.season_number = s.season AND e.episode_number < s.episode)
@@ -523,7 +524,7 @@ class TVDatabase:
     
     def increment_episode(self, series_id):
         """Increments the current episode in the series table by 1
-        Note!: should be corrected for transission between seasons.
+        TODO: should be corrected for transission between seasons.
         """
         query = '''
             UPDATE series
@@ -581,36 +582,193 @@ class TVDatabase:
         '''
 
         return self.execute_query(query)
+    
 
-    def get_current_program(self, time = datetime.now()) -> dict:
+from contextlib import contextmanager
+import sqlite3
+
+class SQLexecute:
+    def __init__(self, db_path):
+        self.db_path = db_path
+
+    @contextmanager
+    def get_connection(self, row_factory):
         """
-        Returns the program showing at a specified time
-        Note!: Should possibly be moved to programmanager/tvstreamer or be rewritten in SQL
+        Context manager for database connections.
+        Ensures proper connection handling and cleanup.
         """
-        schedule = self.get_air_schedule()
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            if row_factory:
+                conn.row_factory = sqlite3.Row
+            yield conn
+        except sqlite3.Error as e:
+            if conn:
+                conn.rollback()
+            print(f"Database error: {e}")
+            raise
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Unexpected error: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
 
-        current_time = time.time()
-        current_day = int(time.strftime('%w'))
-
-        if current_day == 0:
-            current_day = 7
+    def execute_query(self, query, params=None, fetch_one=False, fetch_all=True, output = "dict"):
+        """
+        Universal query executor with error handling.
         
-        for program in schedule:
-            if program['day_of_week'] == current_day:
-                # Parse start time
-                start_hour, start_min = map(int, program['start_time'].split(':'))
-                start_time = time_class(start_hour, start_min)
-                
-                end_time = datetime.strptime(program['end_time'], "%H:%M").time() if program['end_time'] else None
-                if not end_time:
-                    duration_minutes = program['duration'] if program['duration'] else 30
-                    end_time = calculate_end_time(program['start_time'], duration_minutes)
-
-                # Normal program within same day
-                if start_time <= current_time < end_time:
-                    return program
+        Args:
+            query: SQL query string
+            params: Parameters for the query (optional)
+            fetch_one: Return single row instead of all rows
+            fetch_all: Whether to fetch results (False for INSERT/UPDATE/DELETE)
         
-        return None
+        Returns:
+            Query results or None for non-SELECT queries
+        """
+
+        row_factory = False
+        if output == "dict" or output == "rows":
+            row_factory = True
+
+
+        with self.get_connection(row_factory=row_factory) as conn:
+
+            cursor = conn.cursor()
+
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            
+            if fetch_all and not fetch_one:
+                result = cursor.fetchall()
+            elif fetch_one:
+                result = cursor.fetchone()
+            else:
+                result = cursor.rowcount  # For INSERT/UPDATE/DELETE operations
+            
+            conn.commit()
+
+            if output == "dict":
+                return [dict(zip(row.keys(), row)) for row in result] 
+
+            else:
+                return result
+            
+    #Cell operations
+    def get_most_recent_id(self, table):
+        table_id = self.execute_query(f'''
+            SELECT id 
+            FROM {table} 
+            ORDER BY id DESC 
+            LIMIT 1;
+        ''', output="tuples")
+
+        return table_id[0][0]
+    
+    def get_cell(self, table, record_id, column):
+        result = self.execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
+        return result[0] if result else None
+
+    def edit_cell(self, table, id, column, new_value):
+        self.execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
+    
+    def check_if_id_exists(self,table, key):
+        query = f'''
+            SELECT COUNT(*)
+            FROM {table}
+            WHERE id = ?;
+        '''
+
+        return self.execute_query(query,(key,),output=tuple)[0][0]
+    
+
+    #Column operations
+    def add_column(self, table, col, type=None):
+        self.execute_query(f"""ALTER TABLE {table} ADD COLUMN {col} {type};""")
+
+    def rename_column(self,table,col1,col2):
+        self.execute_query(f"""ALTER TABLE {table} RENAME COLUMN {col1} TO {col2};""")
+
+    def drop_column(self,table,col):
+        self.execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
+
+    def update_column(self, table, col, value):
+        self.execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
+
+    #Row operations
+    def get_row_by_id(self, table:str, row_id:int):
+        result = self.execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
+        return result[0] if result else None
+
+    def delete_row(self, table, id):
+        if id == -1:
+            id = "(SELECT MAX(id))"
+
+        try:
+            self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
+            print(f"Slettet oppføring {id} i {table}")
+            return True
+        except:
+            return False
+
+    def edit_row_by_id(self, table:str, row_id:int, **kwargs):        
+        fields = []
+        values = []
+        for key, value in kwargs.items():
+            fields.append(f"{key} = ?")
+            values.append(value)
+        
+        values.append(row_id)
+        
+        query = f"UPDATE {table} SET {', '.join(fields)} WHERE id = ?"
+        self.execute_query(query,values)
+
+    def edit_row_by_conditions(self, table:str, conditions:dict, **kwargs):        
+        fields = []
+        values = []
+        conditions_list = []
+
+        for key, value in kwargs.items():
+            fields.append(f"{key} = ?")
+            values.append(value)
+
+        for key, value in conditions.items():
+            conditions_list.append(f"{key} = ?")
+            values.append(value)
+        
+        query = f"UPDATE {table} SET {', '.join(fields)} WHERE {' AND '.join(conditions_list)}"
+        self.execute_query(query,values)
+
+    def insert_row(self, table:str, data:dict={}, **kwargs):
+        fields = ', '.join(list(data.keys()) + list(kwargs.keys()))
+        placeholders = ', '.join(['?'] * (len(data) + len(kwargs)))
+        params = list(data.values()) + list(kwargs.values())
+        
+        query = f'''
+            INSERT INTO {table}
+            ({fields}) 
+            VALUES ({placeholders})    
+        '''
+        self.execute_query(query, params)
+
+    def update_row(self, table:str, data:dict, **kwargs):
+        fields = ', '.join([f"{key} = ?" for key in data])
+        conditions = ', AND '.join([f"{key} = ?" for key in kwargs])
+        params = list(data.values()) + list(kwargs.values())
+
+        query = f'''
+            UPDATE {table}
+            SET {fields}
+            WHERE {conditions}
+        '''
+        self.execute_query(query, params)
+
 
 if __name__ == "__main__":
     tvdb = TVDatabase()

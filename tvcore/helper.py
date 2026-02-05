@@ -4,7 +4,6 @@ import slugify
 def create_path_friendly_name(title):
     return slugify.slugify(title)
 
-
 def calculate_end_time(start_time:str, duration_minutes:int):
     start_hour, start_minute = map(int, start_time.split(':'))
     start_datetime = datetime.combine(datetime.today(), time_class(start_hour, start_minute))

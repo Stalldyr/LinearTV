@@ -121,7 +121,7 @@ function saveProgram() {
         )
     }
 
-    fetch('/admin/add_program', {
+    fetch('/admin/save_program', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
