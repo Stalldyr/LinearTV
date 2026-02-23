@@ -32,6 +32,8 @@ path_manager = MediaPathManager()
 metadata_fetcher = MetaDataFetcher()
 broadcast_monitor = BroadcastMonitor()
 
+#broadcast_monitor.start_monitoring()
+
 # ============ STREAMING PAGES ============
 
 @stream_app.route('/tvstream')
@@ -89,7 +91,7 @@ def current_program():
         last_id = None
         while True:
             current = broadcast_monitor.get_current_stream()
-            if current.get("id", None) != last_id:
+            if current is not None and current.get("id") != last_id:
                 yield f"data: {json.dumps(current)}\n\n"
                 last_id = current["id"]
                 
