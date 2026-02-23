@@ -246,7 +246,7 @@ class TVDatabase:
 
         return self.sql.get_most_recent_id(TABLE_EPISODES)
     
-    def get_pending_episodes(self, strict:bool = False, local:bool = False, schedule:bool = True):
+    def get_pending_episodes(self, strict:bool = False, local:bool = False, schedule:bool = True, offset:int = 0):
         """
         Return pending episodes from the episodes table.
 
@@ -275,12 +275,12 @@ class TVDatabase:
             SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.reverse_order, s.episode_count
             FROM episodes e
             JOIN series s ON e.series_id = s.id
-            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1)
+            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN (s.episode - ?) AND (s.episode + s.episode_count - 1)
             {join}
             ORDER BY series_name, e.season_number, e.episode_number
         '''
 
-        return self.execute_query(query)
+        return self.execute_query(query, (offset,))
             
     def get_scheduled_episodes(self):
         """
@@ -579,6 +579,29 @@ class TVDatabase:
             LEFT JOIN movies m ON ws.movie_id = m.id
             LEFT JOIN episodes e ON ws.episode_id = e.id
             LEFT JOIN series s ON e.series_id = s.id
+        '''
+
+        return self.execute_query(query)
+    
+    def increment_season(self, series_id):
+        query = '''
+            UPDATE series
+
+            SET CASE
+                WHEN total_episodes = episode
+                THEN
+                    SET season = season + 1
+                    AND SET episode = 1
+            WHERE id = ?
+        '''
+
+        self.execute_query(query,(series_id,))
+    
+    def season_transition_test(self):
+        query = '''
+            SELECT DISTINCT s.* FROM series as s
+            INNER JOIN weekly_schedule ws ON s.id = ws.series_id
+            ORDER BY s.name
         '''
 
         return self.execute_query(query)

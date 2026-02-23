@@ -42,6 +42,11 @@ def tvstream():
 def serve_video(content_type, directory, filename):
     return send_from_directory(path_manager.get_program_dir(content_type, directory), filename)
 
+
+@stream_app.route('/test')
+def test():
+    return send_from_directory('downloads/series/lotto', 'lotto_s2025e03.nb-ttv.vtt')
+
 # ============= ADMIN PAGES =============
 
 @stream_app.route('/admin/schedule')
@@ -84,7 +89,7 @@ def current_program():
         last_id = None
         while True:
             current = broadcast_monitor.get_current_stream()
-            if current["id"] != last_id:
+            if current.get("id", None) != last_id:
                 yield f"data: {json.dumps(current)}\n\n"
                 last_id = current["id"]
                 
@@ -141,7 +146,7 @@ def return_status(success, message, error_code = None, debug=False):
         return jsonify({"status": "error", "message": message}), error_code
 
 
-if __name__ == '__main__':
+def test_run():
     app = Flask(__name__)
     app.register_blueprint(stream_app)
 
@@ -150,7 +155,7 @@ if __name__ == '__main__':
         test_time = datetime.strptime(os.getenv('TEST_TIME'), "%Y-%m-%d %H:%M")
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        broadcast_monitor = BroadcastMonitor(time=test_time)
+        broadcast_monitor = BroadcastMonitor(time=test_time, debug=True)
         broadcast_monitor.start_monitoring()
 
     @app.route('/')
@@ -158,6 +163,9 @@ if __name__ == '__main__':
         return render_template("admin_panel.html")
 
     app.run(host='0.0.0.0', port=5001, debug=True)
+
+if __name__ == '__main__':
+    test_run()
 
 
 

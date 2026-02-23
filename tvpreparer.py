@@ -56,8 +56,12 @@ class TVPreparer():
             print(f"No {media_type} to delete")
         
         for entry in data:
-            path = self.paths.get_filepath(media_type, entry["directory"], entry["filename"])
-            self.handler.delete_media(entry["id"], path, media_type)
+            try:
+                path = self.paths.get_filepath(media_type, entry["directory"], entry["filename"])
+                self.handler.delete_media(entry["id"], path, media_type)
+
+            except Exception as e:
+                print(f"Error deleteing {entry["filename"]}:", e)
 
     def update_keeping_status(self):
         """
@@ -136,9 +140,8 @@ class TVPreparer():
                 break
                 
             file_path = self.paths.get_filepath(media_type, entry["directory"], filename)
-            file_path_check = self.paths.get_filepath(media_type, entry["directory"], filename).exists()
 
-            if file_path_check:
+            if file_path.exists():
                 print(f"Local file found for {filename}, skipping download.")
                 status = STATUS_AVAILABLE
             elif media_type == TYPE_SERIES:

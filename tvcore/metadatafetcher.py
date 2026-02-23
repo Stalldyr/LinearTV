@@ -245,9 +245,9 @@ class MetaDataFetcher:
 
                 #TODO: Implement extract_movie_info_from_tmdb
                 data = {
-                    "title": metadata["title"],
-                    "original_title": metadata["original_title"],
-                    "release": metadata["release_date"],
+                    "title": metadata.get("title"),
+                    "original_title": metadata.get("original_title"),
+                    "release": metadata.get("release_date"),
                     "overview": metadata["overview"],
                     "genre": metadata["genres"],
                     "original_language": metadata["original_language"],

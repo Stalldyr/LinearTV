@@ -25,12 +25,13 @@ class BroadcastMonitor:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, time=None, time_acceleration=1, debug=True, loop_interval = 1):
+    def __init__(self, time=None, time_acceleration=1, time_freeze=False, debug=False, loop_interval=1):
         self.debug = debug
         self.loop_interval = loop_interval
 
         #Testing parameters
         self.test_time = time #Sets start time for testing
+        self.time_freeze = time_freeze #Wether or not time should pass or freeze
         self.current_time = time #Sets the "now" time for testing
         self.time_acceleration = time_acceleration # Sets time acceleration for testing
         self.simulation_started = None #For time testing
@@ -77,6 +78,9 @@ class BroadcastMonitor:
 
         if self.test_time is None:
             return datetime.now()
+        
+        if self.time_freeze:
+            return self.test_time
         
         if self.simulation_started is None:
             self.simulation_started = datetime.now()
@@ -190,3 +194,6 @@ class BroadcastMonitor:
         else:
             return {"status": "idle"}
         
+    def correct_for_times_past_midnight(self, start_time, end_time):
+        if end_time < start_time:
+            pass

@@ -42,6 +42,7 @@ class MediaPathManager:
     def get_filepath(self, media_type, directory, filename) -> Path:
         """Get full path to a specific file"""
         program_dir = self.get_program_dir(media_type, directory)
+        print(program_dir)
         return Path(program_dir)/filename
     
     def get_metadata_path(self, media_type, directory, metadata_file):

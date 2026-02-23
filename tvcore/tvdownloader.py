@@ -76,6 +76,9 @@ class TVDownloader:
 class Downloader:
     def __init__(self):
         self.default_quality = 480
+
+        #ytdlp options
+        #Highly customizable. Check yt_dlp.YoutubeDL.__doc__
         self.ydl_opts = {}
          
     def download(self, url, output_path, index=1, quality=None, **kwargs):
@@ -96,7 +99,8 @@ class Downloader:
         else:
             self.ydl_opts = {
                 'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]',
-                'outtmpl': str(output_path), 
+                'outtmpl': str(output_path),
+                'writesubtitles': str(output_path),
                 'playlist_items': str(index),
                 'merge_output_format': 'mp4'
             }

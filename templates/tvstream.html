@@ -31,11 +31,9 @@
       class="video-js"
       preload="auto"
       controls
-      
     >
 
     <source src="{{ url_for('streaming.static', filename='PM5544.mp4' ) }}" type="video/mp4">
-    <track kind="captions">
     
     <p class="vjs-no-js">
       To view this video please enable JavaScript, and consider upgrading to a
@@ -91,15 +89,13 @@
       }
       document.getElementById('programTitle').innerText = program.name;
       document.getElementById('programTime').innerText = `${program.start_time} - ${program.end_time}`;
-      if (program.description){
-          if (program.episode_number){
-              document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.description}`;
-          } else {
-              document.getElementById('programDescription').innerText = program.description;
-          }
+
+      if (program.episode_number){
+          document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.description}`;
       } else {
           document.getElementById('programDescription').innerText = program.description;
       }
+
     } else {
       player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
       document.getElementById('programTitle').innerText = program.name;
@@ -113,6 +109,17 @@
         document.getElementById('programTitle').innerText += " (R)"
     }
   }
+
+  function create_subtitles(subtitles){
+    subtitles.forEach(subtitle => {
+      const track = document.createElement("track")
+      track.src = subtitle.src
+      track.srclang = subtitle.language
+      track.label = subtitle.label
+
+      player.appendChild(track)
+    });
+  }
   
   function SSE(){
     const evtSource = new EventSource("stream/current");
@@ -123,5 +130,5 @@
     };
   }
 
-  SSE()
+  SSE();
 </script>
