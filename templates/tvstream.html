@@ -130,5 +130,23 @@
     };
   }
 
-  SSE();
+  function Polling(){
+    let currentProgram = "";
+    function updateProgram() {
+        fetch('/stream/current')
+          .then(response => response.json())
+          .then(program => {
+            console.log(program)
+            if (program.filename !== currentProgram) {
+              currentProgram = program.filename;
+              onProgramChanged(program);
+            }
+          });
+    }
+
+    updateProgram();
+    setInterval(updateProgram, 5000);
+  }
+
+  Polling();
 </script>

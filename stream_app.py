@@ -85,6 +85,8 @@ def delete_program():
 
 #Stream
 
+#TODO: SSE doesn't work ideally on deployment. 
+"""
 @stream_app.route('/stream/current')
 def current_program():
     def current_stream():
@@ -98,7 +100,12 @@ def current_program():
             time.sleep(1)
 
     return Response(current_stream(), mimetype="text/event-stream")
-    
+""" 
+
+@stream_app.route('/stream/current')
+def current_program():
+    return jsonify(broadcast_monitor.current_stream)
+
 @stream_app.route('/stream/status')
 def status():
     return jsonify(broadcast_monitor.get_current_status())
@@ -134,7 +141,6 @@ def get_obsolete_episodes():
 @stream_app.route('/tmdb/<program_type>/<int:tmdb_id>', methods=['GET'])
 def fetch_metadata(program_type,tmdb_id):
     return jsonify(metadata_fetcher.fetch_tmdb_metadata(program_type, tmdb_id))
-
 
 
 def return_status(success, message, error_code = None, debug=False):

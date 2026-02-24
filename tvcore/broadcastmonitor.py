@@ -44,6 +44,15 @@ class BroadcastMonitor:
         self.is_broadcasting = False
         self.current_stream = None
 
+        self.current_stream = {
+            "id": STREAM_ID_LOADING,
+            "status": "off_air",
+            "name": "Laster...",
+            "description": "",
+            "filename": None
+        }
+
+
         self.database = TVDatabase()
 
     def update_schedule(self):
