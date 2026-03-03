@@ -1,8 +1,9 @@
 from .tvdatabase import TVDatabase
 from .metadatafetcher import MetaDataFetcher
 from .tvconstants import *
-from .helper import create_path_friendly_name, calculate_time_blocks, calculate_end_time
+from .helper import calculate_time_blocks, calculate_end_time
 from .tvconfig import TVConfig
+from slugify import slugify
 
 class ProgramManager:
     """
@@ -13,7 +14,7 @@ class ProgramManager:
         self.config = TVConfig()
         self.metadatafetcher = MetaDataFetcher()
 
-    # ============ CRUD OPERATION ============
+    # ============ CRUD OPERATIONS ============
 
     def save_program(self, data:dict):
         """
@@ -27,7 +28,7 @@ class ProgramManager:
         """
         
         program_type = data.pop("program_type")
-        program_id = data.pop("id")
+        program_id = data.pop("program_key")
         program_name = data.get("name", None)
 
         if not program_name:
@@ -47,7 +48,7 @@ class ProgramManager:
                 print("Missing season and/or episode for series")
                 return False, "Series requires season and episode"
 
-        directory = create_path_friendly_name(program_name)
+        directory = slugify(program_name)
         data["directory"] = directory
 
         source_url = data.get("source_url", None)

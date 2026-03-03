@@ -10,6 +10,9 @@
         "series_path": "downloads/series",
         "movies_path": "downloads/movies"
     },
+    "updates": {
+        "frequency": "weekly"
+    },
     "genres": [
         "Documentary",
         "Comedy",

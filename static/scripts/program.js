@@ -99,7 +99,7 @@ function saveProgram() {
     const programType = document.querySelector('input[name="programType"]:checked').value
 
     const data = {
-        id: programId ? programId : null,
+        program_key: programId ? programId : null,
         program_type: programType,
         name: document.getElementById('programTitle').value,
         source_url: document.getElementById('programUrl').value,

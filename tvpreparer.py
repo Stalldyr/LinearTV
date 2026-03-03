@@ -4,6 +4,7 @@ try:
     from .tvcore.tvdatabase import TVDatabase
     from .tvcore.filehandler import TVFileHandler
     from .tvcore.mediapathmanager import MediaPathManager
+    from .tvcore.nrkmanager import NRKManager 
     from .tvcore.tvconstants import *
 except ImportError:
     from tvcore.tvdownloader import TVDownloader
@@ -11,6 +12,7 @@ except ImportError:
     from tvcore.tvdatabase import TVDatabase
     from tvcore.filehandler import TVFileHandler
     from tvcore.mediapathmanager import MediaPathManager
+    from tvcore.nrkmanager import NRKManager 
     from tvcore.tvconstants import *
 
 import sys
@@ -31,6 +33,7 @@ class TVPreparer():
         self.downloader = TVDownloader()
         self.handler = TVFileHandler()
         self.metadata = MetaDataFetcher()
+        self.nrk = NRKManager()
 
     def increment_episodes(self):
         """
@@ -42,6 +45,8 @@ class TVPreparer():
         for e in scheduled_episodes:
             self.database.increment_episode(e['series_id'])
             print(f"Series {e["name"]}: Episode number incremented.")
+
+        #TODO: Increment week number for NRK
 
     def cleanup_obsolete_episodes(self):
         obsolete_episodes = self.database.get_obsolete_episodes()
@@ -96,6 +101,9 @@ class TVPreparer():
 
             else:
                 print(f"No metadata available for {series["name"]}")
+
+    def create_pending_episodes_from_NRK(self):
+        pass
 
     def _create_pending(self, episodes, season, series_id, series_name, ytdlp=True):
         for entry in episodes:

@@ -57,10 +57,28 @@ class MetaDataFetcher:
             
         return metadata
     
+    def get_ytdlp_episode_metadata(self, directory, season, video_url=None, cached=True, write_to_json=True) -> dict:
+        
+        json_name = self.paths.create_ytdlp_season_json_name(season)
+        json_path = self.paths.get_metadata_path(TYPE_SERIES, directory, json_name)
+        
+        if cached and json_path.exists():
+            with open(json_path, 'r') as f:
+                return json.load(f)
+
+        if not video_url:
+            raise ValueError("video_url must be provided if metadata cache does not exist.")
+        
+        metadata = self._fetch_ytdlp_info(video_url)
+        
+        if write_to_json:
+            with open(json_path, 'w') as f:
+                json.dump(metadata, f, indent=4)
+            
+        return metadata
+    
     def _fetch_ytdlp_info(self, url):
-        """
-            Fetch info from YTDLP without downloading.
-        """
+        """ Fetch metadata from YTDLP without downloading."""
 
         ydl_opts = {
             'quiet': True,
@@ -192,6 +210,7 @@ class MetaDataFetcher:
             "season_number": episode_data.get("season_number"),
             "episode_number": episode_data.get("episode_number") or episode_data.get("playlist_index"),
             "title": episode_data.get("title"),
+            "series_title": episode_data.get("series"),
             "description": episode_data.get("description"),
             "duration": episode_data.get("duration")
         }

@@ -74,12 +74,12 @@ class TVDownloader:
     
     
 class Downloader:
-    def __init__(self):
+    def __init__(self, custom_options={}):
         self.default_quality = 480
 
         #ytdlp options
         #Highly customizable. Check yt_dlp.YoutubeDL.__doc__
-        self.ydl_opts = {}
+        self.ydl_opts = custom_options
          
     def download(self, url, output_path, index=1, quality=None, **kwargs):
         '''
@@ -92,6 +92,9 @@ class Downloader:
         '''
 
         quality = quality or self.default_quality
+
+        if self.ydl_opts:
+            return self._execute_download(url)
 
         if kwargs:
             self.ydl_opts.update(kwargs)
