@@ -3,803 +3,489 @@ try:
 except:
     from tvconstants import *
 
+import logging
+from unittest import result
+from sqlalchemy import Column, Integer, String, Boolean, Float, Date, Time, DateTime, ForeignKey, Text, JSON, create_engine, and_, or_, case, func, desc, text, inspect
+from sqlalchemy.orm import relationship, sessionmaker, Session, DeclarativeBase, joinedload
+from sqlalchemy.sql import select, update, delete, exists, not_
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.engine import Row
 from pathlib import Path
-import sys
+from datetime import datetime
+from typing import Optional, List, Dict
+from pydantic_core import ValidationError
 
-class TVDatabase:
-    def __init__(self, test_time=None):
-        db_path = Path(__file__).parent.parent.absolute()/"data"/"tv.db" #TODO: Needs to be improved
+from .tvconstants import *
+from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
+from .metadatafetcher import MetaDataFetcher
 
-        self.db_path = Path(db_path)
-        self.test_time = test_time
+class Base(DeclarativeBase):
+    pass
 
-        self.sql = SQLexecute(self.db_path)
-        self.execute_query = self.sql.execute_query
+class MediaBase(Base):
+    __abstract__ = True
+
+    #ID's    
+    id = Column(Integer, primary_key=True)
+    tmdb_id = Column(Integer, unique=True)
+
+    #Metadata
+    title = Column(Text, nullable=False)
+    description = Column(Text)
+    genre = Column(Text)
+    release = Column(DateTime)
+
+    slug = Column(Text)
+
+    source_url = Column(Text)
+
+class Series(MediaBase):
+    __tablename__ = 'series'
+
+    #User Input
+    reverse_order = Column(Boolean, default=False)
+    start_season = Column(Integer, default=1)
+    start_episode = Column(Integer, default=1)
+
+    # Relationships
+    episodes = relationship("Episode", back_populates="series", cascade="all, delete-orphan")
+
+class Movie(MediaBase):
+    __tablename__ = 'movies'
+
+    program_id = Column(Text, unique=True)
+    duration = Column(Float)
     
-        if not self.db_path.exists():
-            self.db_path.touch(exist_ok=True)
-            self.setup_database()
+    # Relationships
+    schedule_entries = relationship("Schedule", back_populates="movie")
 
-    #SETUP
+class Episode(Base):
+    __tablename__ = 'episodes'
 
-    def setup_database(self):
-        """
-        Sets up database tables if they don't already exists.
-        """
+    #ID's
+    id = Column(Integer, primary_key=True)
+    series_id = Column(Integer, ForeignKey('series.id'), nullable=False)
+    program_id = Column(Text, unique=True)
+    tmdb_id = Column(Integer, unique=True)
 
-        self.execute_query('''
-            CREATE TABLE IF NOT EXISTS series (
-                id INTEGER PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                tmdb_id INT,          
-                season INTEGER DEFAULT 1,       
-                episode INTEGER DEFAULT 1,       
-                source_url TEXT,               
-                directory TEXT,                
-                total_episodes INTEGER,              
-                description TEXT,
-                duration INT,
-                reverse_order BOOLEAN,                    
-                genre TEXT,
-                release TEXT,
-                episode_count INT DEFAULT 0
-            )
-        ''')
+    #Metadata
+    title = Column(Text)
+    season_number = Column(Integer)
+    episode_number = Column(Integer)
+    description = Column(Text)
+    duration = Column(Float)
+    source_url = Column(Text)
+
+    # Relationships
+    series = relationship("Series", back_populates="episodes", lazy="selectin")
+    schedule_entries = relationship("Schedule", back_populates="episode")
+
+class Schedule(Base):
+    __tablename__ = 'schedule'
+
+    #ID's    
+    id = Column(Integer, primary_key=True)
+    episode_id = Column(Integer, ForeignKey('episodes.id'))
+    movie_id = Column(Integer, ForeignKey('movies.id'))
+
+    title = Column(Text, nullable=False)
+
+    #schedule info
+    original_start = Column(DateTime)
+    start = Column(DateTime, nullable=False)
+    end = Column(DateTime, nullable=False)
+    rerun = Column(Boolean, default=False, nullable=False)
+    channel = Column(Text)
+    
+    filepath = Column(Text)
+    download_date = Column(Date)
+    file_size = Column(Integer)
+    status = Column(Text, default='pending', nullable=False)
+    last_aired = Column(Date)
+    views = Column(Integer)
+    
+    # Relationships
+    episode = relationship("Episode", back_populates="schedule_entries", lazy="selectin")
+    movie = relationship("Movie", back_populates="schedule_entries", lazy="selectin")
+    
+class TVDatabase:
+    def __init__(self, test_time=None, db_path=""):
+        if db_path:
+            self.db_path = Path(db_path)
+        else:
+            self.db_path = Path(__file__).parent.parent.absolute() / "data" / "tv.db"
         
-        self.execute_query('''
-            CREATE TABLE IF NOT EXISTS episodes (
-                id INTEGER PRIMARY KEY,
-                series_id INTEGER REFERENCES series(id),
-                yt_dlp_id TEXT,                    -- ID fra youtube-dl/yt-dlp
-                tmdb_id INT,
-                season_number INTEGER,
-                episode_number INTEGER,
-                title TEXT,
-                description TEXT,
-                duration INTEGER,
-                original_air_data DATE,
-                subtitle ,
-                filename TEXT,
-                download_date DATE,
-                file_size INTEGER,
-                status TEXT DEFAULT 'pending',    -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
-                last_aired DATE,
-                views INT, 
-                keep_next_week BOOLEAN DEFAULT 0
-            )
-        ''')
+        self.test_time = test_time
+        
+        # Create engine and session factory
+        self.engine = create_engine(f'sqlite:///{self.db_path}', echo=False)
+        self.SessionLocal = sessionmaker(bind=self.engine)
+        
+        self.metadatafetcher = MetaDataFetcher()
 
-        self.execute_query('''
-            CREATE TABLE IF NOT EXISTS movies (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                tmdb_id INT,
-                yt_dlp_id TEXT,
-                description TEXT,
-                duration INTEGER,
-                release INT,
-                genre TEXT,
-                directory TEXT,
-                filename TEXT,
-                download_date DATE,
-                file_size INTEGER,
-                status TEXT DEFAULT 'pending',  -- 'pending', 'available', 'deleted', 'failed', 'downloading', 'missing'
-                last_aired DATE,
-                views INT,
-                source_url TEXT
-            )                                    
-        ''')
-
-        self.execute_query('''
-            CREATE TABLE IF NOT EXISTS weekly_schedule (
-                id INTEGER PRIMARY KEY,
-                series_id INTEGER REFERENCES series(id),
-                episode_id INTEGER REFERENCES episodes(id),
-                movie_id INTEGER REFERENCES movies(id),
-                name TEXT NOT NULL,      
-                day_of_week INTEGER NOT NULL,           -- 1=monday, 7=sunday
-                start_time TIME NOT NULL,     
-                end_time TIME,
-                blocks INT,
-                is_rerun BOOLEAN DEFAULT 0
-            )
-        ''')
-
+        #self.sql = SQLexecute(self.db_path)
+        #self.execute_query = self.sql.execute_query
+        
+        # Setup database if it doesn't exist
+        if not self.db_path.exists():
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.setup_database()
+    
+    def get_session(self) -> Session:
+        """Create and return a new database session"""
+        return self.SessionLocal()
+    
+    # SETUP
+    
+    def setup_database(self):
+        """Sets up database tables if they don't already exist."""
+        Base.metadata.create_all(self.engine)
+    
     def reset_database(self):
         """
-        Reset the database to its initial state while preserving series and schedule data.
-
+        Reset the database to its initial state while preserving schedule data.
+        
         This method clears episode-specific metadata by:
         - Removing file information (file_size, filename)
         - Clearing download and air date information (download_date, last_aired)
         - Resetting episode status to 'pending'
         - Resetting view count to 0
-        - Clearing third-party identifiers (tmdb_id)
         - Removing keep flags (keep_next_week)
         - Disassociating episodes from the weekly schedule
         """
-
-        self.sql.update_column("episodes", "file_size", None)
-        self.sql.update_column("episodes", "filename", None)
-        self.sql.update_column("episodes", "download_date", None)
-        self.sql.update_column("episodes", "status", "pending")
-        self.sql.update_column("episodes", "last_aired", None)
-        self.sql.update_column("episodes", "views", 0)
-        self.sql.update_column("episodes", "tmdb_id", None)
-        self.sql.update_column("episodes", "keep_next_week", False)
-
-        self.sql.update_column("weekly_schedule", "episode_id", None)
-        
-    #SERIES TABLE OPERATIONS
-    
-    def add_program(self, program_type:str, **program_data):
-        """
-        Adds a new program to the database.
-
-        Required:
-            program_type: Should be set to either "series" or "movies.
-            program_id: Id for the program. Should be set to None for a new program
+        with self.get_session() as session:
+            session.query(Schedule).update({
+                Schedule.file_size: None,
+                Schedule.filepath: None,
+                Schedule.download_date: None,
+                Schedule.status: "pending",
+                Schedule.last_aired: None,
+                Schedule.views: 0,
+                Schedule.keep_next_week: False
+            })
             
-        Required fields in program_data:
-            name: Program name
-            season (for series)
-            episode (for series)
+            session.commit()
+
+
+    #GENERAL CRUD OPERATIONS
+
+    def _to_model(self, obj: Series | Movie | Schedule | Episode) -> tuple[type, dict]:
+        model = type(obj)
+        data = {k: v for k, v in obj.__dict__.items() if not k.startswith('_') and v is not None}
         
-        Optional (via program_data or kwargs):
-            source_url, release, description, duration, genre, tmdb_id,
-            season, episode, directory, total_episodes, etc.
-        """
+        return model, data
+    
+    def _execute(self, query, model: ScheduleOutput| SeriesOutput | EpisodeOutput | MovieOutput ):
+        with self.get_session() as session:
+            try:
+                results = session.execute(query).scalars().all()
+            except Exception as e:
+                logging.error(f"Database query failed: {e}")
+                return []
 
-        self.sql.insert_row(program_type, program_data)
-        new_id = self.sql.get_most_recent_id(program_type)
-        print(f"Added new program: {program_data.get('name')}")
-        return new_id
-        
-    def update_program(self, program_type:str, program_id:int, **program_data):
-        """
-        Updates existing program in the database.
+            validated = []
+            for row in results:
+                try:
+                    validated.append(model.model_validate(row))
+                except ValidationError as e:
+                    logging.warning(f"Skipping invalid row {getattr(row, 'id', '?')}: {e}")
+                except Exception as e:
+                    logging.error(f"Unexpected error validating row: {e}")
 
-        Args:
-            program_type: Should be set to either "series" or "movies.
-            program_id: Database ID for the program.
-            program_data: Fields to update
-                        
-        Optional (via program_data or kwargs):
-            source_url, release, description, duration, genre, tmdb_id,
-            season, episode, directory, total_episodes, etc.
-        """
+            return validated
+            
 
-        self.sql.update_row(program_type, program_data, id=program_id)
+    def get(self, obj: Series | Movie | Schedule | Episode) -> Series | Movie | Schedule | Episode:
+        with self.get_session() as session:
 
-        print(f"Updated program {program_data.get('name')}")
+            model, data = self._to_model
+            stmt = select(model)
+            for key, value in data.items():
+                stmt = stmt.where(getattr(model, key) == value)
 
 
-    def delete_program(self, program_id, media_type):
-        """
-        Deletes a program from the movies/series-table and the weekly schedule (if scheduled).
-        
-        program_id: id in the table
-        media_type: "movies" or "series"
-        """
+            stmt = self._to_model(obj)
+            return session.execute(stmt).scalars().first()
 
-        if media_type == TYPE_SERIES:
-            self.sql.delete_row(TABLE_SERIES, program_id)
-
-            for airing in self.get_program_schedule_by_series_id(program_id):
-                self.sql.delete_row(TABLE_SCHEDULE, airing["id"])
-
-            return True
-
-        elif media_type == TYPE_MOVIES:
-            self.sql.delete_row(TABLE_MOVIES, program_id)
-
-            for airing in self.get_program_schedule_by_movie_id(program_id):
-                self.sql.delete_row(TABLE_SCHEDULE, airing["id"])
-
-            return True
-        
-        else:
-            return False
-
-    def get_schedule_by_time(self, day_of_week, start_time, end_time = None):
-        """
-        Returns rows from the weekly schedule filtered on date and time.
-        Note!: Should possibly be merged with get_current_program 
-        """
-
-        query = '''
-            SELECT * FROM weekly_schedule 
-            WHERE day_of_week = ? AND start_time BETWEEN ? and ?
-            ORDER BY day_of_week, start_time
-        '''
-
-        return self.execute_query(query, (day_of_week, start_time, end_time if end_time else start_time))
-
-    def add_schedule_entry(self, data):
+    def add(self, obj: Series | Movie | Schedule | Episode, unique_on: list[str] = None):
         """Adds new entry to the weekly schedule"""
-        self.sql.insert_row(TABLE_SCHEDULE, data)
-    
-    def delete_schedule_by_id(self, schedule_id):
-        """Deletes entry from schedule based on the primary ID"""
-        return self.sql.delete_row(TABLE_SCHEDULE, schedule_id)
 
+        with self.get_session() as session:
+            if unique_on:
+                model = type(obj)
+                conditions = [getattr(model, col) == getattr(obj, col) for col in unique_on]
+                exists = session.execute(select(model).where(*conditions)).scalars().first()
+                if exists:
+                    return exists.id
 
-    def edit_schedule(self, conditions, data):
-        """Deletes entry from schedule based on custom conditions"""
-        self.sql.edit_row_by_conditions(TABLE_SCHEDULE, conditions, **data)
-    
-    def get_all_series(self):
-        """Returns all series from the series-table."""
-        return self.execute_query('SELECT * FROM series ORDER BY name')
-    
-    #02 EPISODE TABLE OPERATIONS
+            session.add(obj)
+            session.commit()
+            session.refresh(obj)
 
-    def update_program_info(self, media_type:str, media_id:int, **file_info): #change name?
-        """
-        Adds file info for local files to the database.
-        """
-
-        if media_type == TYPE_SERIES:
-            self.sql.edit_row_by_id(TABLE_EPISODES, media_id, **file_info)
-        elif media_type == TYPE_MOVIES:
-            self.sql.edit_row_by_id(TABLE_MOVIES, media_id, **file_info)
-
-        return self.sql.get_most_recent_id(TABLE_EPISODES)
-    
-    def get_pending_episodes(self, strict:bool = False, local:bool = False, schedule:bool = True, offset:int = 0):
-        """
-        Return pending episodes from the episodes table.
-
-        strict: Wether status is strictly "pending" or have other nonavailable statuses, i.e. "failed" or "missing".
-        local: Wether .... 
-        schedule: Wether or not it return pending episodes .... only from programs that are in the weekly schedule
-        """
-        conditions = []
-        join = ""
+            return obj.id
         
-        if strict:
-            conditions.append(f'e.status IN ("{STATUS_PENDING}")')
-        else:
-            conditions.append(f'e.status IN ("{STATUS_PENDING}", "{STATUS_FAILED}", "{STATUS_MISSING}", "{STATUS_DOWNLOADING}", "{STATUS_DELETED}")')
+    def upsert(self, obj: Series | Movie | Schedule):
+        with self.get_session() as session:
+            session.merge(obj)
+            session.commit()
 
-        if local:
-            conditions.append(f's.source_url = None')
+    def upsert_on_column(self, obj: Series | Movie | Schedule, index_elements):
+        with self.get_session() as session:
+            model, data = self._to_model(obj)
+            filters = [getattr(model, col) == data[col] for col in index_elements]
+            exists = session.query(model).filter(*filters).first()
+            if not exists:
+                session.add(model(**data))
+                session.commit()
 
-        if schedule:
-            join = """AND EXISTS (
-                SELECT 1 FROM weekly_schedule ws 
-                WHERE ws.series_id = s.id
-            )"""
-
-        query = f'''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory, s.total_episodes, s.reverse_order, s.episode_count
-            FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            WHERE {" AND ".join(conditions)} AND e.season_number = s.season AND e.episode_number BETWEEN (s.episode - ?) AND (s.episode + s.episode_count - 1)
-            {join}
-            ORDER BY series_name, e.season_number, e.episode_number
-        '''
-
-        return self.execute_query(query, (offset,))
-            
-    def get_scheduled_episodes(self):
+    def delete(self, obj: Series | Movie | Schedule | Episode):
         """
-        All episodes in the schedule for the current week
-        """
-
-        query = f'''
-            SELECT DISTINCT e.*, s.directory, s.name
-            FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            JOIN weekly_schedule ws ON ws.series_id = s.id
-            WHERE e.season_number = s.season AND e.episode_number BETWEEN s.episode AND (s.episode + s.episode_count - 1) 
-            ORDER BY s.name, e.season_number, e.episode_number
-        '''
-        
-        return self.execute_query(query)
-    
-    def get_available_episodes(self):
-        """Returns episodes that has "available"-status, i.e. episodes with a file ready for viewing."""
-
-        query = '''
-            SELECT e.*, s.name as series_name, s.source_url, s.directory
-            FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            WHERE e.status = 'available'
-            ORDER BY e.series_id, e.season_number, e.episode_number
-        '''
-
-        return self.execute_query(query)
-    
-    def get_scheduled_episodes_by_id(self, series_id, season, offset):
-        """
-        Returns episodes from the episodes table that are scheduled to be shown in the weekly schedule
-        """
-
-        query = '''
-            SELECT e.* FROM episodes e
-            JOIN series s ON e.series_id = s.id
-            WHERE series_id = ? 
-            AND e.season_number = ? AND e.episode_number BETWEEN (s.episode - ?) AND (s.episode + s.episode_count - 1)
-            ORDER BY e.season_number, e.episode_number
-        '''
-
-        return self.execute_query(query, (series_id, season, offset))
-    
-    def get_obsolete_episodes(self):
-        """Returns available episodes that has already been viewed and is not planned to be viewes again."""
-        query = '''
-            SELECT e.*, s.directory FROM episodes as e
-            JOIN series as s ON e.series_id = s.id
-            WHERE keep_next_week = 0 
-                AND status = 'available'
-                AND (
-                    e.season_number < s.season
-                    OR (e.season_number = s.season AND e.episode_number < s.episode)
-                )
-        '''
-        
-        return self.execute_query(query)
-    
-    def add_pending_episodes(self, **kwargs):
-        self.sql.insert_row(TABLE_EPISODES, status = STATUS_PENDING, **kwargs)
-
-    def edit_pending_episodes(self, episode_id, **kwargs):
-        self.sql.edit_row_by_id(TABLE_EPISODES, episode_id, **kwargs)
-    
-    def update_episode_keeping_status(self, episode_id:int, keep:bool):
-        ''''
-        Updates if the episode to be kept or not for the next week
-
-        episode_id (int): The primary id of the episode
-        keep (boolean): Marks the episode for keeping (true) or deleting (false)
-        '''
-
-        self.sql.edit_cell(TABLE_EPISODES, episode_id, "keep_next_week", keep)
-
-    def get_kept_episodes(self):
-        """Returns episodes that are kept from previous week."""
-
-        query = '''
-            SELECT e.* FROM episodes as e
-            JOIN series s ON s.id = e.series_id
-            WHERE keep_next_week = 1 
-                AND status = 'available' 
-                AND (
-                    e.season_number < s.season
-                    OR (e.season_number = s.season AND e.episode_number < s.episode)
-                )
-
-        '''
-
-        return self.execute_query(query)
-    
-    def get_episode_by_details(self, series_id: int, season:int , episode: int):
-        """
-        Returns episodes from the "episode" table filtered by series_id, season and episode number
-        """
-
-        query = '''
-            SELECT * FROM episodes
-            WHERE series_id = ? AND season_number = ? AND episode_number = ?
-        '''
-        result = self.execute_query(query, (series_id, season, episode))
-        return result[0] if result else None
-    
-    def update_media_status(self, file_id:int, media_type:str, status:str, **kwargs):
-        updates = {"status": status}
-        updates.update(kwargs)
-
-        if media_type == TYPE_SERIES:
-            self.sql.edit_row_by_id(TABLE_EPISODES, file_id, **updates)
-        elif media_type == TYPE_MOVIES:
-            self.sql.edit_row_by_id(TABLE_MOVIES, file_id, **updates)
-
-    #MOVIES TABLE OPERATIONS
-
-    def get_all_movies(self):
-        query = 'SELECT * FROM movies ORDER BY name'
-        return self.execute_query(query)
-    
-    def get_available_movies(self):
-        query = f'''
-            SELECT m.* FROM movies m
-            WHERE status = "available"
-        '''
-        return self.execute_query(query)
-        
-    def get_scheduled_movies(self):
-        """Returns movies from the weekly schedule"""
-        query = f'''
-            SELECT m.* FROM movies m
-            JOIN weekly_schedule ws ON m.id = ws.movie_id
-        '''
-        return self.execute_query(query)
-    
-    def get_obsolete_movies(self):
-        "Returns movies marked for deletion"
-        query = '''
-            SELECT m.* FROM movies as m
-            WHERE status = 'available' AND last_aired IS NOT NULL
-        '''
-        
-        return self.execute_query(query)
-    
-
-    #WEEKLY SCHEDULE     
-    
-    def update_schedule_count(self):
-        "Updates the number of episodes of the same series within a week"
-        query = '''
-            UPDATE series
-            SET episode_count = (
-                SELECT COUNT(*)
-                FROM weekly_schedule ws
-                WHERE ws.is_rerun = 0 AND ws.series_id = series.id
-            );
-        '''
-
-        self.execute_query(query)
-    
-    def get_weekly_schedule(self) -> list[dict]:
-        """Returns all scheduled programs in the weekly schedule"""
-        query = '''
-            SELECT * FROM weekly_schedule
-            ORDER BY day_of_week, start_time
-        '''
-
-        return self.execute_query(query)
-    
-    def get_weekly_schedule_with_details(self) -> list[dict]:
-        query = '''
-            SELECT ws.name, ws.day_of_week, ws.start_time, ws.is_rerun, e.episode_number, e.filename, e.keep_next_week FROM weekly_schedule AS ws
-            JOIN episodes e ON e.id = ws.episode_id  
-            ORDER BY ws.day_of_week, ws.start_time
-        '''
-        
-        return self.execute_query(query)
-        
-
-    def get_program_schedule_by_series_id(self, series_id):
-        query = '''
-            SELECT * FROM weekly_schedule
-            WHERE series_id = ?
-            ORDER BY day_of_week, start_time
-        '''
-
-        return self.execute_query(query,(series_id,))
-    
-    def get_program_schedule_by_movie_id(self, movie_id):
-        query = '''
-            SELECT * FROM weekly_schedule
-            WHERE movie_id = ?
-            ORDER BY day_of_week, start_time
-        '''
-
-        return self.execute_query(query,(movie_id,))
-    
-    def get_scheduled_series(self):
-        query = '''
-            SELECT DISTINCT s.* FROM series as s
-            INNER JOIN weekly_schedule ws ON s.id = ws.series_id
-            ORDER BY s.name
-        '''
-
-        return self.execute_query(query)
-
-    def check_if_rerun_before_new(self, series_id):
-        query = '''
-            SELECT day_of_week, start_time, is_rerun
-            FROM weekly_schedule 
-            WHERE series_id = ?
-            ORDER BY day_of_week, start_time
-        '''
-        
-        airings = self.execute_query(query, (series_id,))
-        
-        if len(airings) < 2:
-            return False  
-        
-        first_airing = airings[0]
-        return first_airing["is_rerun"] == 1
-    
-    #DOWNLOADS
-
-    def get_weekly_download_schedule(self):
-        count = '''
-            SELECT series_id, COUNT() as count
-            FROM weekly_schedule
-            WHERE is_rerun = 0
-            GROUP BY series_id
-        '''
-
-        query = f'''
-            SELECT s.id as series_id, s.name, s.season, s.episode, s.source_url, s.tmdb_id, s.directory, s.total_episodes, s.reverse_order as reverse, c.count
-            FROM series s
-            LEFT JOIN ({count}) c ON c.series_id = s.id
-            WHERE c.count > 0
-        '''
-
-        return self.execute_query(query)
-    
-    def increment_episode(self, series_id):
-        """Increments the current episode in the series table by 1
-        TODO: should be corrected for transission between seasons.
-        """
-        query = '''
-            UPDATE series
-            SET episode = episode + 1
-            WHERE id = ?
-        '''
-
-        self.execute_query(query,(series_id,))
-
-    def update_episode_links(self, schedule_id, episode_id):
-        query = '''
-            UPDATE weekly_schedule
-            SET episode_id = ?
-            WHERE id = ?
-        '''
-
-        self.execute_query(query,(episode_id,schedule_id))
-
-    def update_movie_link(self, id, movie_id):
-        query = '''
-            UPDATE weekly_schedule
-            SET movie_id = ?
-            WHERE id = ?
-        '''
-
-        self.execute_query(query,(movie_id,id))
-    
-    #AIRING OPERATIONS
-    
-    def get_air_schedule(self) -> list[dict]:
-        query = '''
-            SELECT 
-                ws.id,
-                ws.name,
-                ws.day_of_week,
-                ws.start_time,
-                ws.end_time,
-                ws.is_rerun,
-                COALESCE(e.filename, m.filename) as filename,
-                COALESCE(m.description, e.description, s.description) as description,
-                COALESCE(e.status, m.status) as status,
-                COALESCE(m.duration, e.duration, s.duration) as duration,
-                COALESCE(m.last_aired, e.last_aired) as last_aired,
-                e.episode_number,
-                COALESCE(m.directory, s.directory) as directory,
-                COALESCE(e.id, m.id) as media_id,
-                CASE 
-                    WHEN m.id IS NOT NULL THEN 'movies'
-                    WHEN e.id IS NOT NULL THEN 'series'
-                END as content_type
-            FROM weekly_schedule ws
-            LEFT JOIN movies m ON ws.movie_id = m.id
-            LEFT JOIN episodes e ON ws.episode_id = e.id
-            LEFT JOIN series s ON e.series_id = s.id
-        '''
-
-        return self.execute_query(query)
-    
-    def increment_season(self, series_id):
-        query = '''
-            UPDATE series
-
-            SET CASE
-                WHEN total_episodes = episode
-                THEN
-                    SET season = season + 1
-                    AND SET episode = 1
-            WHERE id = ?
-        '''
-
-        self.execute_query(query,(series_id,))
-    
-    def season_transition_test(self):
-        query = '''
-            SELECT DISTINCT s.* FROM series as s
-            INNER JOIN weekly_schedule ws ON s.id = ws.series_id
-            ORDER BY s.name
-        '''
-
-        return self.execute_query(query)
-    
-
-from contextlib import contextmanager
-import sqlite3
-
-class SQLexecute:
-    def __init__(self, db_path):
-        self.db_path = db_path
-
-    @contextmanager
-    def get_connection(self, row_factory):
-        """
-        Context manager for database connections.
-        Ensures proper connection handling and cleanup.
-        """
-        conn = None
-        try:
-            conn = sqlite3.connect(self.db_path)
-            if row_factory:
-                conn.row_factory = sqlite3.Row
-            yield conn
-        except sqlite3.Error as e:
-            if conn:
-                conn.rollback()
-            print(f"Database error: {e}")
-            raise
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            print(f"Unexpected error: {e}")
-            raise
-        finally:
-            if conn:
-                conn.close()
-
-    def execute_query(self, query, params=None, fetch_one=False, fetch_all=True, output = "dict"):
-        """
-        Universal query executor with error handling.
+        Deletes an entry from any table 
         
         Args:
-            query: SQL query string
-            params: Parameters for the query (optional)
-            fetch_one: Return single row instead of all rows
-            fetch_all: Whether to fetch results (False for INSERT/UPDATE/DELETE)
+            obj: ---- 
         
         Returns:
-            Query results or None for non-SELECT queries
+            True if successful, False otherwise
         """
+        with self.get_session() as session:
+            db_obj  = session.get(type(obj), obj.id)
+            if db_obj :
+                session.delete(db_obj)
+                session.commit()
 
-        row_factory = False
-        if output == "dict" or output == "rows":
-            row_factory = True
-
-
-        with self.get_connection(row_factory=row_factory) as conn:
-
-            cursor = conn.cursor()
-
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            
-            if fetch_all and not fetch_one:
-                result = cursor.fetchall()
-            elif fetch_one:
-                result = cursor.fetchone()
-            else:
-                result = cursor.rowcount  # For INSERT/UPDATE/DELETE operations
-            
-            conn.commit()
-
-            if output == "dict":
-                return [dict(zip(row.keys(), row)) for row in result] 
-
-            else:
-                return result
-            
-    #Cell operations
-    def get_most_recent_id(self, table):
-        table_id = self.execute_query(f'''
-            SELECT id 
-            FROM {table} 
-            ORDER BY id DESC 
-            LIMIT 1;
-        ''', output="tuples")
-
-        return table_id[0][0]
-    
-    def get_cell(self, table, record_id, column):
-        result = self.execute_query(f"SELECT {column} FROM {table} WHERE id = ?", (record_id,))
-        return result[0] if result else None
-
-    def edit_cell(self, table, id, column, new_value):
-        self.execute_query( f"UPDATE {table} SET {column} = ? WHERE id = ?", (new_value, id))
-    
-    def check_if_id_exists(self,table, key):
-        query = f'''
-            SELECT COUNT(*)
-            FROM {table}
-            WHERE id = ?;
-        '''
-
-        return self.execute_query(query,(key,),output=tuple)[0][0]
-    
-
-    #Column operations
-    def add_column(self, table, col, type=None):
-        self.execute_query(f"""ALTER TABLE {table} ADD COLUMN {col} {type};""")
-
-    def rename_column(self,table,col1,col2):
-        self.execute_query(f"""ALTER TABLE {table} RENAME COLUMN {col1} TO {col2};""")
-
-    def drop_column(self,table,col):
-        self.execute_query(f"""ALTER TABLE {table} DROP COLUMN {col};""")
-
-    def update_column(self, table, col, value):
-        self.execute_query(f"""UPDATE {table} SET {col} = ?;""", (value,))
-
-    #Row operations
-    def get_row_by_id(self, table:str, row_id:int):
-        result = self.execute_query(f'SELECT * FROM {table} WHERE id = ?', (row_id,))
-        return result[0] if result else None
-
-    def delete_row(self, table, id):
-        if id == -1:
-            id = "(SELECT MAX(id))"
-
-        try:
-            self.execute_query(f"DELETE FROM {table} WHERE id = ?", (id,))        
-            print(f"Slettet oppføring {id} i {table}")
-            return True
-        except:
+                return True
             return False
-
-    def edit_row_by_id(self, table:str, row_id:int, **kwargs):        
-        fields = []
-        values = []
-        for key, value in kwargs.items():
-            fields.append(f"{key} = ?")
-            values.append(value)
         
-        values.append(row_id)
+
+    def delete2(self, obj: Series | Movie | Schedule | Episode):
+        """
+        Deletes an entry from any table 
         
-        query = f"UPDATE {table} SET {', '.join(fields)} WHERE id = ?"
-        self.execute_query(query,values)
-
-    def edit_row_by_conditions(self, table:str, conditions:dict, **kwargs):        
-        fields = []
-        values = []
-        conditions_list = []
-
-        for key, value in kwargs.items():
-            fields.append(f"{key} = ?")
-            values.append(value)
-
-        for key, value in conditions.items():
-            conditions_list.append(f"{key} = ?")
-            values.append(value)
+        Args:
+            obj: ---- 
         
-        query = f"UPDATE {table} SET {', '.join(fields)} WHERE {' AND '.join(conditions_list)}"
-        self.execute_query(query,values)
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.get_session() as session:
+            model, data = self._to_model(obj)
+            stmt = delete(model).where(model.id == obj.id)
+            session.execute(stmt)
+            session.commit()
+    
 
-    def insert_row(self, table:str, data:dict={}, **kwargs):
-        fields = ', '.join(list(data.keys()) + list(kwargs.keys()))
-        placeholders = ', '.join(['?'] * (len(data) + len(kwargs)))
-        params = list(data.values()) + list(kwargs.values())
+    # MEDIA CRUD OPERATIONS
         
-        query = f'''
-            INSERT INTO {table}
-            ({fields}) 
-            VALUES ({placeholders})    
-        '''
-        self.execute_query(query, params)
+    
+    def get_all_series(self, missing=False) -> List[SeriesOutput]:
+        """Returns all series from the series-table."""
+        q = select(
+            Series
+        ).order_by(
+            Series.title
+        )
 
-    def update_row(self, table:str, data:dict, **kwargs):
-        fields = ', '.join([f"{key} = ?" for key in data])
-        conditions = ', AND '.join([f"{key} = ?" for key in kwargs])
-        params = list(data.values()) + list(kwargs.values())
+        if missing:
+            q = q.where(or_(Series.description, Series.title, Series.release).is_(None))
 
-        query = f'''
-            UPDATE {table}
-            SET {fields}
-            WHERE {conditions}
-        '''
-        self.execute_query(query, params)
+        return self._execute(q, SeriesOutput)
+        
+    def get_all_episodes(self, missing=False) -> List[EpisodeOutput]:
+        """Returns all series from the series-table."""
+        
+        q = select(
+            Episode
+        ).order_by(
+            Episode.id
+        )
+
+        if missing:
+            q = q.where(or_(
+                Episode.title.is_(None),
+                Episode.description.is_(None),
+                Episode.season_number.is_(None),
+                Episode.episode_number.is_(None),
+                Episode.duration.is_(None)
+            ))
+
+        return self._execute(q, EpisodeOutput)
+    
+    def get_all_movies(self, missing=False) -> List[MovieOutput]:
+        """Returns all series from the series-table."""
+        q = select(
+            Movie
+        ).order_by(
+            Movie.title
+        )
+
+        if missing:
+            q = q.where(or_(
+                Movie.description, 
+                Movie.title,
+                Movie.release
+                #More??? REMOVEB4COMMIT
+            ).is_(None))
+
+        return self._execute(q, MovieOutput)
+    
+    # SCHEDULE OPERATIONS
+                
+    def get_scheduled_programs(self, current:tuple[datetime, datetime] = ()) -> List[ScheduleOutput]:
+        q = select(
+            Schedule
+        )
+
+        if current:
+            q.where(Schedule.start.between(current[0], current[1]))
+
+        return self._execute(q, ScheduleOutput)
+        
+    def get_pending_programs(self, strict: bool = False, current: tuple[datetime, datetime] = ()) -> List[ScheduleOutput]:
+        """
+        Return pending episodes from the episodes table.
+        
+        Args:
+            strict: Whether status is strictly "pending" or have other non-available statuses
+            local: Whether to filter for local programs only
+            schedule: Whether to return pending episodes only from programs in the weekly schedule
+        """
+        
+        q = select(
+                Schedule
+            )
+        
+        if strict:
+            q = q.where(Schedule.status == STATUS_PENDING)
+        else:
+            q = q.where(Schedule.status.in_([
+                STATUS_PENDING, STATUS_FAILED, STATUS_MISSING, 
+                STATUS_DOWNLOADING, STATUS_DELETED
+            ]))
+
+        if current:
+            q = q.where(Schedule.start.between(current[0], current[1]))
+
+        return self._execute(q, ScheduleOutput)      
+            
+    def get_obsolete_programs(self) -> list[ScheduleOutput]:
+        return self.get_obsolete_episodes() + self.get_obsolete_movies()
+
+    def get_obsolete_episodes(self) -> list[ScheduleOutput]:
+        """Returns available episodes that has already been viewed and is not planned to be viewes again."""
+
+        future_episode_ids = (
+            select(Schedule.episode_id)
+            .where(
+                Schedule.start > datetime.now(),
+                Schedule.episode_id.isnot(None)
+            )
+            .scalar_subquery()
+        )
+
+        q = (
+            select(Schedule)
+            .where(
+                Schedule.start < datetime.now(),
+                Schedule.filepath.isnot(None),
+                Schedule.episode_id.not_in(future_episode_ids)
+            )
+        )
+
+        return self._execute(q, ScheduleOutput)
+    
+
+    def get_obsolete_movies(self) -> list[ScheduleOutput]:
+        """Returns available movies that has already been viewed and is not planned to be viewes again."""
+
+        future_episode_ids = (
+            select(Schedule.movie_id)
+            .where(
+                Schedule.start > datetime.now(),
+                Schedule.movie_id.isnot(None)
+            )
+            .scalar_subquery()
+        )
+
+        q = (
+            select(Schedule)
+            .where(
+                Schedule.start < datetime.now(),
+                Schedule.filepath.isnot(None),
+                Schedule.movie_id.not_in(future_episode_ids)
+            )
+        )
+
+        return self._execute(q, ScheduleOutput)
+    
+                        
+
+    def get_episode_by_details(self, series_id: int, season: int, episode: int) -> Optional[Dict]:
+        """
+        Returns episode from the "episode" table filtered by series_id, season and episode number
+        """
+        with self.get_session() as session:
+            ep = session.query(Episode).filter(
+                Episode.series_id == series_id,
+                Episode.season_number == season,
+                Episode.episode_number == episode
+            ).first()
+            
+            return self._to_dict(ep) if ep else None
+        
+        
+    def get_weekly_schedule(self) -> List[ScheduleOutput]:
+        """Returns all scheduled programs in the current week"""
+        year, week, day = datetime.today().isocalendar()
+        start = datetime.fromisocalendar(year, week, 1)
+        end = datetime.fromisocalendar(year, week, 7)
 
 
-if __name__ == "__main__":
-    tvdb = TVDatabase()
+        q = select(
+                Schedule
+            ).where(
+                Schedule.start.between(start,end)
+            ).order_by(
+                Schedule.start
+        )
+        
+        return self._execute(q, ScheduleOutput)
+            
+    def get_schedule(self) -> List[ScheduleOutput]:
+        """Get all series that are in the weekly schedule"""
+        q = select(
+            Schedule
+        ).order_by(
+            Schedule.start
+        )
+        
+        return self._execute(q, ScheduleOutput)
+                            
+    # AIRING OPERATIONS
 
-    if len(sys.argv)>1:
-        operation = sys.argv[1]
-        if operation == "setup":
-            tvdb.setup_database()
+    def get_air_schedule(self) -> List[ScheduleOutput]:            
+        with self.get_session() as session:
+            q = select(Schedule).options(
+                joinedload(Schedule.movie),
+                joinedload(Schedule.episode).joinedload(Episode.series)
+            )
 
-        if operation == "reset":
-            tvdb.reset_database()
+            return self._execute(q, ScheduleOutput)
+    
+    # UTILITY METHODS
+    
+    @staticmethod
+    def _to_dict(obj) -> Dict:
+        """Convert SQLAlchemy model instance to dictionary"""
+        if obj is None:
+            return None
+        
+        result = {}
+        for column in obj.__table__.columns:
+            value = getattr(obj, column.name)
+            # Convert date/time objects to strings for consistency
+            if isinstance(value, (datetime, )):
+                value = value.isoformat()
+            result[column.name] = value
+        return result
+

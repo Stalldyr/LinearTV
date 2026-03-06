@@ -1,7 +1,7 @@
-from tvcore.tvdatabasealchemy import TVDatabaseAlch, Series, Movie, Schedule, Episode
+from tvcore.tvdatabase import TVDatabase, Series, Movie, Schedule, Episode
 from tvcore.schemas import SeriesInput, MovieInput, EpisodeInput, ScheduleInput
 
-tvdb = TVDatabaseAlch()
+tvdb = TVDatabase()
 from datetime import datetime, time
 
 def db_setup():
@@ -220,7 +220,7 @@ def SQLAlchemy_test():
     series_id = 5
 
     # Oppdatere serie
-    tvdb.add(
+    series_id = tvdb.add(
         Series(
             **SeriesInput(
                 title="Breaking Bad",
@@ -241,7 +241,7 @@ def SQLAlchemy_test():
 
     # Legge til episode
     new_episode = EpisodeInput(
-        series_id = 2,
+        series_id = series_id,
         season_number=1,
         episode_number=1,
         title="Pilot",
@@ -256,7 +256,7 @@ def SQLAlchemy_test():
     # ============================================================================
 
     # Legge til schedule entry
-    tvdb.add_schedule_entry({
+    tvdb.add({
         'series_id': series_id,
         'episode_id': episode['id'],
         'name': 'Breaking Bad',
@@ -303,7 +303,7 @@ def SQLAlchemy_test():
     # ============================================================================
 
     # Legge til film
-    movie_id = tvdb.add_program(
+    movie_id = tvdb.add(
         "movies",
         name="The Shawshank Redemption",
         tmdb_id=278,
@@ -460,8 +460,11 @@ def add_test_entries():
     for x in [blackadder, life_of_brian, episode1, schedule1, schedule2]:
         print(tvdb.add(x))
 
-#test = tvdb.get_pending_programs(datetime(2026, 3, 5, 0, 0), datetime(2026, 3, 6, 21, 0))
+test = tvdb.get_pending_programs(datetime(2026, 3, 5, 0, 0), datetime(2026, 3, 6, 21, 0))
 
 #add_test_entries()
 
-#print(tvdb.get_weekly_air_schedule())
+#test = tvdb.get_air_schedule()
+
+print(test[0].episode)
+

@@ -1,5 +1,5 @@
 from .tvconstants import *
-from .tvdatabase import TVDatabase
+from .tvdatabase import TVDatabase, Schedule
 import yt_dlp
 
 class TVDownloader:
@@ -11,7 +11,7 @@ class TVDownloader:
         self.database = TVDatabase()
         
 
-    def download_from_playlist(self, media_id:int, media_type:str, output_path, download_url, episode, total_episodes=0, reverse_order=False):
+    def download_from_playlist(self, schedule_id:int, output_path, download_url, episode, total_episodes=0, reverse_order=False):
         """
         Download a TV episode
         
@@ -30,7 +30,7 @@ class TVDownloader:
             str: Status (STATUS_AVAILABLE, STATUS_FAILED, etc.)
         """
 
-        self.database.update_media_status(media_id, media_type, STATUS_DOWNLOADING)
+        self.database.upsert(Schedule(id=schedule_id, status = STATUS_DOWNLOADING))
         
         playlist_idx = self._calculate_playlist_index(
             episode, total_episodes, reverse_order
@@ -42,28 +42,28 @@ class TVDownloader:
             index = playlist_idx
         )
 
-        status = self._update_download_status(media_id, media_type, success)
+        status = self._update_download_status(schedule_id, success)
 
         return status
     
-    def download_single(self, media_id, media_type, download_url, output_path):
-        self.database.update_media_status(media_id, media_type, STATUS_DOWNLOADING)
+    def download_single(self, schedule_id, download_url, output_path):
+        self.database.upsert(Schedule(id=schedule_id, status = STATUS_DOWNLOADING))
         
         success = self.downloader.download(
             download_url,
             output_path
         )
 
-        status = self._update_download_status(media_id, media_type, success)
+        status = self._update_download_status(schedule_id, success)
         
         return status
     
-    def _update_download_status(self, media_id, media_type, success):
+    def _update_download_status(self, schedule_id, success):
         if success:
-            self.database.update_media_status(media_id, media_type, STATUS_AVAILABLE)
+            self.database.upsert(Schedule(id=schedule_id, status = STATUS_AVAILABLE))
             return STATUS_AVAILABLE
         else:
-            self.database.update_media_status(media_id, media_type, STATUS_FAILED)
+            self.database.upsert(Schedule(id=schedule_id, status = STATUS_FAILED))
             return STATUS_FAILED
 
     def _calculate_playlist_index(self, episode, total_episodes, reverse_order):
@@ -93,20 +93,13 @@ class Downloader:
 
         quality = quality or self.default_quality
 
-        if self.ydl_opts:
-            return self._execute_download(url)
-
-        if kwargs:
-            self.ydl_opts.update(kwargs)
-
-        else:
-            self.ydl_opts = {
-                'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]',
-                'outtmpl': str(output_path),
-                'writesubtitles': str(output_path),
-                'playlist_items': str(index),
-                'merge_output_format': 'mp4'
-            }
+        self.ydl_opts = {
+            'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]',
+            'outtmpl': str(output_path),
+            'writesubtitles': str(output_path),
+            'playlist_items': str(index),
+            'merge_output_format': 'mp4'
+        }
 
         return self._execute_download(url)
     

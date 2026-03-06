@@ -27,6 +27,9 @@ class MetaDataFetcher:
 
     # ============ YTDLP ============
 
+    def get_ytdlp_series_metadata(self):
+        pass
+
     def get_ytdlp_season_metadata(self, media_type, directory, season, video_url=None, cached=True, write_to_json=True) -> dict:
         '''
         Docstring for get_ytdlp_season_metadata
@@ -57,12 +60,8 @@ class MetaDataFetcher:
             
         return metadata
     
-    def get_ytdlp_episode_metadata(self, directory, season, video_url=None, cached=True, write_to_json=True) -> dict:
-        
-        json_name = self.paths.create_ytdlp_season_json_name(season)
-        json_path = self.paths.get_metadata_path(TYPE_SERIES, directory, json_name)
-        
-        if cached and json_path.exists():
+    def get_ytdlp_episode_metadata(self, json_path=None, video_url=None, write_to_json=True) -> dict:        
+        if json_path.exists():
             with open(json_path, 'r') as f:
                 return json.load(f)
 
@@ -84,6 +83,7 @@ class MetaDataFetcher:
             'quiet': True,
             'no_warnings': True,
             'enable_file_urls': True
+            #Save straight to path???
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -99,7 +99,7 @@ class MetaDataFetcher:
         '''
             Get metadata from TMDB (with caching)
             
-            media_type: "movies" of "series"
+            media_type: "movies" or "series"
             tmdb_id: ID of TMDB-media
             season: Season for series (only needed for mediatype "series")
         '''
@@ -123,6 +123,33 @@ class MetaDataFetcher:
 
         return metadata
     
+
+    def get_tmdb_season_data(self, tmdb_id:int, season, cached=True, write_to_json = True) -> dict:
+        '''
+            Get metadata from TMDB (with caching)
+            
+            media_type: "movies" or "series"
+            tmdb_id: ID of TMDB-media
+            season: Season for series (only needed for mediatype "series")
+        '''
+
+        if cached:
+            metadata = self.paths.load_tmdb_json(media_type, directory, season)
+            if metadata:
+                return metadata
+            
+
+        if not tmdb_id:
+            raise ValueError("video_url must be provided if metadata cache does not exist.")
+        
+        metadata = self.fetch_tmdb_data(media_type, tmdb_id, season)
+            
+        if write_to_json:
+            json_path = self.get_json_path(media_type, directory, season)
+
+            with open(json_path, 'w') as f:
+                json.dump(metadata, f, indent=4)
+    
     def get_json_path(self,  media_type:str, directory:str, season:int=None):
         if media_type == TYPE_SERIES:
             if season is None:
@@ -141,20 +168,15 @@ class MetaDataFetcher:
 
         return json_path
     
-    def load_tmdb_json(self, media_type:str, directory:str, season:int=None):
-        """
-        Load TMDB-metadata from cache
-            
-        media_type: "movies" of "series"
-        """        
-        json_path = self.get_json_path(media_type, directory, season)
-
-        if json_path.exists():
-            with open(json_path) as f:
-                return json.load(f)
-        else:
-            return None
+    def fetch_tmdb_series_data(self, tmdb_id): #Need to add options and errorhandling
+        return tmdb.TV(tmdb_id).info()
     
+    def fetch_tmdb_season_data(self, tmdb_id, season):
+        return tmdb.TV_Seasons(tmdb_id, season).info()
+    
+    def fetch_tmdb_episode_data(self, tmdb_id, season, episode):
+        return tmdb.TV_Episodes(tmdb_id, season, episode).info()
+        
     def fetch_tmdb_data(self, media_type:str, tmdb_id:int, season:int=None):
         if media_type == TYPE_SERIES:
             if season:
@@ -183,8 +205,24 @@ class MetaDataFetcher:
             return None
 
 
-    def _fetch_tmdb_info(self, fetcher, params, fetch_options):
+    def _fetch_tmdb_info(self, fetcher, params: tuple, fetch_options: dict):
         return fetcher(*params).info(**fetch_options)
+    
+    def read_tmdb_series_json(self, tmdb_id_int):
+        """
+        Load TMDB-metadata from cache
+            
+        media_type: "movies" of "series"
+        """        
+        json_name = self.paths.create_tmbd_season_json_name(self.language)
+        json_path = self.get_json_path(media_type, directory, season)
+
+        if json_path.exists():
+            with open(json_path) as f:
+                return json.load(f)
+        else:
+            print("File not found")
+            return None
     
     # ============ EXTRACT METADATA ============
 
@@ -204,13 +242,14 @@ class MetaDataFetcher:
             return 0
         
     def extract_episode_info_from_ytdlp(self, episode_data: dict):
+        #TODO: Turn into pydantic shcema
         """Extract relevant episode info from yt-dlp data"""
         return {
-            "yt_dlp_id": episode_data.get("id"),
+            "program_id": episode_data.get("id"),
             "season_number": episode_data.get("season_number"),
             "episode_number": episode_data.get("episode_number") or episode_data.get("playlist_index"),
             "title": episode_data.get("title"),
-            "series_title": episode_data.get("series"),
+            #"series_title": episode_data.get("series"),
             "description": episode_data.get("description"),
             "duration": episode_data.get("duration")
         }

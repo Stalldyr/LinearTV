@@ -1,11 +1,13 @@
 
 try:
-    from .tvdatabase import TVDatabase
+    from .tvdatabase import TVDatabase, Schedule
+    from .schemas import ScheduleOutput
     from .tvconstants import *
     from .helper import calculate_end_time
     from .tvconfig import TVConfig
 except:
-    from tvdatabase import TVDatabase
+    from tvdatabase import TVDatabase, Schedule
+    from schemas import ScheduleOutput
     from tvconstants import *
     from helper import calculate_end_time
     from tvconfig import TVConfig
@@ -47,9 +49,9 @@ class BroadcastMonitor:
         self.current_stream = {
             "id": STREAM_ID_LOADING,
             "status": "off_air",
-            "name": "Laster...",
+            "title": "Laster...",
             "description": "",
-            "filename": None
+            "filepath": None
         }
 
 
@@ -74,7 +76,7 @@ class BroadcastMonitor:
             self.current_stream = self.get_current_program()
             if self.debug:
                 if self.current_stream:
-                    print(f"Monitoring: {self.current_stream['name']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    print(f"Monitoring: {self.current_stream['title']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 else:
                     print(f"No program at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -108,9 +110,9 @@ class BroadcastMonitor:
             return {
                 "id": STREAM_ID_OFF_AIR,
                 "status": "off_air",
-                "name": "Ingen sending",
+                "title": "Ingen sending",
                 "description": "Sendingen starter kl. 18:00",
-                "filename": None,
+                "filepath": None,
             }
         
         if self.current_time.time() >= self.broadcast_end:  
@@ -119,80 +121,85 @@ class BroadcastMonitor:
             return {
                 "id": STREAM_ID_OFF_AIR,
                 "status": "off_air",
-                "name": "Ingen sending",
+                "title": "Ingen sending",
                 "description": "Sendingen er ferdig for i dag",
-                "filename": None,
+                "filepath": None,
             }
 
         program = self.search_current_program()
+        
        
         if not program:
             return {
                 "id": STREAM_ID_NO_PROGRAM,
                 "status": "no_program",
-                "name": "Ingen program",
+                "title": "Ingen program",
                 "description": "Ingen program på dette tidspunktet",
-                "filename": None,
+                "filepath": None,
             }
         
-        if program.get('status') != STATUS_AVAILABLE:
+        if program.status != STATUS_AVAILABLE:
             return {
                 "id": STREAM_ID_UNAVAILABLE,
                 "status": "unavailable",
-                "name": program.get('name', 'Ukjent program'),
+                "title": program.title, # | 'Ukjent program',
                 "description": "Programmet er ikke tilgjengelig for avspilling",
-                "filename": None,
+                "filepath": None,
             }
         
-        offset = self.calculate_offset(program["start_time"])
-        program["offset"] = offset
 
-        self.current_stream = program
-        self.update_air_date(program)
+        program = program.model_dump()
+        program["offset"] = self.calculate_offset(program["start"])
+
+        #self.current_stream = program
+        #self.update_air_date(program)
+
+
 
         return program
 
     def get_current_stream(self):
         return self.current_stream
     
-    def search_current_program(self) -> dict:
+    def search_current_program(self) -> ScheduleOutput:
         """
         Returns the program showing at the current time
         TODO: Needs to implement logic that goes past midnight
         """
         current_time = self.current_time.time()
-        current_day = int(self.current_time.strftime('%w'))
+        #current_day = int(self.current_time.strftime('%w'))
 
-        if current_day == 0:
-            current_day = 7
+        #if current_day == 0:
+        #    current_day = 7
         
         for program in self.schedule:
-            if program['day_of_week'] == current_day:
-                start_hour, start_min = map(int, program['start_time'].split(':'))
-                start_time = time_class(start_hour, start_min)
+            if program.start.date() == self.current_time.date():
+                #start_hour, start_min = map(int, program.start.split(':'))
+                #start_time = program.start.time()
                 
-                end_time = datetime.strptime(program['end_time'], "%H:%M").time() if program['end_time'] else None
-                if not end_time:
-                    duration_minutes = program['duration'] if program['duration'] else 30
-                    end_time = calculate_end_time(program['start_time'], duration_minutes)
+                #end_time = datetime.strptime(program.end, "%H:%M").time() if program.end else None
+                #if not end_time:
+                #    duration_minutes = program['duration'] if program['duration'] else 30
+                #    end_time = calculate_end_time(program['start_time'], duration_minutes)
 
-                if start_time <= current_time < end_time:
+                if program.start <= self.current_time < program.end:
                     return program
         
         return None
     
-    def calculate_offset(self, start_time, buffer_seconds=10):
-        offset = (self.current_time - datetime.strptime(start_time, "%H:%M")).seconds - buffer_seconds
+    def calculate_offset(self, start_time:datetime, buffer_seconds:int=10):
+        offset = (self.current_time - start_time).seconds - buffer_seconds
         return max(0, offset)
     
 
-    def update_air_date(self, program):
-        if program["last_aired"] != self.current_time.date().strftime("%Y-%m-%d"):
-            if program["content_type"] == TYPE_SERIES:
-                self.database.update_program_info(TYPE_SERIES, program["media_id"], last_aired = self.current_time.date())
-
-            elif program["content_type"] == TYPE_MOVIES:
-                    self.database.update_program_info(TYPE_MOVIES, program["media_id"], last_aired = self.current_time.date())
+    def update_air_date(self, program: ScheduleOutput):
+        if program.last_aired != self.current_time.date().strftime("%Y-%m-%d"):
+            self.database.upsert(
+                Schedule(
+                    id = program.id,
+                    last_aired = self.current_time.date()
+                )
+            )
     
     def get_current_status(self):
         if self.current_stream:

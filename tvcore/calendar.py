@@ -16,6 +16,9 @@ def first_day_of_iso_week(year, week):
     # Calculate the first day of the given ISO week
     return jan4 + days_to_monday + timedelta(weeks=weeks_diff)
 
+def get_iso_week(date: datetime) -> tuple:
+    return date.isocalendar()
+
 def get_iso_week_number(date: datetime) -> int:
     return date.isocalendar()[1]
 
@@ -28,45 +31,13 @@ def get_dates_in_a_week(date: datetime) -> int:
         
     return dates
 
-def get_iso_week(date:datetime, year:int):
-    iso_week = get_iso_week_number(date)
+def get_iso_week_span(start_date: datetime, end_date:datetime) -> tuple:
+    return datetime.fromisocalendar(start_date.year, get_iso_week_number(start_date), 1), datetime.fromisocalendar(end_date.year, get_iso_week_number(end_date), 7)
 
-    return (datetime.fromisocalendar(year, iso_week, 1), datetime.fromisocalendar(year, iso_week, 7))
-
-def get_iso_week_span(date: datetime) -> int:
-    iso_week = get_iso_week_number(date)
-    
-    return (datetime.fromisocalendar(date.year, iso_week, 1), datetime.fromisocalendar(date.year, iso_week, 7))
-
-def convert():
-    pass
-
-class CustomHTMLCalendar(calendar.HTMLCalendar):
-    def __init__(self, year=None, month=None):
-        super().__init__(calendar.SUNDAY)
-        self.year, self.month = year, month
-
-    def formatday(self, day, weekday):
-        if day == 0:
-            return ''
-        else:
-            return f'{day}'
-
-    def formatweek(self, theweek):
-        week = ''
-        for d, wd in theweek:
-            week += self.formatday(d, wd)
-        return f'{week}'
-
-    def formatmonth(self, withyear=True):
-        return super().formatmonth(self.year, self.month, withyear)
+def get_number_of_weeks(start_date: datetime, end_date:datetime):
+    return datetime.fromisocalendar(end_date.year, get_iso_week_number(end_date),1) - datetime.fromisocalendar(start_date.year, get_iso_week_number(start_date),1)
 
 
+def get_iso_week_span_target_year(start_week: int, end_week: int, target_year: int):
+    return (datetime.fromisocalendar(target_year, start_week ,1), datetime.fromisocalendar(target_year, end_week, 1))
 
-
-if __name__ == "__main__":
-    # Usage
-    #custom_calendar = CustomHTMLCalendar(2023, 4)
-    #print(custom_calendar.formatmonth())
-
-    print()
