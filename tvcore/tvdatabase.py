@@ -10,10 +10,13 @@ from sqlalchemy.orm import relationship, sessionmaker, Session, DeclarativeBase,
 from sqlalchemy.sql import select, update, delete, exists, not_
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Row
+from sqlalchemy.ext.declarative import DeclarativeMeta
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List, Dict
 from pydantic_core import ValidationError
+from types import SimpleNamespace
+import json
 
 from .tvconstants import *
 from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
@@ -107,6 +110,10 @@ class Schedule(Base):
     # Relationships
     episode = relationship("Episode", back_populates="schedule_entries", lazy="selectin")
     movie = relationship("Movie", back_populates="schedule_entries", lazy="selectin")
+
+    @property
+    def json(self):
+        return self.to_json(self, self.__class__)
     
 class TVDatabase:
     def __init__(self, test_time=None, db_path=""):
@@ -223,20 +230,29 @@ class TVDatabase:
             session.refresh(obj)
 
             return obj.id
+    
+    def update(self, obj):
+        with self.get_session() as session:
+            #stmt = update(obj).where(Schedule.channel == "Nrk1").values(channel = "nrk1")
+            #session.execute(stmt)
+            session.commit()
         
     def upsert(self, obj: Series | Movie | Schedule):
+        """Adds or updates an entry in the database based on the presence of a primary ID."""
         with self.get_session() as session:
             session.merge(obj)
             session.commit()
 
     def upsert_on_column(self, obj: Series | Movie | Schedule, index_elements):
+        """Adds or updates an entry in the database based on the presence of a primary ID."""
         with self.get_session() as session:
             model, data = self._to_model(obj)
-            filters = [getattr(model, col) == data[col] for col in index_elements]
-            exists = session.query(model).filter(*filters).first()
-            if not exists:
-                session.add(model(**data))
-                session.commit()
+            update_dict = {col: getattr(stmt.excluded, col) for col in data.keys() if col not in index_elements}
+
+            stmt = insert(model).values(**data)
+            stmt = stmt.on_conflict_do_update(index_elements=index_elements, set_=update_dict)
+            session.execute(stmt)
+            session.commit()
 
     def delete(self, obj: Series | Movie | Schedule | Episode):
         """
@@ -323,25 +339,26 @@ class TVDatabase:
             q = q.where(or_(
                 Movie.description, 
                 Movie.title,
-                Movie.release
-                #More??? REMOVEB4COMMIT
-            ).is_(None))
+                Movie.release,
+                Movie.genre
+            ).is_(None)
+        )
 
         return self._execute(q, MovieOutput)
     
     # SCHEDULE OPERATIONS
                 
-    def get_scheduled_programs(self, current:tuple[datetime, datetime] = ()) -> List[ScheduleOutput]:
+    def get_scheduled_programs(self, date: datetime = None) -> List[ScheduleOutput]:
         q = select(
             Schedule
         )
 
-        if current:
-            q.where(Schedule.start.between(current[0], current[1]))
+        if date:
+            q = q.where(func.date(Schedule.start) == date)
 
         return self._execute(q, ScheduleOutput)
         
-    def get_pending_programs(self, strict: bool = False, current: tuple[datetime, datetime] = ()) -> List[ScheduleOutput]:
+    def get_pending_programs(self, strict: bool = False, date: date = None) -> List[ScheduleOutput]:
         """
         Return pending episodes from the episodes table.
         
@@ -352,8 +369,8 @@ class TVDatabase:
         """
         
         q = select(
-                Schedule
-            )
+            Schedule
+        )
         
         if strict:
             q = q.where(Schedule.status == STATUS_PENDING)
@@ -363,8 +380,8 @@ class TVDatabase:
                 STATUS_DOWNLOADING, STATUS_DELETED
             ]))
 
-        if current:
-            q = q.where(Schedule.start.between(current[0], current[1]))
+        if date:
+            q = q.where(func.date(Schedule.start) == date)
 
         return self._execute(q, ScheduleOutput)      
             
@@ -373,36 +390,18 @@ class TVDatabase:
 
     def get_obsolete_episodes(self) -> list[ScheduleOutput]:
         """Returns available episodes that has already been viewed and is not planned to be viewes again."""
-
-        future_episode_ids = (
-            select(Schedule.episode_id)
-            .where(
-                Schedule.start > datetime.now(),
-                Schedule.episode_id.isnot(None)
-            )
-            .scalar_subquery()
-        )
-
-        q = (
-            select(Schedule)
-            .where(
-                Schedule.start < datetime.now(),
-                Schedule.filepath.isnot(None),
-                Schedule.episode_id.not_in(future_episode_ids)
-            )
-        )
-
-        return self._execute(q, ScheduleOutput)
-    
+        return self._obsolete_filter(Schedule.episode_id)
 
     def get_obsolete_movies(self) -> list[ScheduleOutput]:
         """Returns available movies that has already been viewed and is not planned to be viewes again."""
+        return self._obsolete_filter(Schedule.movie_id)
 
+    def _obsolete_filter(self, id_column: Column[int]):
         future_episode_ids = (
-            select(Schedule.movie_id)
+            select(id_column)
             .where(
                 Schedule.start > datetime.now(),
-                Schedule.movie_id.isnot(None)
+                id_column.isnot(None)
             )
             .scalar_subquery()
         )
@@ -412,13 +411,11 @@ class TVDatabase:
             .where(
                 Schedule.start < datetime.now(),
                 Schedule.filepath.isnot(None),
-                Schedule.movie_id.not_in(future_episode_ids)
+                id_column.not_in(future_episode_ids)
             )
         )
 
-        return self._execute(q, ScheduleOutput)
-    
-                        
+        return self._execute(q, ScheduleOutput)           
 
     def get_episode_by_details(self, series_id: int, season: int, episode: int) -> Optional[Dict]:
         """
@@ -434,7 +431,7 @@ class TVDatabase:
             return self._to_dict(ep) if ep else None
         
         
-    def get_weekly_schedule(self) -> List[ScheduleOutput]:
+    def get_current_week_schedule(self) -> List[ScheduleOutput]:
         """Returns all scheduled programs in the current week"""
         year, week, day = datetime.today().isocalendar()
         start = datetime.fromisocalendar(year, week, 1)
@@ -460,17 +457,89 @@ class TVDatabase:
         )
         
         return self._execute(q, ScheduleOutput)
-                            
-    # AIRING OPERATIONS
+    
+    def get_current_program_by_channel(self, channel: str, time=None) -> list[dict]:
+        if time is None:
+            time = datetime.now()
 
-    def get_air_schedule(self) -> List[ScheduleOutput]:            
         with self.get_session() as session:
-            q = select(Schedule).options(
-                joinedload(Schedule.movie),
-                joinedload(Schedule.episode).joinedload(Episode.series)
+            #channels = session.execute(select(Schedule.channel).distinct()).scalars().all()
+
+            #print(channels)
+
+            q = select(
+                Schedule.id,
+                Schedule.channel,
+                Schedule.start,
+                Schedule.end,
+                Schedule.filepath,
+                Schedule.rerun,
+                Schedule.status,
+                Schedule.title,
+                func.coalesce(Episode.description, Movie.description).label("description"),
+                func.coalesce(Episode.duration, Movie.duration).label("duration")
+            ).where(
+                Schedule.start <= time,
+                Schedule.end >= time,
+                Schedule.status == STATUS_AVAILABLE,
+                Schedule.channel == channel
+            ).outerjoin(
+                Episode
+            ).outerjoin(
+                Movie
+            ).order_by(
+                Schedule.channel,
+                Schedule.start
             )
 
-            return self._execute(q, ScheduleOutput)
+            result = session.execute(q).mappings().first()
+            if result:
+                return dict(result)
+            else:
+                return None
+            
+    def get_next_programs(self, time=None) -> list[dict]:
+        if time is None:
+            time = datetime.now()
+
+        with self.get_session() as session:
+            q = select(
+                Schedule.id,
+                Schedule.channel,
+                Schedule.start,
+                Schedule.end,
+                Schedule.filepath,
+                Schedule.rerun,
+                Schedule.status,
+                Schedule.title,
+                func.coalesce(Episode.description, Movie.description).label("description"),
+                func.coalesce(Episode.duration, Movie.duration).label("duration")
+            ).where(
+                Schedule.start >= time,
+                Schedule.status == STATUS_AVAILABLE
+            ).outerjoin(
+                Episode
+            ).outerjoin(
+                Movie
+            ).order_by(
+                Schedule.channel,
+                Schedule.start
+            ).group_by(
+                Schedule.channel
+            )
+        
+            return self._to_dict(session.execute(q).all())
+
+            
+    # AIRING OPERATIONS
+
+    def get_air_schedule(self) -> List[ScheduleOutput]:
+        q = select(Schedule).options(
+            joinedload(Schedule.movie),
+            joinedload(Schedule.episode).joinedload(Episode.series)
+        )
+
+        return self._execute(q, ScheduleOutput)
     
     # UTILITY METHODS
     
@@ -488,4 +557,49 @@ class TVDatabase:
                 value = value.isoformat()
             result[column.name] = value
         return result
+        
+class AlchemyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj.__class__, DeclarativeMeta):
+            # Convert SQLAlchemy model to dictionary
+            fields = {}
+            for field in [x for x in dir(obj) if not x.startswith('_') and x != 'metadata']:
+                data = obj.__getattribute__(field)
+                try:
+                    json.dumps(data)
+                    fields[field] = data
+                except TypeError:
+                    fields[field] = None
+            return fields
+        return json.JSONEncoder.default(self, obj)
 
+class Serializer(object):
+
+    def serialize(self):
+        return {c: getattr(self, c) for c in inspect(self).attrs.keys()}
+
+    @staticmethod
+    def serialize_list(l):
+        return [m.serialize() for m in l]
+
+
+def to_json(inst, cls):
+    """
+    Jsonify the sql alchemy query result.
+    """
+    convert = dict()
+    # add your coversions for things like datetime's 
+    # and what-not that aren't serializable.
+    d = dict()
+    for c in cls.__table__.columns:
+        v = getattr(inst, c.name)
+        if c.type in convert.keys() and v is not None:
+            try:
+                d[c.name] = convert[c.type](v)
+            except:
+                d[c.name] = "Error:  Failed to covert using ", str(convert[c.type])
+        elif v is None:
+            d[c.name] = str()
+        else:
+            d[c.name] = v
+    return json.dumps(d)

@@ -1,8 +1,7 @@
 from flask import Flask, jsonify, render_template, render_template_string, send_from_directory, request, Blueprint, Response
 import os 
 from datetime import datetime
-from templates.stream_html import *
-from templates.schedule import *
+
 
 try:
     from .tvcore.tvdatabase import TVDatabase
@@ -10,13 +9,16 @@ try:
     from .tvcore.mediapathmanager import MediaPathManager
     from .tvcore.metadatafetcher import MetaDataFetcher
     from .tvcore.broadcastmonitor import BroadcastMonitor
+    from .templates.stream_html import *
+    from .templates.schedule import *
 except ImportError:
     from tvcore.tvdatabase import TVDatabase
     from tvcore.programmanager import ProgramManager
     from tvcore.mediapathmanager import MediaPathManager
     from tvcore.metadatafetcher import MetaDataFetcher
     from tvcore.broadcastmonitor import BroadcastMonitor
-    from tvcore.schemas import ScheduleInput
+    from templates.stream_html import *
+    from templates.schedule import *
 
 stream_app = Blueprint(
     'streaming', 
@@ -53,7 +55,6 @@ def serve_video(content_type, directory, filename):
 
 @stream_app.route('/admin/schedule')
 def admin():
-    print(base_schedule().dump())
     return base_schedule().dump()
     return render_template('admin_schedule.html', **program_manager.initialize_admin_page())
 
@@ -109,9 +110,9 @@ def current_program():
     return Response(current_stream(), mimetype="text/event-stream")
 """ 
 
-@stream_app.route('/stream/current')
-def current_program():
-    return jsonify(broadcast_monitor.current_stream)
+@stream_app.route('/stream/<channel>')
+def current_program(channel):
+    return broadcast_monitor.get_current_program(channel)
 
 @stream_app.route('/stream/status')
 def status():
@@ -121,7 +122,7 @@ def status():
 
 @stream_app.route('/api/schedule')
 def get_schedule():
-    return jsonify([obj.model_dump() for obj in tv_db.get_weekly_schedule()])
+    return jsonify([obj.model_dump() for obj in tv_db.get_current_week_schedule()])
 
 @stream_app.route('/api/pending')
 def get_pending_episodes():
@@ -181,12 +182,19 @@ def test_run():
     app = Flask(__name__)
     app.register_blueprint(stream_app)
 
-    test_time = None 
+    test_time = None
+    test_acc = 1
     if os.getenv('TEST_TIME'):
         test_time = datetime.strptime(os.getenv('TEST_TIME'), "%Y-%m-%d %H:%M")
 
+    if os.getenv('TEST_ACC'):
+        test_acc = int(os.getenv('TEST_ACC'))
+
+    test_time = datetime(2026,3,8,19,35)
+    test_acc = 1
+
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        broadcast_monitor = BroadcastMonitor(time=test_time, debug=False)
+        broadcast_monitor = BroadcastMonitor(time=test_time, time_acceleration=test_acc, debug=True)
         broadcast_monitor.start_monitoring()
 
     @app.route('/')

@@ -25,6 +25,15 @@
     fadeDelay: null
   });
 
+  let fetch_link = "/stream/nrk1"
+  function setChannelNRK1(){
+    fetch_link = "/stream/nrk1"
+  }
+
+  function setChannelNRK2(){
+    fetch_link = "/stream/nrk2"
+  }
+
   function onProgramChanged(program){
     if (program.status === "available"){
       if (parseInt(program.offset) > parseInt(program.duration)){
@@ -32,13 +41,13 @@
       } else {
         player.src(`/video/${program.filepath}`);
       }
-      document.getElementById('programTitle').innerText = program.episode.series.title;
+      document.getElementById('programTitle').innerText = program.title;
       document.getElementById('programTime').innerText = `${program.start} - ${program.end}`;
 
-      if (program.episode.episode_number){
-          document.getElementById('programDescription').innerText = `Episode ${program.episode.episode_number}: ${program.episode.description}`;
+      if (program.episode_number){
+          document.getElementById('programDescription').innerText = `Episode ${program.episode_number}: ${program.description}`;
       } else {
-          document.getElementById('programDescription').innerText = program.episode.description;
+          document.getElementById('programDescription').innerText = program.description;
       }
 
     } else {
@@ -48,6 +57,7 @@
       document.getElementById('programDescription').innerText = program.description;
     }
 
+    console.log(program.offset)
     player.currentTime(program.offset)
 
     if (program.is_rerun){
@@ -67,7 +77,7 @@
   }
   
   function SSE(){
-    const evtSource = new EventSource("stream/current");
+    const evtSource = new EventSource(fetch_link);
 
     evtSource.onmessage = (e) => {
       const program = JSON.parse(e.data);
@@ -78,19 +88,19 @@
   function Polling(){
     let currentProgram = "";
     function updateProgram() {
-        fetch('/stream/current')
+        fetch(fetch_link)
           .then(response => response.json())
           .then(program => {
             console.log(program)//REMOVEB4COMMIT
-            if (program.filename !== currentProgram) {
-              currentProgram = program.filename;
+            if (program.id !== currentProgram) {
+              currentProgram = program.id;
               onProgramChanged(program);
             }
           });
     }
 
     updateProgram();
-    setInterval(updateProgram, 5000);
+    setInterval(updateProgram, 1000);
   }
 
   addEventListener('DOMContentLoaded', (event) => {

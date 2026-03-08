@@ -8,21 +8,24 @@ try:
 except ImportError:
     from tvcore.tvdownloader import TVDownloader
     from tvcore.metadatafetcher import MetaDataFetcher
-    from tvcore.tvdatabase import TVDatabase, Episode
+    from tvcore.tvdatabase import TVDatabase, Episode, Schedule
     from tvcore.filehandler import TVFileHandler
     from tvcore.mediapathmanager import MediaPathManager
     from tvcore.tvconstants import *
 
+from datetime import datetime, date, timedelta
 import sys
 from colorama import Fore, Style
 import time
 import logging
 
+from slugify import slugify
+
 logging.basicConfig(level=logging.DEBUG)
 
 class TVPreparer():
     """
-    Preperation for new week in the schedule.
+    Preparation for new week in the schedule.
     """
 
     def __init__(self):
@@ -80,64 +83,90 @@ class TVPreparer():
             if episode.tmdb_id:
                 pass
 
-    def download_weekly_schedule(self):
-        pending_episodes = self.database.get_pending_programs()
+    def download_weekly_schedule(self, buffer_days=3):
+        now = date.today()
 
-        for entry in pending_episodes:
+        pending_programs = [
+            entry
+            for day in range(buffer_days)
+            for entry in self.database.get_pending_programs(date=now + timedelta(days=day))
+        ]
 
-            if entry.episode_id and entry.episode.source_url:  
+        if not pending_programs:
+            print("No new episodes to download")
+
+        for entry in pending_programs:
+            slug = None
+            file_path = None
+            status = None
+            source_url = None
+
+            if entry.episode_id and entry.episode.series.id and entry.episode.source_url:
+                if entry.episode.series.slug:
+                    slug = entry.episode.series.slug
+                else:
+                    slug = slugify(entry.episode.series.title)
+
+                source_url = entry.episode.source_url
+
                 filename = self.paths.create_episode_file_name2(
                     entry.episode.series.id,
                     entry.episode.id
                 )
-                file_path = self.paths.get_filepath(TYPE_SERIES, entry.episode.series.slug, filename)
-                status = self.downloader.download_single(entry.id, entry.episode.source_url, file_path)
+                file_path = self.paths.get_filepath(TYPE_SERIES, slug, filename)
 
-            elif entry.movie_id and entry.episode.source_url:
-                filename = self.paths.create_movie_file_name(entry.movie.slug)
-                file_path = self.paths.get_filepath(TYPE_MOVIES, entry.movie.slug, filename)
-                status = self.downloader.download_single(entry.id, entry.movie.source_url, file_path)
+            elif entry.movie_id and entry.movie.source_url:
+                if entry.movie.slug:
+                    slug = entry.movie.slug
+                else:
+                    slug = slugify(entry.movie.title)
+
+                source_url = entry.movie.source_url
+                    
+                filename = self.paths.create_movie_file_name2(entry.movie_id)
+                file_path = self.paths.get_filepath(TYPE_MOVIES, slug, filename)
+                
             else:
-                print("No source available")
+                print("Missing media ID or source URL for entry, skipping download:", entry.id)
                 continue
                 
-            """
+            
             if file_path.exists():
-                print(f"Local file found for {filename}, skipping download.")
+                print(f"Local file found for {file_path}, skipping download.")
                 status = STATUS_AVAILABLE
-            elif media_type == TYPE_SERIES:
-                status = self.downloader.download_from_playlist(
-                    entry["id"],
-                    TYPE_SERIES,
-                    file_path,
-                    entry["source_url"],
-                    entry["episode_number"],
-                    total_episodes=entry["total_episodes"],
-                    reverse_order= entry["reverse_order"]
-                )
-            elif media_type == TYPE_MOVIES:
-                status = self.downloader.download_single(entry["id"], TYPE_MOVIES, entry["source_url"], file_path)
-            """
+                self.database.upsert(Schedule(id=entry.id, status = STATUS_AVAILABLE))
+            else:
+                status = self.downloader.download_single(entry.id, source_url, file_path)
+
             
             if status == STATUS_AVAILABLE:
                 self.handler.update_file_info(entry.id, file_path)
             
             time.sleep(1)
 
-    def verify_files_for_scheduled_media(self):
-        programs = self.database.get_scheduled_programs()
+    def verify_scheduled_programs(self, buffer_days=3):
+        now = date.today()
 
-        for entry in programs:
+        scheduled_programs = [
+            entry
+            for day in range(buffer_days)
+            for entry in self.database.get_scheduled_programs(date=now + timedelta(days=day))
+        ]
+
+        if not scheduled_programs:
+            print("No programs to verify")
+
+        for entry in scheduled_programs:
             file_path = None
             if entry.filepath:
-                file_path = entry.filepath
+                file_path = self.paths.get_full_path(entry.filepath)
 
             elif entry.episode_id: 
-                        filename = self.paths.create_episode_file_name2(
-                            entry.episode.series.id,
-                            entry.episode.id
-                        )
-                        file_path = self.paths.get_filepath(TYPE_SERIES, entry.episode.series.slug, filename)
+                filename = self.paths.create_episode_file_name2(
+                    entry.episode.series.id,
+                    entry.episode.id
+                )
+                file_path = self.paths.get_filepath(TYPE_SERIES, entry.episode.series.slug, filename)
                         
             elif entry.movie_id: 
                 filename = self.paths.create_movie_file_name(entry.movie.slug)
@@ -170,12 +199,12 @@ if __name__ == "__main__":
             prep.download_weekly_schedule()
 
         elif operation == "verify":
-            prep.verify_files_for_scheduled_media()
+            prep.verify_scheduled_programs()
 
         elif operation == "all":
             prep.cleanup_obsolete_episodes()
             prep.download_weekly_schedule()
-            prep.verify_files_for_scheduled_media()
+            prep.verify_scheduled_programs()
 
         else:
             print("Not a valid operation")

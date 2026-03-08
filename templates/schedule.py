@@ -1,7 +1,7 @@
 from hypermedia import *
 from flask import url_for
 
-def base_schedule():
+def base_schedule() -> ElementList:
   return Html(
     Head(
         Link(

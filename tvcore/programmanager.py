@@ -90,7 +90,7 @@ class ProgramManager:
 
         try:
             movie = MovieInput(**data)
-        except pydantic_core._pydantic_core.ValidationError as e:
+        except ValidationError as e:
             logging.error("Validation failed:\n%s", e)
             return False, e.errors(), 400
         
@@ -190,7 +190,7 @@ class ProgramManager:
     # ============ PAGE INITIALIZATION DATA ============
         
     def initialize_admin_page(self):
-        schedule_data = self.db.get_weekly_schedule()
+        schedule_data = self.db.get_current_week_schedule()
         series_data = self.db.get_all_series()
         movie_data = self.db.get_all_movies()
 

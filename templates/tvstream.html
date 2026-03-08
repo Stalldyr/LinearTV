@@ -36,6 +36,11 @@
       </a>
     </p>
   </video>
+
+  <div class="channelSelector">
+    <button id="nrk1">NRK1</button>
+    <button id="nrk2">NRK2</button>
+  </div>
   
   <div id="info">
     <h2 id="programTitle"></h2>
@@ -45,4 +50,8 @@
   </div>
 
   <script type="text/javascript" src="tvstreamer/static/scripts/stream.js"></script>
+  <script>
+    document.getElementById("nrk1").addEventListener("click", setChannelNRK1);
+    document.getElementById("nrk2").addEventListener("click", setChannelNRK2);
+  </script>
 </div>
