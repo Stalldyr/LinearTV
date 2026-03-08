@@ -34,8 +34,6 @@ path_manager = MediaPathManager()
 metadata_fetcher = MetaDataFetcher()
 broadcast_monitor = BroadcastMonitor()
 
-#broadcast_monitor.start_monitoring()
-
 SERIES_DATA = [obj.model_dump() for obj in tv_db.get_all_series()]
 MOVIE_DATA = [obj.model_dump() for obj in tv_db.get_all_movies()]
 GENRES = ["Drama", "Comedy", "Documentary", "News", "Sport"]
@@ -46,17 +44,19 @@ GENRES = ["Drama", "Comedy", "Documentary", "News", "Sport"]
 def tvstream():
     return render_template("tvstream.html")
 
+@stream_app.route('/video/noprogram')
+def noprogram_video():
+    return send_from_directory(path_manager.download_path / "ads", "PM5544.mp4")
+
 @stream_app.route('/video/<content_type>/<directory>/<filename>')
 def serve_video(content_type, directory, filename):
     return send_from_directory(path_manager.get_program_dir(content_type, directory), filename)
-
 
 # ============= ADMIN PAGES =============
 
 @stream_app.route('/admin/schedule')
 def admin():
     return base_schedule().dump()
-    return render_template('admin_schedule.html', **program_manager.initialize_admin_page())
 
 @stream_app.route('/admin/preparer')
 def prepare():
@@ -72,7 +72,7 @@ def save_schedule():
 @stream_app.route('/admin/delete/schedule', methods=['POST'])
 def delete_schedule():
     data = request.get_json()
-    return return_status(*program_manager.delete_schedule(data["day"], data["time"]))
+    return return_status(*program_manager.delete_schedule())
     
 @stream_app.route('/admin/save/series', methods=['POST'])
 def save_series():
@@ -114,14 +114,17 @@ def current_program():
 def current_program(channel):
     return broadcast_monitor.get_current_program(channel)
 
-@stream_app.route('/stream/status')
-def status():
-    return jsonify(broadcast_monitor.get_current_status())
+#@stream_app.route('/stream/status')
+#def status():
+#    return jsonify(broadcast_monitor.get_current_status())
 
 #TV-Schedule
 
-@stream_app.route('/api/schedule')
+@stream_app.route('/api/schedule', methods=['GET'])
 def get_schedule():
+    channel = request.args.get("channel")
+    if channel:
+        return jsonify([obj.model_dump() for obj in tv_db.get_current_week_schedule(channel)])
     return jsonify([obj.model_dump() for obj in tv_db.get_current_week_schedule()])
 
 @stream_app.route('/api/pending')
@@ -190,12 +193,12 @@ def test_run():
     if os.getenv('TEST_ACC'):
         test_acc = int(os.getenv('TEST_ACC'))
 
-    test_time = datetime(2026,3,8,19,35)
-    test_acc = 1
+    test_time = datetime(2026,3,8,18,35)
+    test_acc = 60
 
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        broadcast_monitor = BroadcastMonitor(time=test_time, time_acceleration=test_acc, debug=True)
-        broadcast_monitor.start_monitoring()
+    #if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    #    broadcast_monitor = BroadcastMonitor(time=test_time, time_acceleration=test_acc, debug=True)
+    #    broadcast_monitor.start_monitoring()
 
     @app.route('/')
     def setup_index():

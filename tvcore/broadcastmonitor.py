@@ -12,7 +12,7 @@ except:
     from helper import calculate_end_time
     from tvconfig import TVConfig
 
-from datetime import datetime, timedelta, time as time_class
+from datetime import datetime, timedelta, time
 import threading
 import time
 from flask import url_for
@@ -38,9 +38,7 @@ class BroadcastMonitor:
         self.current_time = time #Sets the "now" time for testing
         self.time_acceleration = time_acceleration # Sets time acceleration for testing
         self.simulation_started = None #For time testing
-
-        self.offset = 0 #How far into the stream the program should start
-        
+ 
         self.broadcast_start = datetime.strptime(TVConfig().config["schedule"]["broadcast_start"], "%H:%M").time()
         self.broadcast_end = datetime.strptime(TVConfig().config["schedule"]["broadcast_end"], "%H:%M").time()
         
@@ -50,8 +48,6 @@ class BroadcastMonitor:
         self.current_nrk2 = None
 
         self.database = TVDatabase()
-
-
 
     def start_monitoring(self):
         if not self.is_broadcasting:
@@ -67,6 +63,7 @@ class BroadcastMonitor:
             self.current_time = self.get_current_time()
             self.current_nrk1 = self.get_current_program("nrk1")
             self.current_nrk2 = self.get_current_program("nrk2")
+            self.current_cable = self.get_current_program("cable")
             if self.debug:
                 print(f"Monitoring: {self.current_nrk1['title']} at {self.current_nrk1['channel']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print(f"Monitoring: {self.current_nrk2['title']} at {self.current_nrk2['channel']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -107,7 +104,8 @@ class BroadcastMonitor:
         return max(0, offset)
     
     def get_current_program(self, channel):
-        current_program = self.database.get_current_program_by_channel(channel, time=self.current_time)
+        now = self.get_current_time()
+        current_program = self.database.get_current_program_by_channel(channel, time=now)
 
         if current_program:
             current_program["offset"] = self.calculate_offset(current_program["start"])
@@ -121,7 +119,7 @@ class BroadcastMonitor:
                 "status": "no_program",
                 "title": "Ingen program",
                 "description": "Ingen program på dette tidspunktet",
-                "filepath": "static/PM5544.mp4",
+                "filepath": None,
                 "channel": channel,
             }
 

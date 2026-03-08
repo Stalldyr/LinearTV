@@ -10,10 +10,10 @@
       volumePanel: true,  
       fullscreenToggle: true
     },
-    techOrder: [ 'chromecast', 'html5' ],
-    plugins: {
-      chromecast: {}
-    }
+    //techOrder: [ 'chromecast', 'html5' ],
+    //plugins: {
+    //  chromecast: {}
+    //}
   };
 
   var player = videojs('tvPlayer', options)
@@ -34,11 +34,20 @@
     fetch_link = "/stream/nrk2"
   }
 
+  function setChannelNRK2(){
+    fetch_link = "/stream/cable"
+  }
+
+  const noProgramSource = { src: '/video/noprogram?t=' + Date.now(), type: 'video/mp4' }
+
+
+
   function onProgramChanged(program){
     if (program.status === "available"){
       if (parseInt(program.offset) > parseInt(program.duration)){
-        player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
+        player.src(noProgramSource);
       } else {
+        
         player.src(`/video/${program.filepath}`);
       }
       document.getElementById('programTitle').innerText = program.title;
@@ -51,13 +60,12 @@
       }
 
     } else {
-      player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
+      player.src(noProgramSource);
       document.getElementById('programTitle').innerText = program.title;
       document.getElementById('programTime').innerText = "";
       document.getElementById('programDescription').innerText = program.description;
     }
 
-    console.log(program.offset)
     player.currentTime(program.offset)
 
     if (program.is_rerun){
@@ -86,12 +94,12 @@
   }
 
   function Polling(){
-    let currentProgram = "";
+    let currentProgram = null;
     function updateProgram() {
         fetch(fetch_link)
           .then(response => response.json())
           .then(program => {
-            console.log(program)//REMOVEB4COMMIT
+            //console.log(program)//REMOVEB4COMMIT
             if (program.id !== currentProgram) {
               currentProgram = program.id;
               onProgramChanged(program);
@@ -100,12 +108,13 @@
     }
 
     updateProgram();
-    setInterval(updateProgram, 1000);
+    setInterval(updateProgram, 5000);
   }
 
   addEventListener('DOMContentLoaded', (event) => {
-    player.src(`{{ url_for("streaming.static", filename="PM5544.mp4" ) }}`);
-    Polling();
+    player.ready(function() {
+      Polling();
+    });
   });
 
   

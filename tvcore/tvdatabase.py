@@ -12,7 +12,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from pathlib import Path
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict
 from pydantic_core import ValidationError
 from types import SimpleNamespace
@@ -431,20 +431,23 @@ class TVDatabase:
             return self._to_dict(ep) if ep else None
         
         
-    def get_current_week_schedule(self) -> List[ScheduleOutput]:
+    def get_current_week_schedule(self, channel:str = None) -> List[ScheduleOutput]:
         """Returns all scheduled programs in the current week"""
         year, week, day = datetime.today().isocalendar()
-        start = datetime.fromisocalendar(year, week, 1)
-        end = datetime.fromisocalendar(year, week, 7)
-
+        offset = timedelta(hours=4) #Marks the end of the air day, to include programs that starts late at night and ends after midnight
+        start = datetime.fromisocalendar(year, week, 1) + offset
+        end = datetime.fromisocalendar(year, week+1, 1) + offset
 
         q = select(
-                Schedule
+            Schedule
             ).where(
                 Schedule.start.between(start,end)
             ).order_by(
                 Schedule.start
         )
+
+        if channel:
+            q = q.where(Schedule.channel == channel)
         
         return self._execute(q, ScheduleOutput)
             

@@ -2,8 +2,6 @@
 
   <link href="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video-js.min.css') }}" rel="stylesheet">
   <script src="{{ url_for('streaming.static', filename='node_modules/video.js/dist/video.min.js') }}"></script>
-
-  <script src="{{ url_for('streaming.static', filename='node_modules/videojs-offset/dist/videojs-offset.min.js') }}"></script>
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.css">
   <script src="https://cdn.jsdelivr.net/npm/videojs-logo@latest/dist/videojs-logo.min.js"></script>
@@ -23,10 +21,7 @@
       id="tvPlayer"
       class="video-js"
       preload="auto"
-      controls
     >
-
-    <source src="{{ url_for('streaming.static', filename='PM5544.mp4' ) }}" type="video/mp4">
     
     <p class="vjs-no-js">
       To view this video please enable JavaScript, and consider upgrading to a
@@ -40,6 +35,7 @@
   <div class="channelSelector">
     <button id="nrk1">NRK1</button>
     <button id="nrk2">NRK2</button>
+    <button id="cable">Kabel-TV</button>
   </div>
   
   <div id="info">
@@ -53,5 +49,6 @@
   <script>
     document.getElementById("nrk1").addEventListener("click", setChannelNRK1);
     document.getElementById("nrk2").addEventListener("click", setChannelNRK2);
+    document.getElementById("cable").addEventListener("click", setChannelCable);
   </script>
 </div>
