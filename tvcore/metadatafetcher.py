@@ -251,7 +251,8 @@ class MetaDataFetcher:
             "title": episode_data.get("title"),
             #"series_title": episode_data.get("series"),
             "description": episode_data.get("description"),
-            "duration": episode_data.get("duration")
+            "duration": episode_data.get("duration"),
+            'source_url': episode_data.get('webpage_url')
         }
         
     def extract_episode_info_from_tmdb(self, episode_data:dict):

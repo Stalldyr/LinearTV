@@ -131,7 +131,7 @@ class ProgramManager:
     def delete_program(self, program_id):
         try:
             success = self.db.delete(
-                Obj(program_id)
+                #Obj(program_id) 
             )
             
             if success:
@@ -151,6 +151,9 @@ class ProgramManager:
             Args:
                 data: input data schedule    
         """
+        #TODO: FIX
+
+        return
 
         try:
             existing = self.db.get_schedule_by_time(data["day_of_week"], data["start_time"])

@@ -36,7 +36,7 @@ class MediaBase(Base):
     title = Column(Text, nullable=False)
     description = Column(Text)
     genre = Column(Text)
-    release = Column(DateTime)
+    release = Column(Date)
 
     slug = Column(Text)
 
@@ -466,10 +466,6 @@ class TVDatabase:
             time = datetime.now()
 
         with self.get_session() as session:
-            #channels = session.execute(select(Schedule.channel).distinct()).scalars().all()
-
-            #print(channels)
-
             q = select(
                 Schedule.id,
                 Schedule.channel,
@@ -560,7 +556,29 @@ class TVDatabase:
                 value = value.isoformat()
             result[column.name] = value
         return result
-        
+    
+    def update_end_time(self):
+        with self.get_session() as session:
+            schedules = session.execute(
+                select(Schedule)
+                .outerjoin(Episode)
+                .outerjoin(Movie)
+            ).scalars().all()
+
+            for schedule in schedules:
+                if schedule.episode:
+                    duration = schedule.episode.duration
+                elif schedule.movie:
+                    duration = schedule.movie.duration
+                else:
+                    continue
+
+                if duration:
+                    schedule.end = schedule.start + timedelta(seconds=duration)
+
+            session.commit()
+
+            
 class AlchemyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj.__class__, DeclarativeMeta):
@@ -606,3 +624,5 @@ def to_json(inst, cls):
         else:
             d[c.name] = v
     return json.dumps(d)
+
+

@@ -99,8 +99,8 @@ class BroadcastMonitor:
         else:
             return None
     
-    def calculate_offset(self, start_time:datetime, buffer_seconds:int=10):
-        offset = (self.current_time - start_time).seconds - buffer_seconds
+    def calculate_offset(self, start_time:datetime, current_time:datetime, buffer_seconds:int=10):
+        offset = (current_time - start_time).seconds - buffer_seconds
         return max(0, offset)
     
     def get_current_program(self, channel):
@@ -108,7 +108,7 @@ class BroadcastMonitor:
         current_program = self.database.get_current_program_by_channel(channel, time=now)
 
         if current_program:
-            current_program["offset"] = self.calculate_offset(current_program["start"])
+            current_program["offset"] = self.calculate_offset(current_program["start"], now)
             current_program["start"] = current_program["start"].strftime("%H:%M")
             current_program["end"] = current_program["end"].strftime("%H:%M") 
             return current_program

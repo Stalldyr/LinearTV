@@ -99,7 +99,6 @@
         fetch(fetch_link)
           .then(response => response.json())
           .then(program => {
-            //console.log(program)//REMOVEB4COMMIT
             if (program.id !== currentProgram) {
               currentProgram = program.id;
               onProgramChanged(program);

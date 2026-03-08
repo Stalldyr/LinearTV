@@ -55,6 +55,8 @@ class TVPreparer():
         self.enrich_series_metadata()
 
         self.enrich_episode_metadata()
+
+        self.database.update_end_time()
     
     def enrich_series_metadata(self, overturn = False):
         series = self.database.get_all_series(overturn)
@@ -64,7 +66,8 @@ class TVPreparer():
                 series_data = self.metadata.get_ytdlp_series_metadata(entry)
 
             if entry.tmdb_id:
-                tmdb_data = self.metadata.fetch_tmdb_series_data(entry.tmdb_id)
+                pass
+                #tmdb_data = self.metadata.fetch_tmdb_series_data(entry.tmdb_id)
 
     def enrich_episode_metadata(self, overwrite=[]):
         episodes = self.database.get_all_episodes(True)

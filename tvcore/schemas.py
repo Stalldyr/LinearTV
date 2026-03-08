@@ -9,22 +9,6 @@ except:
     from tvcore.calendar import parse_aspnet_date, same_iso_week_this_year
 import isodate
 
-class NRKInputDEPRICATED(BaseModel):
-    program_id: str = Field(alias="programId")
-    series_id: str | None = Field(alias="seriesId")
-
-    episode_title: str = Field(alias="title")
-    series_title: str | None = Field(alias="seriesTitle")
-
-    planned_start: datetime = Field(alias="plannedStart")
-    actual_start: datetime | None = Field(alias="actualStart")
-    rerun: bool = Field(alias="reRun")
-    duration: int
-    description: str | None
-    category_id: int | None = Field(alias="category.id")
-    category_display_value: str | None = Field(alias="category.displayValue")
-    status: str
-
 class NRKInputCategory(BaseModel):
     display_value: str = Field(alias="displayValue")
 
@@ -111,7 +95,7 @@ class MovieInput(HTMLFormModel):
     title: str
     description: str | None
     genre: str | None
-    release: str | None
+    release: str | date | None
     source_url: str | None
     tmdb_id: int | None
     duration: float | None
@@ -121,9 +105,9 @@ class EpisodeInput(HTMLFormModel):
 
     id: int | None
     series_id: int | None
+    program_id: str | None
     title: str
     description: str | None
-    release: str | datetime | None
     season_number: int | None
     episode_number: int | None
     source_url: str | None
