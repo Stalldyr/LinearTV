@@ -115,10 +115,13 @@ class BroadcastMonitor:
 
         else:
             next_program = self.database.get_next_program_by_channel(channel, time=now)
+            print(next_program)
             if next_program:
+                next_program["filepath"] = None
+                next_program["status"] = "no_program"
                 next_program["start"] = next_program["start"].strftime("%H:%M")
                 next_program["end"] = next_program["end"].strftime("%H:%M") 
-                next_program["description"] = "Neste program: " + next_program["title"] + ". Starter " + next_program["start"]
+                next_program["description"] = f"Neste program starter {next_program["start"]}: {next_program["title"]}"
                 next_program["title"] = "Ingen program på dette tidspunktet"
 
                 return next_program

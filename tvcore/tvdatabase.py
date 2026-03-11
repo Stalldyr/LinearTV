@@ -516,7 +516,7 @@ class TVDatabase:
                 func.coalesce(Episode.duration, Movie.duration).label("duration")
             ).where(
                 Schedule.start >= time,
-                #Schedule.status == STATUS_AVAILABLE,
+                Schedule.status == STATUS_AVAILABLE,
                 Schedule.channel == channel
             ).outerjoin(
                 Episode

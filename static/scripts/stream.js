@@ -28,18 +28,21 @@
   let fetch_link = "/stream/nrk1"
   function setChannelNRK1(){
     fetch_link = "/stream/nrk1"
+    updateProgram();
   }
 
   function setChannelNRK2(){
     fetch_link = "/stream/nrk2"
+    updateProgram();
   }
 
   function setChannelCable(){
     fetch_link = "/stream/cable"
+    updateProgram();
   }
 
   const noProgramSource = { src: '/video/noprogram?t=' + Date.now(), type: 'video/mp4' }
-
+  let currentProgram = null;
 
 
   function onProgramChanged(program){
@@ -93,19 +96,17 @@
     };
   }
 
-  function Polling(){
-    let currentProgram = null;
-    function updateProgram() {
-        fetch(fetch_link)
-          .then(response => response.json())
-          .then(program => {
-            if (program.id !== currentProgram) {
-              currentProgram = program.id;
-              onProgramChanged(program);
-            }
-          });
-    }
+  function updateProgram() {
+    fetch(fetch_link)
+      .then(response => response.json())
+      .then(program => {
+        if (program.id !== currentProgram) {
+          currentProgram = program.id;
+          onProgramChanged(program);
+        }
+  })};
 
+  function Polling(){
     updateProgram();
     setInterval(updateProgram, 5000);
   }
