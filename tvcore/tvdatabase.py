@@ -103,7 +103,7 @@ class Schedule(Base):
     filepath = Column(Text)
     download_date = Column(Date)
     file_size = Column(Integer)
-    status = Column(Text, default='pending', nullable=False)
+    status = Column(Text, default=STATUS_PENDING, nullable=False)
     last_aired = Column(Date)
     views = Column(Integer)
     
@@ -165,7 +165,7 @@ class TVDatabase:
                 Schedule.file_size: None,
                 Schedule.filepath: None,
                 Schedule.download_date: None,
-                Schedule.status: "pending",
+                Schedule.status: STATUS_PENDING,
                 Schedule.last_aired: None,
                 Schedule.views: 0,
                 Schedule.keep_next_week: False
@@ -441,7 +441,8 @@ class TVDatabase:
         q = select(
             Schedule
             ).where(
-                Schedule.start.between(start,end)
+                Schedule.start.between(start,end),
+                Schedule.status.in_([STATUS_PENDING, STATUS_AVAILABLE])
             ).order_by(
                 Schedule.start
         )
@@ -497,7 +498,7 @@ class TVDatabase:
             else:
                 return None
             
-    def get_next_programs(self, time=None) -> list[dict]:
+    def get_next_program_by_channel(self, channel:str, time=None) -> list[dict]:
         if time is None:
             time = datetime.now()
 
@@ -515,7 +516,8 @@ class TVDatabase:
                 func.coalesce(Episode.duration, Movie.duration).label("duration")
             ).where(
                 Schedule.start >= time,
-                Schedule.status == STATUS_AVAILABLE
+                #Schedule.status == STATUS_AVAILABLE,
+                Schedule.channel == channel
             ).outerjoin(
                 Episode
             ).outerjoin(
@@ -523,11 +525,13 @@ class TVDatabase:
             ).order_by(
                 Schedule.channel,
                 Schedule.start
-            ).group_by(
-                Schedule.channel
             )
         
-            return self._to_dict(session.execute(q).all())
+            result = session.execute(q).mappings().first()
+            if result:
+                return dict(result)
+            else:
+                return None
 
             
     # AIRING OPERATIONS
@@ -540,23 +544,10 @@ class TVDatabase:
 
         return self._execute(q, ScheduleOutput)
     
-    # UTILITY METHODS
-    
-    @staticmethod
-    def _to_dict(obj) -> Dict:
-        """Convert SQLAlchemy model instance to dictionary"""
-        if obj is None:
-            return None
-        
-        result = {}
-        for column in obj.__table__.columns:
-            value = getattr(obj, column.name)
-            # Convert date/time objects to strings for consistency
-            if isinstance(value, (datetime, )):
-                value = value.isoformat()
-            result[column.name] = value
-        return result
-    
+
+
+    #Bulk update table values
+
     def update_end_time(self):
         with self.get_session() as session:
             schedules = session.execute(
@@ -577,6 +568,25 @@ class TVDatabase:
                     schedule.end = schedule.start + timedelta(seconds=duration)
 
             session.commit()
+    
+    # UTILITY METHODS
+    
+    @staticmethod
+    def _to_dict(obj) -> Dict:
+        """Convert SQLAlchemy model instance to dictionary"""
+        if obj is None:
+            return None
+        
+        result = {}
+        for column in obj.__table__.columns:
+            value = getattr(obj, column.name)
+            # Convert date/time objects to strings for consistency
+            if isinstance(value, (datetime, )):
+                value = value.isoformat()
+            result[column.name] = value
+        return result
+    
+
 
             
 class AlchemyEncoder(json.JSONEncoder):

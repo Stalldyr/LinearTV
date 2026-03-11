@@ -114,14 +114,24 @@ class BroadcastMonitor:
             return current_program
 
         else:
-            return {
-                "id": STREAM_ID_NO_PROGRAM,
-                "status": "no_program",
-                "title": "Ingen program",
-                "description": "Ingen program på dette tidspunktet",
-                "filepath": None,
-                "channel": channel,
-            }
+            next_program = self.database.get_next_program_by_channel(channel, time=now)
+            if next_program:
+                next_program["start"] = next_program["start"].strftime("%H:%M")
+                next_program["end"] = next_program["end"].strftime("%H:%M") 
+                next_program["description"] = "Neste program: " + next_program["title"] + ". Starter " + next_program["start"]
+                next_program["title"] = "Ingen program på dette tidspunktet"
+
+                return next_program
+            
+            else:
+                return {
+                    "id": STREAM_ID_NO_PROGRAM,
+                    "status": "no_program",
+                    "title": "Ingen program",
+                    "description": "Ingen program på dette tidspunktet",
+                    "filepath": None,
+                    "channel": channel,
+                }
 
 
     def update_air_date(self, program: ScheduleOutput):

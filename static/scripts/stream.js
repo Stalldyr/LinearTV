@@ -34,7 +34,7 @@
     fetch_link = "/stream/nrk2"
   }
 
-  function setChannelNRK2(){
+  function setChannelCable(){
     fetch_link = "/stream/cable"
   }
 
