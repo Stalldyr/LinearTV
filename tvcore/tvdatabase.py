@@ -215,7 +215,6 @@ class TVDatabase:
             return session.execute(stmt).scalars().first()
 
     def add(self, obj: Series | Movie | Schedule | Episode, unique_on: list[str] = None):
-        """Adds new entry to the weekly schedule"""
 
         with self.get_session() as session:
             if unique_on:
@@ -431,21 +430,36 @@ class TVDatabase:
             return self._to_dict(ep) if ep else None
         
         
-    def get_current_week_schedule(self, channel:str = None) -> List[ScheduleOutput]:
+    def get_current_week_schedule(self, channel:str = None, date:datetime=None, full_week:bool = False) -> List[ScheduleOutput]:
         """Returns all scheduled programs in the current week"""
-        year, week, day = datetime.today().isocalendar()
         offset = timedelta(hours=4) #Marks the end of the air day, to include programs that starts late at night and ends after midnight
-        start = datetime.fromisocalendar(year, week, 1) + offset
-        end = datetime.fromisocalendar(year, week+1, 1) + offset
+
+        if not date:
+            date = datetime.today()
+
+        if full_week:
+            year, week, _ = date.isocalendar()
+            start = datetime.fromisocalendar(year, week, 1) + offset
+            end = start + timedelta(days=7)
+
+        else:
+            start = date + offset
+            end = start + timedelta(days=1)
+            
 
         q = select(
-            Schedule
+                Schedule
+                #func.coalesce(Episode.description, Movie.description).label("description")
             ).where(
                 Schedule.start.between(start,end),
                 Schedule.status.in_([STATUS_PENDING, STATUS_AVAILABLE])
+            ).outerjoin(
+                Episode
+            ).outerjoin(
+                Movie
             ).order_by(
                 Schedule.start
-        )
+            )
 
         if channel:
             q = q.where(Schedule.channel == channel)
@@ -498,7 +512,7 @@ class TVDatabase:
             else:
                 return None
             
-    def get_next_program_by_channel(self, channel:str, time=None) -> list[dict]:
+    def get_next_program_by_channel(self, channel:str, time:datetime=None, limit=1) -> list[dict]:
         if time is None:
             time = datetime.now()
 
@@ -526,6 +540,10 @@ class TVDatabase:
                 Schedule.channel,
                 Schedule.start
             )
+
+            if limit:
+                end_time = time + timedelta(days=1)
+                q = q.where(Schedule.start < end_time)
         
             result = session.execute(q).mappings().first()
             if result:

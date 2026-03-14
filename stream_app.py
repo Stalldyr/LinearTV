@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, render_template_string, send_from_directory, request, Blueprint, Response
 import os 
 from datetime import datetime
-
+import logging
 
 try:
     from .tvcore.tvdatabase import TVDatabase
@@ -20,6 +20,8 @@ except ImportError:
     from templates.stream_html import *
     from templates.schedule import *
 
+
+
 stream_app = Blueprint(
     'streaming', 
     __name__,
@@ -34,9 +36,9 @@ path_manager = MediaPathManager()
 metadata_fetcher = MetaDataFetcher()
 broadcast_monitor = BroadcastMonitor()
 
-SERIES_DATA = [obj.model_dump() for obj in tv_db.get_all_series()]
-MOVIE_DATA = [obj.model_dump() for obj in tv_db.get_all_movies()]
-GENRES = ["Drama", "Comedy", "Documentary", "News", "Sport"]
+
+
+
 
 # ============ STREAMING PAGES ============
 
@@ -122,10 +124,13 @@ def current_program(channel):
 
 @stream_app.route('/api/schedule', methods=['GET'])
 def get_schedule():
-    channel = request.args.get("channel")
-    if channel:
-        return jsonify([obj.model_dump() for obj in tv_db.get_current_week_schedule(channel)])
-    return jsonify([obj.model_dump() for obj in tv_db.get_current_week_schedule()])
+    #TODO: Create pydantic model
+    channel = request.args.get("channel", None)
+    date = request.args.get("date", None)
+    full_week = request.args.get("full_week", False)
+    full_week_bool = True if full_week in ["true", "True", "1"] else False
+
+    return jsonify([obj.model_dump() for obj in tv_db.get_current_week_schedule(channel=channel, date=date, full_week=full_week_bool)])
 
 @stream_app.route('/api/pending')
 def get_pending_episodes():
@@ -145,7 +150,6 @@ def get_obsolete_episodes():
 def fetch_metadata(program_type,tmdb_id):
     return jsonify(metadata_fetcher.fetch_tmdb_metadata(program_type, tmdb_id))
 
-
 #HTMX
 
 @stream_app.route("/admin/partials/program-form-open")
@@ -162,9 +166,11 @@ def open_movie_form():
     program_type = request.args.get("programType")
 
     if program_type == "series":
-        return series_form(SERIES_DATA, GENRES).dump()
+        return
+        #return series_form(SERIES_DATA, GENRES).dump()
     elif program_type == "movie":
-        return movie_form(MOVIE_DATA, GENRES).dump()
+        return
+        #return movie_form(MOVIE_DATA, GENRES).dump()
 
     
 
@@ -192,13 +198,11 @@ def test_run():
 
     if os.getenv('TEST_ACC'):
         test_acc = int(os.getenv('TEST_ACC'))
+        print(test_acc)
 
-    test_time = datetime(2026,3,8,18,35)
-    test_acc = 60
-
-    #if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-    #    broadcast_monitor = BroadcastMonitor(time=test_time, time_acceleration=test_acc, debug=True)
-    #    broadcast_monitor.start_monitoring()
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        broadcast_monitor = BroadcastMonitor(time=test_time, time_acceleration=test_acc, debug=True)
+        broadcast_monitor.start_monitoring()
 
     @app.route('/')
     def setup_index():

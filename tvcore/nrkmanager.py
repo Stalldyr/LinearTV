@@ -10,7 +10,6 @@ from datetime import datetime, date, timedelta
 from time import sleep
 from slugify import slugify
 import requests
-import logging
 from pydantic_core import ValidationError
 
 from typing import TypeVar, Type, Generic
@@ -98,7 +97,7 @@ class NRKManager(Generic[T]):
         metadata = self.metadata._fetch_ytdlp_info(url)
         return self.metadata.extract_episode_info_from_ytdlp(metadata)
     
-    def api_request(self, channels, date, source="https://psapi.nrk.no/epg/{channels}?date={date}"):
+    def api_request(self, channels, date):
         return requests.get(f"https://psapi.nrk.no/epg/{channels}?date={date}")
     
     def fetch_programs_by_date(self, date):

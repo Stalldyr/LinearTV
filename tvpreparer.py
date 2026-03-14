@@ -18,10 +18,20 @@ import sys
 from colorama import Fore, Style
 import time
 import logging
-
 from slugify import slugify
+from pathlib import Path
 
-logging.basicConfig(level=logging.DEBUG)
+
+log_path = Path(__file__).parent / "logs" / "preparer.log"
+log_path.parent.mkdir(exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    handlers=[
+        logging.FileHandler(log_path),
+        logging.StreamHandler()
+    ]
+)
 
 class TVPreparer():
     """
@@ -39,17 +49,19 @@ class TVPreparer():
         obsolete_programs = self.database.get_obsolete_programs()
 
         if not obsolete_programs:
-            print(f"No programs to delete")
+            logging.info("No programs to delete")
+            return
         
         for entry in obsolete_programs:
             try:
                 path = self.paths.get_full_path(entry.filepath)
                 self.handler.delete_media(entry.id, path)
-                print(Fore.GREEN + "Deletion successful: " + Style.RESET_ALL, entry.filepath)
+                logging.info("Deletion successful: %s", entry.filepath)
+                #print(Fore.GREEN + "Deletion successful: " + Style.RESET_ALL, entry.filepath)
             
             except Exception as e:
-                logging.error(f"Error deleting {entry.filepath}:", e)
-                print(Fore.RED + "Deletion failed: "+ Style.RESET_ALL, entry.filepath)
+                logging.error("Error deleting %s: %s", entry.filepath, e)
+                #print(Fore.RED + "Deletion failed: "+ Style.RESET_ALL, entry.filepath)
 
     def enrich_metadata(self):
         self.enrich_series_metadata()
@@ -96,7 +108,7 @@ class TVPreparer():
         ]
 
         if not pending_programs:
-            print("No new episodes to download")
+            logging.info("No new episodes to download")
 
         for entry in pending_programs:
             slug = None
@@ -130,16 +142,17 @@ class TVPreparer():
                 file_path = self.paths.get_filepath(TYPE_MOVIES, slug, filename)
                 
             else:
-                print("Missing media ID or source URL for entry, skipping download:", entry.id)
-                continue
-                
-            
+                logging.warning("Missing media ID or source URL for entry, skipping download: %s", entry.id)
+                            
             if file_path.exists():
-                print(f"Local file found for {file_path}, skipping download.")
+                logging.info("Local file found for %s, skipping download.", file_path)
                 status = STATUS_AVAILABLE
-                self.database.upsert(Schedule(id=entry.id, status = STATUS_AVAILABLE))
+                self.database.upsert(Schedule(id=entry.id, status = status))
             else:
-                status = self.downloader.download_single(entry.id, source_url, file_path)
+                try:
+                    status = self.downloader.download_single(entry.id, source_url, file_path)
+                except Exception as e:
+                    logging.error("Error while downloading: %s", e)
 
             
             if status == STATUS_AVAILABLE:
@@ -157,7 +170,7 @@ class TVPreparer():
         ]
 
         if not scheduled_programs:
-            print("No programs to verify")
+            logging.info("No programs to verify")
 
         for entry in scheduled_programs:
             file_path = None
@@ -175,18 +188,32 @@ class TVPreparer():
                 filename = self.paths.create_movie_file_name(entry.movie.slug)
                 file_path = self.paths.get_filepath(TYPE_MOVIES, entry.movie.slug, filename)
 
-            file_status = self.handler.verify_local_file(entry.id, file_path)
-            
+            try:
+                file_status = self.handler.verify_local_file(entry.id, file_path)
+            except Exception as e:
+                logging.error("Error veryifing file %s: %s", file_path, e)
+
+
             #TODO Check file integrity series_dl._check_file_integrity()
 
             if file_status == STATUS_AVAILABLE:
-                print(Fore.GREEN + "File found: " + Style.RESET_ALL, file_path)
+                logging.info("File found: %s", file_path)
             else:
-                print(Fore.RED + "File missing: "+ Style.RESET_ALL, file_path)
+                logging.warning("File missing: %s", file_path)
+
 
             self.handler.update_file_info(entry.id, file_path)
 
+def _status_helper(status, level, succes, failure, file_path):
+    if status == STATUS_AVAILABLE:
+        print(Fore.GREEN + "File found: " + Style.RESET_ALL, file_path)
+    else:
+        print(Fore.RED + "File missing: "+ Style.RESET_ALL, file_path)
+
+
+
 if __name__ == "__main__":
+
     prep = TVPreparer()
 
     if len(sys.argv)>1:
@@ -211,3 +238,4 @@ if __name__ == "__main__":
 
         else:
             print("Not a valid operation")
+

@@ -43,7 +43,7 @@
 
   const noProgramSource = { src: '/video/noprogram?t=' + Date.now(), type: 'video/mp4' }
   let currentProgram = null;
-
+  let currentChannel = null;
 
   function onProgramChanged(program){
     if (program.status === "available"){
@@ -100,8 +100,9 @@
     fetch(fetch_link)
       .then(response => response.json())
       .then(program => {
-        if (program.id !== currentProgram) {
+        if (program.id !== currentProgram || currentChannel !== program.channel) {
           currentProgram = program.id;
+          currentChannel = program.channel;
           onProgramChanged(program);
         }
   })};

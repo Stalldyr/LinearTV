@@ -288,8 +288,6 @@ def program_form(visible=False) -> Element:
 
     style = {"display":"block"} if visible else  {"display":"none"}
 
-    
-
     return Div(
         H3("Legg til nytt program"),
 

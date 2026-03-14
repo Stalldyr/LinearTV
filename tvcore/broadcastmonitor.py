@@ -3,19 +3,14 @@ try:
     from .tvdatabase import TVDatabase, Schedule
     from .schemas import ScheduleOutput
     from .tvconstants import *
-    from .helper import calculate_end_time
-    from .tvconfig import TVConfig
 except:
     from tvdatabase import TVDatabase, Schedule
     from schemas import ScheduleOutput
     from tvconstants import *
-    from helper import calculate_end_time
-    from tvconfig import TVConfig
 
 from datetime import datetime, timedelta, time
 import threading
 import time
-from flask import url_for
 
 class BroadcastMonitor:
     _instance = None
@@ -38,15 +33,11 @@ class BroadcastMonitor:
         self.current_time = time #Sets the "now" time for testing
         self.time_acceleration = time_acceleration # Sets time acceleration for testing
         self.simulation_started = None #For time testing
- 
-        self.broadcast_start = datetime.strptime(TVConfig().config["schedule"]["broadcast_start"], "%H:%M").time()
-        self.broadcast_end = datetime.strptime(TVConfig().config["schedule"]["broadcast_end"], "%H:%M").time()
         
         self.is_broadcasting = False
-        
-        self.current_nrk1 = None
-        self.current_nrk2 = None
 
+        self.channels = ["nrk1", "nrk2", "cable"] #TODO:Shouldn't be hardcoded
+        
         self.database = TVDatabase()
 
     def start_monitoring(self):
@@ -61,12 +52,10 @@ class BroadcastMonitor:
     def _monitor_loop(self):
         while self.is_broadcasting:
             self.current_time = self.get_current_time()
-            self.current_nrk1 = self.get_current_program("nrk1")
-            self.current_nrk2 = self.get_current_program("nrk2")
-            self.current_cable = self.get_current_program("cable")
             if self.debug:
-                print(f"Monitoring: {self.current_nrk1['title']} at {self.current_nrk1['channel']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                print(f"Monitoring: {self.current_nrk2['title']} at {self.current_nrk2['channel']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                for channel in self.channels:
+                    current = self.get_current_program(channel)
+                    print(f"Monitoring: {current['title']} at {current['channel']} at {self.current_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
             time.sleep(1)
 
@@ -75,8 +64,10 @@ class BroadcastMonitor:
         Return either real time or simulated time. For testing purposes mainly
         """
 
-        if self.test_time is None:
+        if self.test_time is None and self.time_acceleration is None:
             return datetime.now()
+
+        self.test_time = datetime.now()
         
         if self.time_freeze:
             return self.test_time
@@ -91,13 +82,6 @@ class BroadcastMonitor:
         
         return self.test_time + simulated_time_elapsed
 
-    def get_current_stream(self, channel):
-        if channel == "nrk1":
-            return self.current_nrk1
-        elif channel == "nrk2":
-            return self.current_nrk2
-        else:
-            return None
     
     def calculate_offset(self, start_time:datetime, current_time:datetime, buffer_seconds:int=10):
         offset = (current_time - start_time).seconds - buffer_seconds
@@ -111,31 +95,24 @@ class BroadcastMonitor:
             current_program["offset"] = self.calculate_offset(current_program["start"], now)
             current_program["start"] = current_program["start"].strftime("%H:%M")
             current_program["end"] = current_program["end"].strftime("%H:%M") 
+
             return current_program
 
         else:
+            no_program = {
+                "id": STREAM_ID_NO_PROGRAM,
+                "status": "no_program",
+                "title": "Ingen program på dette tidspunktet",
+                "description": "Det er en stund til neste program starter. Sjekk TV-guide",
+                "filepath": None,
+                "channel": channel,
+            }
+
             next_program = self.database.get_next_program_by_channel(channel, time=now)
-            print(next_program)
             if next_program:
-                next_program["filepath"] = None
-                next_program["status"] = "no_program"
-                next_program["start"] = next_program["start"].strftime("%H:%M")
-                next_program["end"] = next_program["end"].strftime("%H:%M") 
-                next_program["description"] = f"Neste program starter {next_program["start"]}: {next_program["title"]}"
-                next_program["title"] = "Ingen program på dette tidspunktet"
+                no_program["description"] = f"Neste program starter {next_program["start"]}:\n {next_program["title"]}"
 
-                return next_program
-            
-            else:
-                return {
-                    "id": STREAM_ID_NO_PROGRAM,
-                    "status": "no_program",
-                    "title": "Ingen program",
-                    "description": "Ingen program på dette tidspunktet",
-                    "filepath": None,
-                    "channel": channel,
-                }
-
+            return no_program
 
     def update_air_date(self, program: ScheduleOutput):
         if program.last_aired != self.current_time.date().strftime("%Y-%m-%d"):
@@ -145,13 +122,3 @@ class BroadcastMonitor:
                     last_aired = self.current_time.date()
                 )
             )
-    
-    def get_current_status(self):
-        if self.current_stream:
-            return {
-                "status": "streaming",
-                "current_stream": self.current_stream
-            }
-        else:
-            return {"status": "idle"}
-    
