@@ -502,7 +502,6 @@ class TVDatabase:
             ).outerjoin(
                 Movie
             ).order_by(
-                Schedule.channel,
                 Schedule.start
             )
 
@@ -537,7 +536,6 @@ class TVDatabase:
             ).outerjoin(
                 Movie
             ).order_by(
-                Schedule.channel,
                 Schedule.start
             )
 

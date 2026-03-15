@@ -198,7 +198,6 @@ def test_run():
 
     if os.getenv('TEST_ACC'):
         test_acc = int(os.getenv('TEST_ACC'))
-        print(test_acc)
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         broadcast_monitor = BroadcastMonitor(time=test_time, time_acceleration=test_acc, debug=True)
