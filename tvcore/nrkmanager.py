@@ -1,41 +1,19 @@
-from nrkscraper.nrk_db import NRKSession, NRKdb, NRK1, NRK2, T
 from tvstreamer.tvcore.metadatafetcher import MetaDataFetcher
 from tvstreamer.tvcore.programmanager import ProgramManager
 from tvstreamer.tvcore.tvdatabase import TVDatabase, Series, Movie, Episode, Schedule
 from tvstreamer.tvcore.tvconstants import *
-
 from tvstreamer.tvcore.schemas import NRKInput
-import isodate
-from datetime import datetime, date, timedelta
-from time import sleep
+
 from slugify import slugify
 import requests
 from pydantic_core import ValidationError
 
-from typing import TypeVar, Type, Generic
-
-
-
-class NRKManager(Generic[T]):
-    def __init__(self, db_path: str, channel: Type[T],  debug: bool = False):
-        self.Session = NRKSession(db_path, debug)
+class NRKManager():
+    def __init__(self, channel:str, debug:bool = False):
         self.metadata = MetaDataFetcher()
         self.programmanager = ProgramManager()
         self.db = TVDatabase()
         self.channel = channel
-
-    @classmethod
-    def nrk1(cls, db_path: str, debug: bool = False) -> "NRKManager[NRK1]":
-        return cls(db_path, NRK1, debug)
-    
-    @classmethod
-    def nrk2(cls, db_path: str, debug: bool = False) -> "NRKManager[NRK2]":
-        return cls(db_path, NRK2, debug)
-
-    def get_nrk_from_db(self, start, end):
-        with self.Session() as session:
-            db = NRKdb(session, self.channel)
-            return db.get_available_nrk_web_programs_by_dates(start, end)
     
     def insert_database(self, program: NRKInput):
         if program.availability.status == "available":
@@ -87,7 +65,7 @@ class NRKManager(Generic[T]):
                         start = program.start,
                         end = program.end,
                         rerun = program.rerun,
-                        channel = self.channel.__tablename__
+                        channel = self.channel
                     )
                     ,
                     ["start", "channel"]
@@ -101,36 +79,33 @@ class NRKManager(Generic[T]):
         return requests.get(f"https://psapi.nrk.no/epg/{channels}?date={date}")
     
     def fetch_programs_by_date(self, date):
-        data = self.api_request(self.channel.__tablename__, date).json()
+        data = self.api_request(self.channel, date).json()
 
         entries = data[0]["entries"]
         
         for entry in entries:
-            epgentries = entry.get("epgEntries")
+            try:
+                epgentries = entry.get("epgEntries")
 
-            if epgentries:
-                for epgentry in epgentries:
-                    data = self.validate_input(epgentry)
+                if epgentries:
+                    for epgentry in epgentries:
+                        data = self._validate_input(epgentry)
+                        self.insert_database(data)
+                        yield data
+
+                else:
+                    data = self._validate_input(entry)
                     self.insert_database(data)
+                    yield data
+            
+            except Exception as e:
+                yield e
 
-            else:
-                data = self.validate_input(entry)
-                self.insert_database(data)
-
-    def validate_input(self, data:dict):
+    def _validate_input(self, data:dict):
         try:
             return NRKInput.model_validate(data)
         except ValidationError as e:
-            print(e)
+            raise
 
-
-    def insert_database_from_api(self, current_date, end_date):
-        while current_date <= end_date:
-            self.fetch_programs_by_date(current_date)
-            current_date += timedelta(days=1)
-
-            sleep(1)
-
-
-
-
+    def check_for_duplicate_titles(self):
+        pass

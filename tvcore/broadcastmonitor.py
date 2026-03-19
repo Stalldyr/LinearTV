@@ -109,7 +109,8 @@ class BroadcastMonitor:
 
             next_program = self.database.get_next_program_by_channel(channel, time=now)
             if next_program:
-                no_program["description"] = f"Neste program starter {next_program["start"]}:\n {next_program["title"]}"
+                start = next_program["start"].strftime("%H:%M")
+                no_program["description"] = f"Neste program starter {start}:\n {next_program["title"]}"
 
             return no_program
 

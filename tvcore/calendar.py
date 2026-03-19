@@ -1,4 +1,3 @@
-import calendar
 from datetime import datetime, timedelta, timezone, date
 import re
 
@@ -57,7 +56,6 @@ def parse_aspnet_date(date_str):
     return datetime.fromtimestamp(ms / 1000, tz=tz)
 
 def same_iso_week_this_year(dt: date, target_year: int = None) -> date:
-    #TODO: Move to calendar module??
     if target_year is None:
         target_year = date.today().isocalendar().year
     

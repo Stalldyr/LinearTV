@@ -1,9 +1,11 @@
 try: 
     from .tvcore.tvdownloader import TVDownloader
     from .tvcore.metadatafetcher import MetaDataFetcher
-    from .tvcore.tvdatabase import TVDatabase
+    from .tvcore.tvdatabase import TVDatabase, Episode, Schedule
     from .tvcore.filehandler import TVFileHandler
     from .tvcore.mediapathmanager import MediaPathManager
+    from .tvcore.nrkmanager import NRKManager
+    from .tvcore.calendar import get_iso_week_span_target_year, get_iso_week_number
     from .tvcore.tvconstants import *
 except ImportError:
     from tvcore.tvdownloader import TVDownloader
@@ -11,16 +13,17 @@ except ImportError:
     from tvcore.tvdatabase import TVDatabase, Episode, Schedule
     from tvcore.filehandler import TVFileHandler
     from tvcore.mediapathmanager import MediaPathManager
+    from tvcore.nrkmanager import NRKManager
+    from tvcore.calendar import get_iso_week_span_target_year, get_iso_week_number
     from tvcore.tvconstants import *
 
 from datetime import datetime, date, timedelta
 import sys
 from colorama import Fore, Style
-import time
+from time import sleep
 import logging
 from slugify import slugify
 from pathlib import Path
-
 
 log_path = Path(__file__).parent / "logs" / "preparer.log"
 log_path.parent.mkdir(exist_ok=True)
@@ -53,50 +56,71 @@ class TVPreparer():
             return
         
         for entry in obsolete_programs:
+            #TODO: Implement deletion of metadata
             try:
-                path = self.paths.get_full_path(entry.filepath)
-                self.handler.delete_media(entry.id, path)
+                media_path = self.paths.get_full_path(entry.filepath)
+                self.handler.delete_media(entry.id, media_path)
                 logging.info("Deletion successful: %s", entry.filepath)
-                #print(Fore.GREEN + "Deletion successful: " + Style.RESET_ALL, entry.filepath)
             
             except Exception as e:
                 logging.error("Error deleting %s: %s", entry.filepath, e)
-                #print(Fore.RED + "Deletion failed: "+ Style.RESET_ALL, entry.filepath)
+
+    def fetch_nrk_data(self, buffer_weeks=4):
+        week_number = get_iso_week_number(date.today())
+        start_date, end_date = get_iso_week_span_target_year(week_number + 2, week_number + buffer_weeks, 2001)
+        
+        nrk1 = NRKManager("nrk1")
+        nrk2 = NRKManager("nrk2")
+        while start_date <= end_date:
+            try:
+                nrk1.fetch_programs_by_date(start_date)
+            except Exception as e:
+                logging.error("Failed to fetch NRK1 programs for %s: %s", start_date, e)
+
+            sleep(3)
+
+            try:
+                nrk2.fetch_programs_by_date(start_date)
+            except Exception as e:
+                logging.error("Failed to fetch NRK2 programs for %s: %s", start_date, e)
+            
+            start_date += timedelta(days=1)
+
+            sleep(3)
 
     def enrich_metadata(self):
-        self.enrich_series_metadata()
-
         self.enrich_episode_metadata()
-
         self.database.update_end_time()
     
-    def enrich_series_metadata(self, overturn = False):
-        series = self.database.get_all_series(overturn)
-
-        for entry in series:
-            if entry.source_url:
-                series_data = self.metadata.get_ytdlp_series_metadata(entry)
-
-            if entry.tmdb_id:
-                pass
-                #tmdb_data = self.metadata.fetch_tmdb_series_data(entry.tmdb_id)
-
     def enrich_episode_metadata(self, overwrite=[]):
-        episodes = self.database.get_all_episodes(True)
+        episodes = self.database.get_all_episodes(missing=True)
         
         for episode in episodes:
-            if episode.source_url:   
-                json_name = self.paths.create_ytdlp_episode_json_name2(episode.series.id, episode.id)
-                json_path = self.paths.get_metadata_path(TYPE_SERIES, episode.series.slug, json_name)
+            if episode.source_url:
+                json_path = self.paths.get_metadata_path(
+                    TYPE_SERIES, 
+                    episode.series.slug, 
+                    self.paths.create_ytdlp_episode_json_name(episode.series.id, episode.id)
+                )
 
-                episode_data = self.metadata.get_ytdlp_episode_metadata(json_path=json_path, video_url=episode.source_url)
-
+                episode_data = self.metadata.get_ytdlp_data(episode.source_url, json_path = json_path)
                 relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
 
-                self.database.upsert(Episode(id=episode.id,**relevant_data))
+                self.database.upsert(Episode(id=episode.id,**relevant_data.model_dump()))
                 
             if episode.tmdb_id:
-                pass
+                json_path = self.paths.get_metadata_path(
+                    TYPE_SERIES, 
+                    episode.series.slug, 
+                    self.paths.create_tmbd_episode_json_name(episode.series.id, episode.id)
+                )
+
+                episode_data = self.metadata.get_tmdb_data(tmdb_id=episode.tmdb_id, json_path = json_path)
+                relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
+
+                self.database.upsert(Episode(id=episode.id,**relevant_data.model_dump()))
+
+
 
     def download_weekly_schedule(self, buffer_days=3):
         now = date.today()
@@ -124,7 +148,7 @@ class TVPreparer():
 
                 source_url = entry.episode.source_url
 
-                filename = self.paths.create_episode_file_name2(
+                filename = self.paths.create_episode_file_name(
                     entry.episode.series.id,
                     entry.episode.id
                 )
@@ -138,11 +162,12 @@ class TVPreparer():
 
                 source_url = entry.movie.source_url
                     
-                filename = self.paths.create_movie_file_name2(entry.movie_id)
+                filename = self.paths.create_movie_file_name(entry.movie_id)
                 file_path = self.paths.get_filepath(TYPE_MOVIES, slug, filename)
                 
             else:
                 logging.warning("Missing media ID or source URL for entry, skipping download: %s", entry.id)
+                continue
                             
             if file_path.exists():
                 logging.info("Local file found for %s, skipping download.", file_path)
@@ -158,7 +183,7 @@ class TVPreparer():
             if status == STATUS_AVAILABLE:
                 self.handler.update_file_info(entry.id, file_path)
             
-            time.sleep(1)
+            sleep(10)
 
     def verify_scheduled_programs(self, buffer_days=3):
         now = date.today()

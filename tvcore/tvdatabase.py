@@ -110,11 +110,7 @@ class Schedule(Base):
     # Relationships
     episode = relationship("Episode", back_populates="schedule_entries", lazy="selectin")
     movie = relationship("Movie", back_populates="schedule_entries", lazy="selectin")
-
-    @property
-    def json(self):
-        return self.to_json(self, self.__class__)
-    
+  
 class TVDatabase:
     def __init__(self, test_time=None, db_path=""):
         if db_path:
@@ -129,9 +125,6 @@ class TVDatabase:
         self.SessionLocal = sessionmaker(bind=self.engine)
         
         self.metadatafetcher = MetaDataFetcher()
-
-        #self.sql = SQLexecute(self.db_path)
-        #self.execute_query = self.sql.execute_query
         
         # Setup database if it doesn't exist
         if not self.db_path.exists():
@@ -167,8 +160,7 @@ class TVDatabase:
                 Schedule.download_date: None,
                 Schedule.status: STATUS_PENDING,
                 Schedule.last_aired: None,
-                Schedule.views: 0,
-                Schedule.keep_next_week: False
+                Schedule.views: 0
             })
             
             session.commit()
@@ -336,11 +328,11 @@ class TVDatabase:
 
         if missing:
             q = q.where(or_(
-                Movie.description, 
-                Movie.title,
-                Movie.release,
-                Movie.genre
-            ).is_(None)
+                Movie.description.is_(None), 
+                Movie.title.is_(None),
+                Movie.release.is_(None),
+                Movie.genre.is_(None)
+            )
         )
 
         return self._execute(q, MovieOutput)
@@ -357,7 +349,7 @@ class TVDatabase:
 
         return self._execute(q, ScheduleOutput)
         
-    def get_pending_programs(self, strict: bool = False, date: date = None) -> List[ScheduleOutput]:
+    def get_pending_programs(self, strict:bool = False, date:date = None) -> List[ScheduleOutput]:
         """
         Return pending episodes from the episodes table.
         
@@ -430,7 +422,7 @@ class TVDatabase:
             return self._to_dict(ep) if ep else None
         
         
-    def get_current_week_schedule(self, channel:str = None, date:datetime=None, full_week:bool = False) -> List[ScheduleOutput]:
+    def get_current_week_schedule(self, channel:str = None, date:datetime = None, full_week:bool = False) -> List[ScheduleOutput]:
         """Returns all scheduled programs in the current week"""
         offset = timedelta(hours=4) #Marks the end of the air day, to include programs that starts late at night and ends after midnight
 
@@ -445,14 +437,13 @@ class TVDatabase:
         else:
             start = date + offset
             end = start + timedelta(days=1)
-            
 
         q = select(
                 Schedule
                 #func.coalesce(Episode.description, Movie.description).label("description")
             ).where(
                 Schedule.start.between(start,end),
-                Schedule.status.in_([STATUS_PENDING, STATUS_AVAILABLE])
+                Schedule.status.in_([STATUS_PENDING, STATUS_AVAILABLE, STATUS_DELETED])
             ).outerjoin(
                 Episode
             ).outerjoin(
@@ -603,52 +594,5 @@ class TVDatabase:
         return result
     
 
-
-            
-class AlchemyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj.__class__, DeclarativeMeta):
-            # Convert SQLAlchemy model to dictionary
-            fields = {}
-            for field in [x for x in dir(obj) if not x.startswith('_') and x != 'metadata']:
-                data = obj.__getattribute__(field)
-                try:
-                    json.dumps(data)
-                    fields[field] = data
-                except TypeError:
-                    fields[field] = None
-            return fields
-        return json.JSONEncoder.default(self, obj)
-
-class Serializer(object):
-
-    def serialize(self):
-        return {c: getattr(self, c) for c in inspect(self).attrs.keys()}
-
-    @staticmethod
-    def serialize_list(l):
-        return [m.serialize() for m in l]
-
-
-def to_json(inst, cls):
-    """
-    Jsonify the sql alchemy query result.
-    """
-    convert = dict()
-    # add your coversions for things like datetime's 
-    # and what-not that aren't serializable.
-    d = dict()
-    for c in cls.__table__.columns:
-        v = getattr(inst, c.name)
-        if c.type in convert.keys() and v is not None:
-            try:
-                d[c.name] = convert[c.type](v)
-            except:
-                d[c.name] = "Error:  Failed to covert using ", str(convert[c.type])
-        elif v is None:
-            d[c.name] = str()
-        else:
-            d[c.name] = v
-    return json.dumps(d)
 
 

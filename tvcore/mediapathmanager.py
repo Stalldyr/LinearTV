@@ -1,5 +1,6 @@
 from .tvconstants import *
 from pathlib import Path
+import json
 
 class MediaPathManager:
     def __init__(self, download_path="", series_subdir=TYPE_SERIES, movies_subdir=TYPE_MOVIES, **kwargs):
@@ -37,7 +38,6 @@ class MediaPathManager:
         
         program_dir = self.base_dir / media_dir / slug
         
-        # Create if doesn't exist
         program_dir.mkdir(exist_ok = True)
         
         return program_dir
@@ -64,52 +64,35 @@ class MediaPathManager:
         """Convert a relative path to a full path"""
         return self.download_path / relative_path
     
-    #Filename generation
 
-    def create_episode_file_name(self, slug, season, episode) -> str:
-        return f"{slug}_s{season:02d}e{episode:02d}.mp4"
+    #========= FILE NAME GENEREATION =========
 
-    def create_movie_file_name(self, slug) -> str:
-        return f"{slug}.mp4"
+    #MEDIA
 
-    def create_ytdlp_season_json_name(self, season) -> str:
-        return f'ytdlp_data_season_{season}.json'
-    
-    def create_ytdlp_episode_json_name(self, season, episode) -> str:
-        return f'ytdlp_data_episode_S{season}E{episode}.json'
-    
-    def create_tmbd_season_json_name(self, season, language) -> str:
-        return f'tmdb_data_season_{season}_{language}.json'
-    
-    def create_tmbd_movie_json_name(self, film_name, language) -> str:
-        return f'tmdb_data_{film_name}_{language}.json'
-    
-
-    
-    #File
-
-    def create_episode_file_name2(self, series_id, episode_id) -> str:
+    def create_episode_file_name(self, series_id, episode_id) -> str:
         return f"seriesid{series_id}_episodeid{episode_id}.mp4"
 
-    def create_movie_file_name2(self, movie_id) -> str:
+    def create_movie_file_name(self, movie_id) -> str:
         return f"movieid{movie_id}.mp4"
 
     #YTDLP
 
-    def create_ytdlp_season_json_name2(self, season) -> str:
-        return f'ytdlp_data_season_{season}.json'
+    def create_ytdlp_season_json_name(self, series_id, season) -> str:
+        return f'ytdlp_data_s{series_id}_s{season}.json'
     
-    def create_ytdlp_episode_json_name2(self, series_id, episode_id) -> str:
-        return f'ytdlp_data__s{series_id}e{episode_id}.json'
+    def create_ytdlp_episode_json_name(self, series_id, episode_id) -> str:
+        return f'ytdlp_data_s{series_id}e{episode_id}.json'
     
-
-    
+    def create_ytdlp_movie_json_name(self, movie_id) -> str:
+        return f'ytdlp_data_m{movie_id}.json'
+        
     #TMDB
-    def create_tmbd_episode_json_name(self, tmdbid, season, episode, language) -> str:
-        return f'tmdb_tv_id{tmdbid}s{season}s{episode}_{language}.json'
 
-    def create_tmbd_season_json_name2(self, tmdbid, season, language) -> str:
-        return f'tmdb_tv_id{season}_{language}.json'
+    def create_tmbd_season_json_name(self, tmdbid, season, language) -> str:
+        return f'tmdb_tv_id{tmdbid}s{season}_{language}.json'
     
-    def create_tmbd_movie_json_name2(self, tmdbid, language) -> str:
+    def create_tmbd_episode_json_name(self, tmdbid, season, episode, language) -> str:
+        return f'tmdb_tv_id{tmdbid}s{season}e{episode}_{language}.json'
+    
+    def create_tmbd_movie_json_name(self, tmdbid, language) -> str:
         return f'tmdb_film_{tmdbid}_{language}.json'

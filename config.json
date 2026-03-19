@@ -13,6 +13,9 @@
     "updates": {
         "frequency": "weekly"
     },
+    "nrk_schedule":{
+        "year": 2001
+    },
     "genres": [
         "Documentary",
         "Comedy",

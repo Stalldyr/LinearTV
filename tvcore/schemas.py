@@ -1,6 +1,6 @@
 
 from typing import Type, TypeVar, Optional
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator, AliasChoices
 from datetime import datetime, time, date, timedelta
 
 try:
@@ -204,3 +204,44 @@ class ScheduleOutput(BaseModel):
     movie: MovieOutput | None
 
 
+
+
+class YTDLPInput(BaseModel):
+    program_id: str | None = Field(None, alias="id")
+    season_number: int | None = Field(None)
+    episode_number: int | None = Field(None, validation_alias = AliasChoices("episode_number", "playlist_index"))  #episode_data.get("episode_number") or episode_data.get("playlist_index"),
+    title: str | None
+    #"series_title": episode_data.get("series"),
+    description: str | None
+    duration: float | int | None
+    source_url: str | None = Field(alias="webpage_url")
+
+
+class TMDBEpisodeInput(BaseModel):
+    tmdb_id: str | None = Field(None, alias="id")
+    season_number: int | None = Field(None)
+    episode_number: int | None = Field(None)
+    title: str | None = Field(None, alias="name")
+    #"series_title": episode_data.get("series"),
+    description: str | None = Field(None, alias="overview")
+    duration: float | int | None = Field(None, alias="runtime")
+
+class TMDBSeriesInput(BaseModel):
+    title: str | None = Field(None, alias="name")
+    tmdb_id: str | None = Field(None, alias="id")
+    release: str | None = Field(None,  alias="first_air_date")
+    description: str | None = Field(None, alias="overview")
+    genre: str | None = Field(None,  alias="genres")
+
+class TMDBMovieInput(BaseModel):
+    tmdb_id: str | None = Field(None, alias="id")
+    title: str | None = Field(None, alias="name")
+    description: str | None = Field(None, alias="overview")
+    duration: float | int | None = Field(None, alias="runtime")
+    release: str | None = Field(None, alias="first_air_date")
+    genre: str | None = Field(None,  alias="genres")
+    original_language: str | None
+
+
+class MetadataInput(TMDBEpisodeInput, TMDBSeriesInput, TMDBMovieInput, YTDLPInput):
+    pass
