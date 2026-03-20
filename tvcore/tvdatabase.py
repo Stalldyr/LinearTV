@@ -4,19 +4,14 @@ except:
     from tvconstants import *
 
 import logging
-from unittest import result
 from sqlalchemy import Column, Integer, String, Boolean, Float, Date, Time, DateTime, ForeignKey, Text, JSON, create_engine, and_, or_, case, func, desc, text, inspect
 from sqlalchemy.orm import relationship, sessionmaker, Session, DeclarativeBase, joinedload
 from sqlalchemy.sql import select, update, delete, exists, not_
 from sqlalchemy.dialects.sqlite import insert
-from sqlalchemy.engine import Row
-from sqlalchemy.ext.declarative import DeclarativeMeta
 from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict
 from pydantic_core import ValidationError
-from types import SimpleNamespace
-import json
 
 from .tvconstants import *
 from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
@@ -406,7 +401,7 @@ class TVDatabase:
             )
         )
 
-        return self._execute(q, ScheduleOutput)           
+        return self._execute(q, ScheduleOutput)          
 
     def get_episode_by_details(self, series_id: int, season: int, episode: int) -> Optional[Dict]:
         """

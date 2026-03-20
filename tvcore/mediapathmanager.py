@@ -26,7 +26,7 @@ class MediaPathManager:
         for path in [self.download_path, self.series_path, self.movies_path]:
             Path(path).mkdir(exist_ok=True)
 
-    def get_program_dir(self, media_type, slug) -> Path:
+    def get_program_dir(self, media_type:Path, slug:str) -> Path:
         """Get the full path to a program's slug"""
 
         if media_type == TYPE_SERIES:
@@ -88,7 +88,7 @@ class MediaPathManager:
         
     #TMDB
 
-    def create_tmbd_season_json_name(self, tmdbid, season, language) -> str:
+    def create_tmbd_season_json_name(self, tmdbid:int , season:int, language:str) -> str:
         return f'tmdb_tv_id{tmdbid}s{season}_{language}.json'
     
     def create_tmbd_episode_json_name(self, tmdbid, season, episode, language) -> str:

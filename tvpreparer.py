@@ -4,7 +4,7 @@ try:
     from .tvcore.tvdatabase import TVDatabase, Episode, Schedule
     from .tvcore.filehandler import TVFileHandler
     from .tvcore.mediapathmanager import MediaPathManager
-    from .tvcore.nrkmanager import NRKManager
+    from .tvcore.nrkmanager import NRKManager, check_for_duplicate_titles
     from .tvcore.calendar import get_iso_week_span_target_year, get_iso_week_number
     from .tvcore.tvconstants import *
 except ImportError:
@@ -13,7 +13,7 @@ except ImportError:
     from tvcore.tvdatabase import TVDatabase, Episode, Schedule
     from tvcore.filehandler import TVFileHandler
     from tvcore.mediapathmanager import MediaPathManager
-    from tvcore.nrkmanager import NRKManager
+    from tvcore.nrkmanager import NRKManager, check_for_duplicate_titles
     from tvcore.calendar import get_iso_week_span_target_year, get_iso_week_number
     from tvcore.tvconstants import *
 
@@ -67,26 +67,36 @@ class TVPreparer():
 
     def fetch_nrk_data(self, buffer_weeks=4):
         week_number = get_iso_week_number(date.today())
-        start_date, end_date = get_iso_week_span_target_year(week_number + 2, week_number + buffer_weeks, 2001)
+        start_date, end_date = get_iso_week_span_target_year(week_number, week_number + buffer_weeks, 2001)
         
         nrk1 = NRKManager("nrk1")
         nrk2 = NRKManager("nrk2")
-        while start_date <= end_date:
-            try:
-                nrk1.fetch_programs_by_date(start_date)
-            except Exception as e:
-                logging.error("Failed to fetch NRK1 programs for %s: %s", start_date, e)
 
-            sleep(3)
+        nrk1_programs = []
+        nrk2_programs = []
+        current_date = start_date
+        while current_date <= end_date:
+            try:
+                nrk1_programs += nrk1.fetch_programs_by_date(current_date)
+            except Exception as e:
+                logging.error("Failed to fetch NRK1 programs for %s: %s", current_date, e)
+            sleep(1)
 
             try:
-                nrk2.fetch_programs_by_date(start_date)
+                nrk2_programs += nrk2.fetch_programs_by_date(current_date)
             except Exception as e:
-                logging.error("Failed to fetch NRK2 programs for %s: %s", start_date, e)
+                logging.error("Failed to fetch NRK2 programs for %s: %s", current_date, e)
+            sleep(1)
             
-            start_date += timedelta(days=1)
+            current_date += timedelta(days=1)
 
-            sleep(3)
+        nrk1.insert_programs(nrk1_programs)
+        nrk2.insert_programs(nrk2_programs)
+
+        duplicates = check_for_duplicate_titles(nrk1_programs + nrk2_programs)
+        logging.info("Duplicates between %s and %s:", start_date, end_date)
+        for original, rerun in duplicates:
+            logging.info("%s: %s %s -> %s %s", original.title, original.channel, original.start, rerun.channel, rerun.start)
 
     def enrich_metadata(self):
         self.enrich_episode_metadata()
@@ -203,7 +213,7 @@ class TVPreparer():
                 file_path = self.paths.get_full_path(entry.filepath)
 
             elif entry.episode_id: 
-                filename = self.paths.create_episode_file_name2(
+                filename = self.paths.create_episode_file_name(
                     entry.episode.series.id,
                     entry.episode.id
                 )

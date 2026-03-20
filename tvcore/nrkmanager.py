@@ -7,6 +7,7 @@ from tvstreamer.tvcore.schemas import NRKInput
 from slugify import slugify
 import requests
 from pydantic_core import ValidationError
+from datetime import timedelta
 
 class NRKManager():
     def __init__(self, channel:str, debug:bool = False):
@@ -70,36 +71,35 @@ class NRKManager():
                     ,
                     ["start", "channel"]
                 )
-    
-    def fetch_metadata(self, url):
-        metadata = self.metadata._fetch_ytdlp_info(url)
-        return self.metadata.extract_episode_info_from_ytdlp(metadata)
-    
-    def api_request(self, channels, date):
-        return requests.get(f"https://psapi.nrk.no/epg/{channels}?date={date}")
+            
+    def insert_programs(self, programs: list[NRKInput]):
+        for program in programs:
+            self.insert_database(program)
+        
+    def api_request(self, channel, date):
+        return requests.get(f"https://psapi.nrk.no/epg/{channel}?date={date}")
     
     def fetch_programs_by_date(self, date):
         data = self.api_request(self.channel, date).json()
 
         entries = data[0]["entries"]
-        
+        programs = []
+
         for entry in entries:
-            try:
-                epgentries = entry.get("epgEntries")
+            epgentries = entry.get("epgEntries")
 
-                if epgentries:
-                    for epgentry in epgentries:
-                        data = self._validate_input(epgentry)
-                        self.insert_database(data)
-                        yield data
+            if epgentries:
+                for epgentry in epgentries:
+                    data = self._validate_input(epgentry)
+                    data.channel = self.channel
+                    programs.append(data)
 
-                else:
-                    data = self._validate_input(entry)
-                    self.insert_database(data)
-                    yield data
-            
-            except Exception as e:
-                yield e
+            else:
+                data = self._validate_input(entry)
+                data.channel = self.channel
+                programs.append(data)
+
+        return programs
 
     def _validate_input(self, data:dict):
         try:
@@ -107,5 +107,17 @@ class NRKManager():
         except ValidationError as e:
             raise
 
-    def check_for_duplicate_titles(self):
-        pass
+def check_for_duplicate_titles(programs:list[NRKInput]) -> list[tuple[NRKInput, NRKInput]]:
+    duplicates = []
+    programs.sort(key=lambda p: p.start)
+    
+    for i, program in enumerate(programs):
+        if program.availability.status == "available":
+            for other in programs[i+1:]:
+                if other.start - program.start > timedelta(days=7):
+                    break
+
+                if other.availability.status != "available" and program.title == other.title:
+                    duplicates.append((program, other))
+    
+    return duplicates

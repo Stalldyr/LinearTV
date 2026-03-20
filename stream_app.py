@@ -10,7 +10,7 @@ try:
     from .tvcore.metadatafetcher import MetaDataFetcher
     from .tvcore.broadcastmonitor import BroadcastMonitor
     from .templates.stream_html import *
-    from .templates.schedule import *
+    from .templates.admin_schedule import *
 except ImportError:
     from tvcore.tvdatabase import TVDatabase
     from tvcore.programmanager import ProgramManager
@@ -18,7 +18,7 @@ except ImportError:
     from tvcore.metadatafetcher import MetaDataFetcher
     from tvcore.broadcastmonitor import BroadcastMonitor
     from templates.stream_html import *
-    from templates.schedule import *
+    from tvstreamer.templates.admin_schedule import *
 
 
 
@@ -155,7 +155,6 @@ def fetch_metadata(program_type,tmdb_id):
 @stream_app.route("/admin/partials/program-form-open")
 def open_program_form():
     return program_form(visible=True).dump()
-
 
 @stream_app.route("/admin/partials/program-form-close")
 def close_program_form():

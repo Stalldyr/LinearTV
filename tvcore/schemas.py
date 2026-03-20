@@ -9,6 +9,9 @@ except:
     from tvcore.calendar import parse_aspnet_date, same_iso_week_this_year
 import isodate
 
+from typing import Literal
+Channel = Literal["nrk1", "nrk2"]
+
 class NRKInputCategory(BaseModel):
     display_value: str = Field(alias="displayValue")
 
@@ -31,6 +34,8 @@ class NRKInput(BaseModel):
     description: str | None
     category: NRKInputCategory
     availability: NRKInputStatus
+
+    channel: Channel = None
 
     source_url: str | None = None
 
@@ -209,7 +214,7 @@ class ScheduleOutput(BaseModel):
 class YTDLPInput(BaseModel):
     program_id: str | None = Field(None, alias="id")
     season_number: int | None = Field(None)
-    episode_number: int | None = Field(None, validation_alias = AliasChoices("episode_number", "playlist_index"))  #episode_data.get("episode_number") or episode_data.get("playlist_index"),
+    episode_number: int | None = Field(None, validation_alias = AliasChoices("episode_number", "playlist_index"))
     title: str | None
     #"series_title": episode_data.get("series"),
     description: str | None

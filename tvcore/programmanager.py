@@ -212,25 +212,3 @@ class ProgramManager:
             "genres": genres
         }
         return data
-    
-    def initialize_tv_guide(self):
-        timeslots = self.config.get_time_slots()
-        schedule = self.db.get_air_schedule()
-        DAYS = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
-
-        def create_schedule_list(schedule) -> Element:
-            return Div(
-                *[Div(H1(day), create_entry(program), class_="schedule-entry") for day in DAYS for program in schedule],
-                class_="schedule-list"
-            )
-        
-        def create_entry(program) -> Element:
-            return Div(
-                H3(program.title),
-                P(f"Start: {program.start.time()}"),
-                P(f"End: {program.end.time()}"),
-                P(f"Description: {program.episode.description}"),
-                class_="schedule-entry"
-            )
-
-        return create_schedule_list(schedule).dump()
