@@ -103,7 +103,7 @@ class TVPreparer():
         self.database.update_end_time()
     
     def enrich_episode_metadata(self, overwrite=[]):
-        episodes = self.database.get_all_episodes(missing=True)
+        episodes = self.database.get_episodes(missing=True)
         
         for episode in episodes:
             if episode.source_url:
@@ -256,6 +256,9 @@ if __name__ == "__main__":
 
         if operation == "delete":
             prep.cleanup_obsolete_episodes()
+
+        elif operation == "fetch":
+            prep.fetch_nrk_data()
         
         elif operation == "metadata":
             prep.enrich_metadata()
@@ -266,10 +269,14 @@ if __name__ == "__main__":
         elif operation == "verify":
             prep.verify_scheduled_programs()
 
-        elif operation == "all":
+        elif operation == "daily":
             prep.cleanup_obsolete_episodes()
             prep.download_weekly_schedule()
             prep.verify_scheduled_programs()
+
+        elif operation == "weekly":
+            prep.fetch_nrk_data()
+            prep.enrich_metadata()
 
         else:
             print("Not a valid operation")

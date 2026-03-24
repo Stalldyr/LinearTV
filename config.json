@@ -24,5 +24,8 @@
         "Reality",
         "Drama",
         "Action"
-    ]
+    ],
+    "video":{
+        "quality": 480
+    }
 }

@@ -280,8 +280,8 @@ class TVDatabase:
     # MEDIA CRUD OPERATIONS
         
     
-    def get_all_series(self, missing=False) -> List[SeriesOutput]:
-        """Returns all series from the series-table."""
+    def get_series(self, missing=False, series_id=None) -> List[SeriesOutput]:
+        """Returns series from the series-table. Defaults to all"""
         q = select(
             Series
         ).order_by(
@@ -289,12 +289,21 @@ class TVDatabase:
         )
 
         if missing:
-            q = q.where(or_(Series.description, Series.title, Series.release).is_(None))
+            q = q.where(
+                or_(
+                    Series.description.is_(None), 
+                    Series.title.is_(None), 
+                    Series.release.is_(None)
+                    )
+                )
+
+        if series_id:
+            q = q.where(Series.id == series_id)
 
         return self._execute(q, SeriesOutput)
         
-    def get_all_episodes(self, missing=False) -> List[EpisodeOutput]:
-        """Returns all series from the series-table."""
+    def get_episodes(self, missing=False, episode_id=None, series_id=None) -> List[EpisodeOutput]:
+        """Returns episodes from the series-table. Defaults to all"""
         
         q = select(
             Episode
@@ -311,10 +320,16 @@ class TVDatabase:
                 Episode.duration.is_(None)
             ))
 
+        if episode_id:
+            q = q.where(Episode.id == episode_id)
+
+        if series_id:
+            q = q.where(Episode.series_id == series_id)
+
         return self._execute(q, EpisodeOutput)
     
-    def get_all_movies(self, missing=False) -> List[MovieOutput]:
-        """Returns all series from the series-table."""
+    def get_movies(self, missing=False, movie_id=None) -> List[MovieOutput]:
+        """Returns movies from the movies-table. Defaults to all. """
         q = select(
             Movie
         ).order_by(
@@ -327,8 +342,10 @@ class TVDatabase:
                 Movie.title.is_(None),
                 Movie.release.is_(None),
                 Movie.genre.is_(None)
-            )
-        )
+            ))
+        
+        if movie_id:
+            q = q.where(Movie.id == movie_id)
 
         return self._execute(q, MovieOutput)
     

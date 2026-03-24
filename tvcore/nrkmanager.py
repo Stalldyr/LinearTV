@@ -1,8 +1,10 @@
-from tvstreamer.tvcore.metadatafetcher import MetaDataFetcher
-from tvstreamer.tvcore.programmanager import ProgramManager
-from tvstreamer.tvcore.tvdatabase import TVDatabase, Series, Movie, Episode, Schedule
-from tvstreamer.tvcore.tvconstants import *
-from tvstreamer.tvcore.schemas import NRKInput
+
+from .metadatafetcher import MetaDataFetcher
+from .programmanager import ProgramManager
+from .tvdatabase import TVDatabase, Series, Movie, Episode, Schedule
+from .tvconstants import *
+from .schemas import NRKInput
+
 
 from slugify import slugify
 import requests

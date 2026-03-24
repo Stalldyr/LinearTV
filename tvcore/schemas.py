@@ -1,13 +1,15 @@
 
-from typing import Type, TypeVar, Optional
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator, AliasChoices
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, AliasChoices
 from datetime import datetime, time, date, timedelta
+import json
+import isodate
+from pathlib import Path
 
 try:
     from tvstreamer.tvcore.calendar import parse_aspnet_date, same_iso_week_this_year
 except:
     from tvcore.calendar import parse_aspnet_date, same_iso_week_this_year
-import isodate
+
 
 from typing import Literal
 Channel = Literal["nrk1", "nrk2"]
@@ -86,10 +88,10 @@ class SeriesInput(HTMLFormModel):
     title: str
     description: str | None
     genre: str | None
-    release: str | None
+    release: date | None
     reverse_order: bool = False
-    start_season: int = 1
-    start_episode: int = 1
+    start_season: int | None = Field(default=1) 
+    start_episode: int | None = Field(default=1)
     source_url: str | None
     tmdb_id: int | None
 
@@ -223,7 +225,7 @@ class YTDLPInput(BaseModel):
 
 
 class TMDBEpisodeInput(BaseModel):
-    tmdb_id: str | None = Field(None, alias="id")
+    tmdb_id: int | None = Field(None, alias="id")
     season_number: int | None = Field(None)
     episode_number: int | None = Field(None)
     title: str | None = Field(None, alias="name")
@@ -233,20 +235,53 @@ class TMDBEpisodeInput(BaseModel):
 
 class TMDBSeriesInput(BaseModel):
     title: str | None = Field(None, alias="name")
-    tmdb_id: str | None = Field(None, alias="id")
+    tmdb_id: str | int | None = Field(None, alias="id")
     release: str | None = Field(None,  alias="first_air_date")
     description: str | None = Field(None, alias="overview")
-    genre: str | None = Field(None,  alias="genres")
+    genre: str | list | None = Field(None,  alias="genres")
 
 class TMDBMovieInput(BaseModel):
-    tmdb_id: str | None = Field(None, alias="id")
-    title: str | None = Field(None, alias="name")
+    tmdb_id: int | None = Field(None, alias="id")
+    title: str | None = None
     description: str | None = Field(None, alias="overview")
     duration: float | int | None = Field(None, alias="runtime")
-    release: str | None = Field(None, alias="first_air_date")
-    genre: str | None = Field(None,  alias="genres")
+    release: str | None = Field(None, alias="release_date")
+    genre: str | list | None = Field(None,  alias="genres")
     original_language: str | None
 
 
 class MetadataInput(TMDBEpisodeInput, TMDBSeriesInput, TMDBMovieInput, YTDLPInput):
     pass
+
+
+class ScheduleConfig(BaseModel):
+    broadcast_start: time
+    broadcast_end: time
+    broadcast_steps: int
+
+class PathsConfig(BaseModel):
+    download_path: str | Path
+    series_path: str | Path
+    movies_path: str | Path
+
+class UpdateConfig(BaseModel):
+    frequency: str
+
+class VideoConfig(BaseModel):
+    quality: str | int
+
+class TVConfig(BaseModel):
+    language: str = "en"
+    schedule: ScheduleConfig
+    paths: PathsConfig
+    updates: UpdateConfig
+    video: VideoConfig
+    genres: list[str]
+    
+    @classmethod
+    def from_file(cls, path: str | Path = "") -> "TVConfig":
+        if not path:
+            path = Path(__file__).parent.parent.absolute()/"config.json"
+        
+        with open(path) as f:
+            return cls(**json.load(f))

@@ -36,16 +36,7 @@ class ProgramManager:
         except ValidationError as e:
             logging.error("Validation failed:\n%s", e)
             return False, e.errors(), 400
-        
-        if not series.title:
-            print("Missing program name")
-            return False, "Missing program name"
-        
-        if not series.start_episode or not series.start_episode:
-            print("Missing season and/or episode for series")
-            return False, "Series requires season and episode"
-        
-
+                
         """
         if series.source_url:
             try:
@@ -128,7 +119,7 @@ class ProgramManager:
             print(f"Error while saving: {e}")
             return False, f"Database error: {str(e)}", 500
         
-    def delete_program(self, program_id):
+    def delete_program(self, obj: Series | Movie):
         try:
             success = self.db.delete(
                 #Obj(program_id) 
@@ -146,10 +137,7 @@ class ProgramManager:
 
     def save_schedule(self, data:dict):
         """
-            Save new entry in the weekly schedule
-
-            Args:
-                data: input data schedule    
+        Save new entry in the weekly schedule
         """
         #TODO: FIX
 
@@ -189,26 +177,3 @@ class ProgramManager:
         except Exception as e:
             return False, f"Database error: {str(e)}", 500
         
-        
-    # ============ PAGE INITIALIZATION DATA ============
-        
-    def initialize_admin_page(self):
-        schedule_data = self.db.get_current_week_schedule()
-        series_data = self.db.get_all_series()
-        movie_data = self.db.get_all_movies()
-
-        #for series in series_data:
-        #    series['blocks'] = calculate_time_blocks(series)
-
-        timeslots = self.config.get_time_slots()
-        genres = sorted(self.config.get_genres())
-
-
-        data = {
-            "schedule_data": [obj.model_dump() for obj in schedule_data],
-            "series_data": [obj.model_dump() for obj in series_data],
-            "movie_data": [obj.model_dump() for obj in movie_data],
-            "timeslots": timeslots,
-            "genres": genres
-        }
-        return data

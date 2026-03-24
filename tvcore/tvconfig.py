@@ -15,7 +15,7 @@ class TVConfig:
 
         else:
             with open(Path(config_path), 'r', encoding='utf-8') as f:
-                self.config =  json.load(f)
+                self.config = json.load(f)
 
     def get_time_slots(self):
         schedule_options = self.config["schedule"]

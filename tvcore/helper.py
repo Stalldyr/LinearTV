@@ -12,10 +12,6 @@ def calculate_time_blocks(duration:int, block_size:int=30):
 def calculate_time_slots(start:str, end:str, steps:int):
     """
     Calculates time slots for schedule table
-
-    start: schedule start time
-    end: schedule end time
-    steps: schedule steps (in minutes)
     """
 
     start_dt = datetime.strptime(start, "%H:%M")

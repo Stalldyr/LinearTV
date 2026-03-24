@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, render_template_string, send_from_directory, request, Blueprint, Response
+from flask import Flask, jsonify, render_template, send_from_directory, flash, request, Blueprint, Response
 import os 
 from datetime import datetime
 import logging
@@ -20,8 +20,6 @@ except ImportError:
     from templates.stream_html import *
     from tvstreamer.templates.admin_schedule import *
 
-
-
 stream_app = Blueprint(
     'streaming', 
     __name__,
@@ -35,10 +33,6 @@ program_manager = ProgramManager()
 path_manager = MediaPathManager()
 metadata_fetcher = MetaDataFetcher()
 broadcast_monitor = BroadcastMonitor()
-
-
-
-
 
 # ============ STREAMING PAGES ============
 
@@ -70,15 +64,11 @@ def prepare():
 def save_schedule():
     data = request.form
     return return_status(*program_manager.save_schedule(data))
-
-@stream_app.route('/admin/delete/schedule', methods=['POST'])
-def delete_schedule():
-    data = request.get_json()
-    return return_status(*program_manager.delete_schedule())
     
 @stream_app.route('/admin/save/series', methods=['POST'])
 def save_series():
     data = request.form
+    flash("test")
     return return_status(*program_manager.save_series(data))
 
 @stream_app.route('/admin/save/movie', methods=['POST'])
@@ -88,8 +78,15 @@ def save_movie():
 
 @stream_app.route('/admin/delete/program', methods=['POST'])
 def delete_program():
+    data = request.form
+    print(data)
+    return ""
+    #return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
+
+@stream_app.route('/admin/delete/schedule', methods=['POST'])
+def delete_schedule():
     data = request.get_json()
-    return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
+    return return_status(*program_manager.delete_schedule())
 
 # ============ API ROUTES ============
 
@@ -120,7 +117,7 @@ def current_program(channel):
 #def status():
 #    return jsonify(broadcast_monitor.get_current_status())
 
-#TV-Schedule
+
 
 @stream_app.route('/api/schedule', methods=['GET'])
 def get_schedule():
@@ -154,25 +151,51 @@ def fetch_metadata(program_type,tmdb_id):
 
 @stream_app.route("/admin/partials/program-form-open")
 def open_program_form():
-    return program_form(visible=True).dump()
+    return program_form_panel(visible=True).dump()
 
 @stream_app.route("/admin/partials/program-form-close")
 def close_program_form():
-    return program_form(visible=False).dump()
+    return program_form_panel(visible=False).dump()
 
-@stream_app.route("/admin/partials/program-select")
-def open_movie_form():
+@stream_app.route("/admin/partials/program-type-select")
+def open_program_type_form():
     program_type = request.args.get("programType")
 
     if program_type == "series":
-        return
-        #return series_form(SERIES_DATA, GENRES).dump()
+        series_data = tv_db.get_series()
+        return generate_program_form(SeriesForm, series_data).dump()
     elif program_type == "movie":
-        return
-        #return movie_form(MOVIE_DATA, GENRES).dump()
-
+        movie_data = tv_db.get_movies()
+        return generate_program_form(MovieForm, movie_data).dump()
     
+@stream_app.route("/admin/partials/program-select")
+def program_select():
+    program_id = request.args.get("program_id")
+    program_type = request.args.get("programType")
 
+    if program_type == "series":
+        series_data = tv_db.get_series(series_id=program_id)[0]
+        return SeriesForm(series_data).render().dump()
+    elif program_type == "movie":
+        movie_data = tv_db.get_movies(movie_id=program_id)[0]
+        return MovieForm(movie_data).render().dump()
+
+@stream_app.route("/admin/partials/tmdb-fetch")
+def tmdb_fetch():
+    tmdb_id = request.args.get("tmdb_id")
+    program_type = request.args.get("programType")
+
+    if program_type == "series":
+        metadata = metadata_fetcher.get_tmdb_series_data(tmdb_id, validate=True)
+        print(metadata)
+        return SeriesForm(metadata).render().dump()
+    elif program_type == "movie":
+        metadata = metadata_fetcher.get_tmdb_movie_data(tmdb_id, validate=True)
+        print(metadata)
+        return MovieForm(metadata).render().dump()
+    else:
+        flash('E-post ikke registrert', 'error')
+        return ""
 
 
 def return_status(success, message, error_code = None, debug=False):

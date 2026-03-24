@@ -63,7 +63,7 @@ class MetaDataFetcher:
 
     # ============ TMDB ============
     
-    def get_tmdb_data(self, tmdb_id:int=None, season=None, episode=None, json_path:Path=None, write_to_json = True) -> dict:
+    def get_tmdb_series_data(self, tmdb_id:int=None, season=None, episode=None, json_path:Path=None, write_to_json = True, validate=False) -> dict:
         '''
         Get metadata from TMDB (with caching)
         
@@ -72,7 +72,7 @@ class MetaDataFetcher:
         season: Season for series (only needed for mediatype "series")
         '''
 
-        if json_path.exists():
+        if json_path and json_path.exists():
             with open(json_path) as f:
                 return json.load(f)
 
@@ -81,18 +81,39 @@ class MetaDataFetcher:
         
         if season:
             if episode:
-                data = self.fetch_tmdb_episode_data(self, tmdb_id, season, episode)
+                data = self.fetch_tmdb_episode_data(tmdb_id, season, episode)
             else:
-                data = self.fetch_tmdb_season_data(self, tmdb_id, season)
+                data = self.fetch_tmdb_season_data(tmdb_id, season)
         else:
-            data = self.fetch_tmdb_series_data(self, tmdb_id)
+            data = self.fetch_tmdb_series_data(tmdb_id)
 
-        if write_to_json:
+        if json_path and write_to_json:
             with open(json_path, 'w') as f:
                 json.dump(data, f, indent=4)
+
+        if validate:
+            return self.extract_series_info_from_tmdb(data)    
         
         return data
+    
+    def get_tmdb_movie_data(self, tmdb_id:int=None, json_path:Path=None, write_to_json = True, validate=False):
+        if json_path and json_path.exists():
+            with open(json_path) as f:
+                return json.load(f)
+        
+        if not tmdb_id:
+            return
+        
+        data = self.fetch_tmdb_movie_data(tmdb_id)
+        
+        if json_path and write_to_json:
+            with open(json_path, 'w') as f:
+                json.dump(data, f, indent=4)
 
+        if validate:
+            return self.extract_movie_info_from_tmdb(data)
+        
+        return data
     
     def fetch_tmdb_series_data(self, tmdb_id):
         return tmdb.TV(tmdb_id).info()
@@ -107,8 +128,6 @@ class MetaDataFetcher:
         return tmdb.Movies(tmdb_id).info()
             
     # ============ EXTRACT METADATA ============
-    #TODO: Implement validation error
-
     def _validate_model(self, model:MetadataInput, data:dict):
         try:
             return model.model_validate(data)
