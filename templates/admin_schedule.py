@@ -10,8 +10,8 @@ except:
 tvdb = TVDatabase()
 config = TVConfig.from_file()
 
-all_series = tvdb.get_series()
-all_movies = tvdb.get_movies()
+SERIES = tvdb.get_series()
+MOVIES = tvdb.get_movies()
 GENRES = config.genres
 
 def base_schedule() -> ElementList:
@@ -35,7 +35,7 @@ def base_schedule() -> ElementList:
         )
     ),
     Body(
-      schedule_panel()
+      admin_schedule_panel()
     ),
     Footer(
         Script(
@@ -54,7 +54,7 @@ def base_schedule() -> ElementList:
     )
   )
 
-def schedule_panel():
+def admin_schedule_panel():
   return ElementList(
     H1("Schedule Admin"),
     Button(
@@ -62,7 +62,7 @@ def schedule_panel():
         class_="program-button",
         id="programBtn",
         hx_get="/admin/partials/program-form-open",
-        hx_target="#program-form-container",
+        hx_target="#form-container",
         hx_swap="innerHTML",
     ),
     Button(
@@ -70,105 +70,46 @@ def schedule_panel():
         class_="program-button",
         id="scheduleBtn",
         hx_get="/admin/partials/schedule-form-open",
-        hx_target="#schedule-form-container",
+        hx_target="#form-container",
 	    hx_swap="innerHTML",
     ),
 
-    Table(class_="schedule-calendar"),
+    #Table(class_="schedule-calendar"),
 
     Div(class_="overlay", id="overlay"),
-
-    Div(id="program-form-container")
+    Div(id="form-container"),
+    #Div(id="schedule-form-container")
   )
 
-def program_form_panel(visible=False) -> Element:
-    """
-    Full program form panel. Rendered once; toggled via JS.
-    Left column: identity fields. Right column: metadata fields.
-    """
 
-    style = {"display":"block"} if visible else  {"display":"none"}
-
-    return Div(
-        H3("Edit program"),
-
-        # media type radio (not using radio_inline helper since structure differs slightly)
-        Div(
-            Input(
-                type="radio",
-                name="programType",
-                id="programOption0",
-                value="series",
-                hx_get="/admin/partials/program-type-select",
-                hx_target="#programSelectContainer",
-                hx_swap="innerHTML",
-                checked = True
-            ),
-            Label("Series", for_="programOption0"),
-            Input(
-                type="radio",
-                name="programType",
-                id="programOption1",
-                value="movie",
-                hx_get="/admin/partials/program-type-select",
-                hx_target="#programSelectContainer",
-                hx_swap="innerHTML",
-            ),
-            Label("Film", for_="programOption1"),
-            class_="media-select",
-        ),
-
-        Div(
-            program_select(all_series),
-            SeriesForm().render(GENRES),
-            id="programSelectContainer"
-        ),
-
-        id="programForm",
-        class_="program-form",
-        style=style
-    )
-
-def generate_program_form(formtype: type, program_list: list):
-    return ElementList(
-        program_select(program_list),
-        formtype().render(GENRES)
-    )
-
-def program_title_options(program_data: list[SeriesOutput]) -> Element:
-    return Select(
-        Option("--New series--", disabled=True, selected=True),
-        *[Option(e.title, value=e.id, id=str(e.id)) for e in program_data],
-        id="programTitleSelect",
-        hx_get = "/admin/partials/program-select",
-        hx_target = "#programFormData",
-        hx_include="#programOption0, #programOption1",
-        name="program_id"
-    )
-
-def program_select(program_data):
-  return Div(
-      Label("Choose series:", id="programTitleSelectLabel"),
-      program_title_options(program_data),
-      class_="form-group",
-    )
-
-class ProgramForm:
-    def __init__(self, program: Series | None = None):
-        super().__init__(program)
-
+class FormBase:
     def __init__(self, program=None):
         self.program = program
 
     def _value(self, field: str):
         if self.program is None:
             return None
-        
         return getattr(self.program, field, None)
-    
+
     def _create_form_group(self, *args):
         return Div(*args, class_="form-group")
 
+    def buttons_field(self, delete=True):
+        buttons = [
+            Button("Cancel", type="button", class_="cancel-btn",
+                hx_get="/admin/partials/program-form-close",
+                hx_target="#form-container"),
+            Button("Save", type="submit", class_="save-btn"),
+        ]
+
+        if delete and self.program:
+            buttons.insert(1, Button("Delete", type="button", class_="delete-btn",
+                hx_post="/admin/delete/program"))
+
+        return Div(*buttons, class_="form-buttons")
+
+
+class ProgramForm(FormBase):
     def tmdb_field(self):
         return self._create_form_group(
             Label("TMDB-id:"),
@@ -217,7 +158,7 @@ class ProgramForm:
         return Div(
             Button("Cancel", type="button", class_="cancel-btn", 
                 hx_get="/admin/partials/program-form-close", 
-                hx_target="#program-form-container"),
+                hx_target="#form-container"),
             Button(
                 "Delete",
                 hx_post="delete/program"
@@ -249,10 +190,7 @@ class SeriesForm(ProgramForm):
             Input(type="checkbox", name="reverse_order", checked=self._value("reverse_order"))
         )
 
-    def render(self, genres: list[str]=None) -> Element:
-        if genres is None:
-            genres = GENRES
-
+    def render(self, genres: list[str]=GENRES) -> str:
         return Form(
             Input(type="hidden", name="program_id", value=self._value("id")),
             Div(
@@ -285,7 +223,7 @@ class MovieForm(ProgramForm):
             Input(type="text", name="duration", value=self._value("duration"))
         )
 
-    def render(self, genres: list[str]) -> Element:
+    def render(self, genres:list[str] = GENRES) -> str:
         return Form(
             Input(type="hidden", name="program_id", value=self._value("id")),
             Div(
@@ -305,3 +243,212 @@ class MovieForm(ProgramForm):
             hx_post="/admin/save/movie",
             id="programFormData",
         )
+
+
+class ScheduleForm(FormBase):
+    def program_select_field(self, program_data:list):
+        return self._create_form_group(
+            Label("Program:"),
+            Select(
+                Option("[Ledig]", value="", selected=True),
+                *[Option(e.title, value=e.id) for e in program_data],
+                name="program_id",
+                id="scheduleTitleSelect",
+            )
+        )
+
+    def date_select(self):
+        return self._create_form_group(
+            Label("Date"),
+            Input(type="datetime-local")
+        )
+
+    def duration_group(self):
+        return self._create_form_group(
+            Label("Duration")
+        )
+
+    def rerun_check(self):
+        return self._create_form_group(
+            Label("Re-run:"),
+            Input(type="checkbox", id="isRerun")
+        )
+
+    def render(self, program_data=SERIES):
+        return Form(
+            Input(type="hidden", name="program_id", value=self._value("id")),
+            self.program_select_field(program_data),
+            self.date_select(),
+            self.duration_group(),
+            self.rerun_check(),
+            self.buttons_field(),
+            hx_post="/admin/save/schedule",
+            id="schedule-fields-container",
+        )
+
+class AdminPanel2:
+    def __init__(self, visible=False):
+        self.visible = visible
+
+    def program_type_select(self):
+        return Div(
+            Input(
+                type="radio",
+                name="programType",
+                id="programOption0",
+                value="series",
+                hx_get="/admin/partials/program-type-select",
+                hx_target="#programSelectContainer",
+                hx_swap="innerHTML",
+                checked = True
+            ),
+            Label("Series", for_="programOption0"),
+            Input(
+                type="radio",
+                name="programType",
+                id="programOption1",
+                value="movie",
+                hx_get="/admin/partials/program-type-select",
+                hx_target="#programSelectContainer",
+                hx_swap="innerHTML",
+            ),
+            Label("Film", for_="programOption1"),
+            class_="media-select",
+        )
+
+    def program_form_panel(self) -> Element:
+        style = {"display":"block"} if self.visible else {"display":"none"}
+
+        return Div(
+            H3("Edit program"),
+            self.program_type_select(),
+            self.generate_program_form(SeriesForm, SERIES),
+            id="programForm",
+            class_="program-form",
+            style=style
+        )
+
+    def schedule_form_panel(self) -> Element:
+        style = {"display":"block"} if self.visible else {"display":"none"}
+
+        return Div(
+            H3("Edit program"),
+            self.program_type_select(),
+            self.generate_schedule_form(),
+            id="scheduleForm",
+            class_="program-form",
+            style=style
+        )
+    
+    def generate_program_form(self, formtype: type, program_list: list):
+        return Div(
+            self.program_select(program_list),
+            formtype().render(GENRES),
+            id="programSelectContainer"
+        )
+
+    def program_select(self, program_data):
+        return Div(
+            Label("Choose program:", id="programTitleSelectLabel"),
+            self._program_title_options(program_data),
+            class_="form-group"
+        )
+
+    def _program_title_options(self, program_data: list[SeriesOutput]) -> Element:
+        return Select(
+            Option("--New program--", selected=True),
+            *[Option(e.title, value=e.id, id=str(e.id)) for e in program_data],
+            id="programTitleSelect",
+            hx_get="/admin/partials/program-select",
+            hx_target = "#programFormData",
+            hx_include="#programOption0, #programOption1",
+            name="program_id"
+        )
+    
+    def generate_schedule_form(self):
+        program_list = SERIES
+        return Div(
+            ScheduleForm().render(),
+            id="programSelectContainer"
+        )
+
+    def render(self) -> str:
+        return self.program_form_panel().dump()
+    
+    def render_schedule(self) -> str:
+        return self.schedule_form_panel().dump()
+
+
+class AdminPanel:
+    def __init__(self, visible=False):
+        self.visible = visible
+
+    def _program_type_select(self):
+        return Div(
+            Input(
+                type="radio",
+                name="programType",
+                id="programOption0",
+                value="series",
+                hx_get="/admin/partials/program-type-select",
+                hx_target="#programSelectContainer",
+                hx_swap="innerHTML",
+                checked=True
+            ),
+            Label("Series", for_="programOption0"),
+            Input(
+                type="radio",
+                name="programType",
+                id="programOption1",
+                value="movie",
+                hx_get="/admin/partials/program-type-select",
+                hx_target="#programSelectContainer",
+                hx_swap="innerHTML",
+            ),
+            Label("Film", for_="programOption1"),
+            class_="media-select",
+        )
+
+    def _program_selector(self, program_data: list):
+        return Div(
+            Label("Choose program:", id="programTitleSelectLabel"),
+            Select(
+                Option("--New program--", selected=True),
+                *[Option(e.title, value=e.id) for e in program_data],
+                name="program_id",
+                hx_get="/admin/partials/program-select",
+                hx_target="#program-fields-container",
+                hx_include="closest form",
+            ),
+            class_="form-group"
+        )
+
+    def program_form_panel(self, program_data: list, formtype: type = SeriesForm) -> str:
+        return Form(
+            H3("Edit program"),
+            self._program_type_select(),
+            Div(
+                self._program_selector(program_data),
+                formtype().render(),
+                id="programSelectContainer"
+            ),
+            id="programForm",
+            class_="program-form",
+            style = {"display":"block"} if self.visible else {"display":"none"}
+        )
+
+    def schedule_form_panel(self, program_data: list) -> str:
+        return Form(
+            H3("Edit schedule"),
+            self._program_selector(program_data),
+            Div(
+                ScheduleForm().render(program_data),
+                id="schedule-fields-container"
+            ),
+            id="scheduleForm",
+            class_="schedule-form",
+            style = {"display":"block"} if self.visible else {"display":"none"}
+        )
+    
+    def close_panel():
+        pass

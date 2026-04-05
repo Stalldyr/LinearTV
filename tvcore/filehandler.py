@@ -53,14 +53,11 @@ class TVFileHandler:
 
     def _check_file_integrity(self, path):
         #TODO: Unfinished
-
-        print(f"Checking file integrity.")
         test = subprocess.run(
             ["ffmpeg", "-v", "error", "-i", path, "-f", "null", "-"],
             stderr=subprocess.PIPE,
             text=True
         )
-        print(test.stdout)
 
     def get_file_info(self, input_path):
         path = Path(input_path) 

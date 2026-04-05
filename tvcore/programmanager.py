@@ -5,7 +5,7 @@ from .helper import calculate_time_blocks, calculate_end_time
 from .tvconfig import TVConfig
 from slugify import slugify
 from hypermedia import *
-from .schemas import MovieInput, MovieInput, SeriesInput
+from .schemas import MovieInput, SeriesInput, ScheduleInput
 import logging
 from pydantic_core import ValidationError
 
@@ -37,22 +37,6 @@ class ProgramManager:
             logging.error("Validation failed:\n%s", e)
             return False, e.errors(), 400
                 
-        """
-        if series.source_url:
-            try:
-                self.metadatafetcher.get_ytdlp_season_metadata(program_type, directory, season, video_url=source_url)
-                
-            except Exception as e:
-                print(f"Error recieving ytdlp metadata: {e}")            
-
-        if series.tmdb_id:
-            try:
-                self.metadatafetcher.get_tmdb_metadata(program_type, directory, tmdb_id, season)
-                
-            except Exception as e:
-                print(f"Error recieving tmdb metadata: {e}")
-        """
-
         try:
             self.db.upsert(
                 Series(
@@ -85,26 +69,6 @@ class ProgramManager:
             logging.error("Validation failed:\n%s", e)
             return False, e.errors(), 400
         
-        if not movie.title:
-            print("Missing program name")
-            return False, "Missing program name"
-        
-        """
-        if series.source_url:
-            try:
-                self.metadatafetcher.get_ytdlp_season_metadata(program_type, directory, season, video_url=source_url)
-                
-            except Exception as e:
-                print(f"Error recieving ytdlp metadata: {e}")            
-
-        if series.tmdb_id:
-            try:
-                self.metadatafetcher.get_tmdb_metadata(program_type, directory, tmdb_id, season)
-                
-            except Exception as e:
-                print(f"Error recieving tmdb metadata: {e}")
-        """
-
         try:
             self.db.upsert(
                 Movie(
@@ -140,6 +104,13 @@ class ProgramManager:
         Save new entry in the weekly schedule
         """
         #TODO: FIX
+
+        try:
+            schedule = ScheduleInput(**data)
+        except ValidationError as e:
+            logging.error("Validation failed:\n%s", e)
+            return False, e.errors(), 400
+        
 
         return
 

@@ -63,7 +63,7 @@ class MetaDataFetcher:
 
     # ============ TMDB ============
     
-    def get_tmdb_series_data(self, tmdb_id:int=None, season=None, episode=None, json_path:Path=None, write_to_json = True, validate=False) -> dict:
+    def get_tmdb_series_data(self, tmdb_id:int=None, json_path:Path=None, write_to_json = True, validate=False) -> dict:
         '''
         Get metadata from TMDB (with caching)
         
@@ -79,13 +79,7 @@ class MetaDataFetcher:
         if not tmdb_id:
             return
         
-        if season:
-            if episode:
-                data = self.fetch_tmdb_episode_data(tmdb_id, season, episode)
-            else:
-                data = self.fetch_tmdb_season_data(tmdb_id, season)
-        else:
-            data = self.fetch_tmdb_series_data(tmdb_id)
+        data = self.fetch_tmdb_series_data(tmdb_id)
 
         if json_path and write_to_json:
             with open(json_path, 'w') as f:
@@ -96,6 +90,25 @@ class MetaDataFetcher:
         
         return data
     
+    def get_tmdb_episode_data(self, tmdb_id:int=None, season=None, episode=None, json_path:Path=None, write_to_json = True, validate=False) -> dict:
+        if json_path and json_path.exists():
+            with open(json_path) as f:
+                return json.load(f)
+
+        if not tmdb_id:
+            return
+        
+        data = self.fetch_tmdb_episode_data(tmdb_id, season, episode)
+
+        if json_path and write_to_json:
+            with open(json_path, 'w') as f:
+                json.dump(data, f, indent=4)
+
+        if validate:
+            return self.extract_series_info_from_tmdb(data)    
+        
+        return data
+
     def get_tmdb_movie_data(self, tmdb_id:int=None, json_path:Path=None, write_to_json = True, validate=False):
         if json_path and json_path.exists():
             with open(json_path) as f:

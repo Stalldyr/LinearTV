@@ -5,7 +5,6 @@ from .tvdatabase import TVDatabase, Series, Movie, Episode, Schedule
 from .tvconstants import *
 from .schemas import NRKInput
 
-
 from slugify import slugify
 import requests
 from pydantic_core import ValidationError

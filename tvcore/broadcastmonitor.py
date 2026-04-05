@@ -1,14 +1,8 @@
 
-try:
-    from .tvdatabase import TVDatabase, Schedule
-    from .schemas import ScheduleOutput
-    from .tvconstants import *
-except:
-    from tvdatabase import TVDatabase, Schedule
-    from schemas import ScheduleOutput
-    from tvconstants import *
-
-from datetime import datetime, timedelta, time
+from .tvdatabase import TVDatabase, Schedule
+from .schemas import ScheduleOutput
+from .tvconstants import *
+from datetime import datetime, time
 import threading
 import time
 

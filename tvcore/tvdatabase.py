@@ -1,8 +1,3 @@
-try:
-    from .tvconstants import *
-except:
-    from tvconstants import *
-
 import logging
 from sqlalchemy import Column, Integer, String, Boolean, Float, Date, Time, DateTime, ForeignKey, Text, JSON, create_engine, and_, or_, case, func, desc, text, inspect
 from sqlalchemy.orm import relationship, sessionmaker, Session, DeclarativeBase, joinedload
@@ -12,6 +7,7 @@ from pathlib import Path
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict
 from pydantic_core import ValidationError
+import math
 
 from .tvconstants import *
 from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
@@ -169,13 +165,18 @@ class TVDatabase:
         
         return model, data
     
-    def _execute(self, query, model: ScheduleOutput| SeriesOutput | EpisodeOutput | MovieOutput ):
+    def _execute(self, query, model: ScheduleOutput | SeriesOutput | EpisodeOutput | MovieOutput = None, first=False):
         with self.get_session() as session:
             try:
+                if first:
+                    return session.execute(query).scalars().first()
                 results = session.execute(query).scalars().all()
             except Exception as e:
                 logging.error(f"Database query failed: {e}")
                 return []
+            
+            if model is None:
+                return results
 
             validated = []
             for row in results:
@@ -187,8 +188,7 @@ class TVDatabase:
                     logging.error(f"Unexpected error validating row: {e}")
 
             return validated
-            
-
+        
     def get(self, obj: Series | Movie | Schedule | Episode) -> Series | Movie | Schedule | Episode:
         with self.get_session() as session:
 
@@ -299,6 +299,7 @@ class TVDatabase:
 
         if series_id:
             q = q.where(Series.id == series_id)
+            return self._execute(q, SeriesOutput, first=True)
 
         return self._execute(q, SeriesOutput)
         
@@ -322,6 +323,7 @@ class TVDatabase:
 
         if episode_id:
             q = q.where(Episode.id == episode_id)
+            return self._execute(q, EpisodeOutput)
 
         if series_id:
             q = q.where(Episode.series_id == series_id)
@@ -346,6 +348,7 @@ class TVDatabase:
         
         if movie_id:
             q = q.where(Movie.id == movie_id)
+            return self._execute(q, MovieOutput, first=True)
 
         return self._execute(q, MovieOutput)
     
@@ -434,7 +437,7 @@ class TVDatabase:
             return self._to_dict(ep) if ep else None
         
         
-    def get_current_week_schedule(self, channel:str = None, date:datetime = None, full_week:bool = False) -> List[ScheduleOutput]:
+    def get_current_week_schedule(self, channel:str=None, date:datetime=None, full_week:bool=False) -> List[ScheduleOutput]:
         """Returns all scheduled programs in the current week"""
         offset = timedelta(hours=4) #Marks the end of the air day, to include programs that starts late at night and ends after midnight
 
@@ -445,7 +448,6 @@ class TVDatabase:
             year, week, _ = date.isocalendar()
             start = datetime.fromisocalendar(year, week, 1) + offset
             end = start + timedelta(days=7)
-
         else:
             start = date + offset
             end = start + timedelta(days=1)
@@ -563,7 +565,83 @@ class TVDatabase:
 
         return self._execute(q, ScheduleOutput)
     
+    def get_new_series_in_current_week(self):
+        from .helper import get_iso_week_span
 
+        now = datetime.now()
+
+        start, end = get_iso_week_span(now)
+        
+        n = now - timedelta(days=7)
+        s, e = get_iso_week_span(n-timedelta(weeks=3),n)
+
+
+        with self.get_session() as session:
+
+            q_in = select(
+                    Series
+                ).where(
+                    Schedule.start.between(s, e)
+                ).correlate()
+            
+            q = select(
+                    Series
+                ).where(
+                    Schedule.start.between(start, end),
+                    Series.id.in_(q_in)
+                ).outerjoin(Episode).outerjoin(Schedule).distinct()
+            
+            return session.execute(q).scalars().all()
+        
+    def get_new_this_week(self, lookback_weeks: int = 3) -> list[ScheduleOutput]:
+        """
+        Returns programs that appear in this week's schedule but not in the
+        previous `lookback_weeks` weeks. Includes both series and movies.
+        """
+        now = datetime.now()
+        year, week, _ = now.isocalendar()
+
+        current_start = datetime.fromisocalendar(year, week, 1)
+        current_end = current_start + timedelta(weeks=1)
+
+        lookback_end = current_start
+        lookback_start = current_start - timedelta(weeks=lookback_weeks)
+
+        with self.get_session() as session:
+
+            def get_ids_in_period(start, end):
+                q = select(
+                    Episode.series_id,
+                    Schedule.movie_id
+                ).outerjoin(
+                    Episode, Schedule.episode_id == Episode.id
+                ).where(
+                    Schedule.start.between(start, end)
+                )
+                results = session.execute(q).all()
+                series_ids = {r.series_id for r in results if r.series_id}
+                movie_ids = {r.movie_id for r in results if r.movie_id}
+                return series_ids, movie_ids
+
+            current_series, current_movies = get_ids_in_period(current_start, current_end)
+            lookback_series, lookback_movies = get_ids_in_period(lookback_start, lookback_end)
+
+            new_series = current_series - lookback_series
+            new_movies = current_movies - lookback_movies
+
+            q = select(Schedule).where(
+                Schedule.start.between(current_start, current_end),
+                or_(
+                    and_(Schedule.episode_id.isnot(None), Episode.series_id.in_(new_series)),
+                    Schedule.movie_id.in_(new_movies)
+                )
+            ).outerjoin(
+                Episode, Schedule.episode_id == Episode.id
+            ).order_by(
+                Schedule.start
+            )
+
+            return self._execute(q, ScheduleOutput)
 
     #Bulk update table values
 
@@ -584,7 +662,7 @@ class TVDatabase:
                     continue
 
                 if duration:
-                    schedule.end = schedule.start + timedelta(seconds=duration)
+                    schedule.end = schedule.start + timedelta(minutes=math.ceil(duration/60))
 
             session.commit()
     

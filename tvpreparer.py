@@ -5,7 +5,7 @@ try:
     from .tvcore.filehandler import TVFileHandler
     from .tvcore.mediapathmanager import MediaPathManager
     from .tvcore.nrkmanager import NRKManager, check_for_duplicate_titles
-    from .tvcore.calendar import get_iso_week_span_target_year, get_iso_week_number
+    from .tvcore.helper import get_iso_week_span_target_year, get_iso_week_number
     from .tvcore.tvconstants import *
 except ImportError:
     from tvcore.tvdownloader import TVDownloader
@@ -14,7 +14,7 @@ except ImportError:
     from tvcore.filehandler import TVFileHandler
     from tvcore.mediapathmanager import MediaPathManager
     from tvcore.nrkmanager import NRKManager, check_for_duplicate_titles
-    from tvcore.calendar import get_iso_week_span_target_year, get_iso_week_number
+    from tvcore.helper import get_iso_week_span_target_year, get_iso_week_number
     from tvcore.tvconstants import *
 
 from datetime import datetime, date, timedelta
@@ -125,7 +125,7 @@ class TVPreparer():
                     self.paths.create_tmbd_episode_json_name(episode.series.id, episode.id)
                 )
 
-                episode_data = self.metadata.get_tmdb_data(tmdb_id=episode.tmdb_id, json_path = json_path)
+                episode_data = self.metadata.get_tmdb_episode_data(tmdb_id=episode.tmdb_id, json_path = json_path)
                 relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
 
                 self.database.upsert(Episode(id=episode.id,**relevant_data.model_dump()))

@@ -4,12 +4,8 @@ from datetime import datetime, time, date, timedelta
 import json
 import isodate
 from pathlib import Path
-
-try:
-    from tvstreamer.tvcore.calendar import parse_aspnet_date, same_iso_week_this_year
-except:
-    from tvcore.calendar import parse_aspnet_date, same_iso_week_this_year
-
+from .helper import parse_aspnet_date, same_iso_week_this_year
+import math
 
 from typing import Literal
 Channel = Literal["nrk1", "nrk2"]
@@ -59,7 +55,7 @@ class NRKInput(BaseModel):
     @model_validator(mode="after")
     def _(self):
         self.start = same_iso_week_this_year(self.original_start)
-        self.end = self.start + timedelta(seconds=self.duration)
+        self.end = self.start + timedelta(minutes=math.ceil(self.duration/60))
 
         if self.series_id:
             self.source_url = f"https://tv.nrk.no/serie/{self.series_id}/{self.program_id}"
@@ -86,7 +82,7 @@ class SeriesInput(HTMLFormModel):
 
     id: int | None = Field(alias="program_id")
     title: str
-    description: str | None
+    description: date
     genre: str | None
     release: date | None
     reverse_order: bool = False
@@ -211,8 +207,6 @@ class ScheduleOutput(BaseModel):
     movie: MovieOutput | None
 
 
-
-
 class YTDLPInput(BaseModel):
     program_id: str | None = Field(None, alias="id")
     season_number: int | None = Field(None)
@@ -222,7 +216,6 @@ class YTDLPInput(BaseModel):
     description: str | None
     duration: float | int | None
     source_url: str | None = Field(alias="webpage_url")
-
 
 class TMDBEpisodeInput(BaseModel):
     tmdb_id: int | None = Field(None, alias="id")
@@ -238,7 +231,14 @@ class TMDBSeriesInput(BaseModel):
     tmdb_id: str | int | None = Field(None, alias="id")
     release: str | None = Field(None,  alias="first_air_date")
     description: str | None = Field(None, alias="overview")
-    genre: str | list | None = Field(None,  alias="genres")
+    genre: str | None = Field(None, alias="genres")
+
+    @field_validator("genre", mode="before")
+    @classmethod
+    def extract_genre_name(cls, v):
+        if isinstance(v, list) and v:
+            return v[0].get("name")
+        return v
 
 class TMDBMovieInput(BaseModel):
     tmdb_id: int | None = Field(None, alias="id")
@@ -246,8 +246,16 @@ class TMDBMovieInput(BaseModel):
     description: str | None = Field(None, alias="overview")
     duration: float | int | None = Field(None, alias="runtime")
     release: str | None = Field(None, alias="release_date")
-    genre: str | list | None = Field(None,  alias="genres")
+    genre: str | None = Field(None, alias="genres")
     original_language: str | None
+
+    @field_validator("genre", mode="before")
+    @classmethod
+    def extract_genre_name(cls, v):
+        if isinstance(v, list) and v:
+            return v[0].get("name")
+        return v
+
 
 
 class MetadataInput(TMDBEpisodeInput, TMDBSeriesInput, TMDBMovieInput, YTDLPInput):
