@@ -1,11 +1,11 @@
 import logging
 from sqlalchemy import Column, Integer, String, Boolean, Float, Date, Time, DateTime, ForeignKey, Text, JSON, create_engine, and_, or_, case, func, desc, text, inspect
-from sqlalchemy.orm import relationship, sessionmaker, Session, DeclarativeBase, joinedload
+from sqlalchemy.orm import relationship, sessionmaker, Session, DeclarativeBase, joinedload, Mapped
 from sqlalchemy.sql import select, update, delete, exists, not_
 from sqlalchemy.dialects.sqlite import insert
 from pathlib import Path
 from datetime import date, datetime, timedelta
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from pydantic_core import ValidationError
 import math
 
@@ -20,26 +20,26 @@ class MediaBase(Base):
     __abstract__ = True
 
     #ID's    
-    id = Column(Integer, primary_key=True)
-    tmdb_id = Column(Integer, unique=True)
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    tmdb_id: Mapped[int] = Column(Integer, unique=True)
 
     #Metadata
-    title = Column(Text, nullable=False)
-    description = Column(Text)
-    genre = Column(Text)
-    release = Column(Date)
+    title: Mapped[str] = Column(Text, nullable=False)
+    description: Mapped[str] = Column(Text)
+    genre: Mapped[str] = Column(Text)
+    release: Mapped[date] = Column(Date)
 
-    slug = Column(Text)
+    slug: Mapped[str] = Column(Text)
 
-    source_url = Column(Text)
+    source_url: Mapped[str] = Column(Text)
 
 class Series(MediaBase):
     __tablename__ = 'series'
 
     #User Input
-    reverse_order = Column(Boolean, default=False)
-    start_season = Column(Integer, default=1)
-    start_episode = Column(Integer, default=1)
+    reverse_order: Mapped[bool] = Column(Boolean, default=False)
+    start_season: Mapped[int] = Column(Integer, default=1)
+    start_episode: Mapped[int] = Column(Integer, default=1)
 
     # Relationships
     episodes = relationship("Episode", back_populates="series", cascade="all, delete-orphan")
@@ -47,8 +47,8 @@ class Series(MediaBase):
 class Movie(MediaBase):
     __tablename__ = 'movies'
 
-    program_id = Column(Text, unique=True)
-    duration = Column(Float)
+    program_id: Mapped[str] = Column(Text, unique=True)
+    duration: Mapped[float] = Column(Float)
     
     # Relationships
     schedule_entries = relationship("Schedule", back_populates="movie")
@@ -57,18 +57,18 @@ class Episode(Base):
     __tablename__ = 'episodes'
 
     #ID's
-    id = Column(Integer, primary_key=True)
-    series_id = Column(Integer, ForeignKey('series.id'), nullable=False)
-    program_id = Column(Text, unique=True)
-    tmdb_id = Column(Integer, unique=True)
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    series_id: Mapped[int] = Column(Integer, ForeignKey('series.id'), nullable=False)
+    program_id: Mapped[str] = Column(Text, unique=True)
+    tmdb_id: Mapped[int] = Column(Integer, unique=True)
 
     #Metadata
-    title = Column(Text)
-    season_number = Column(Integer)
-    episode_number = Column(Integer)
-    description = Column(Text)
-    duration = Column(Float)
-    source_url = Column(Text)
+    title: Mapped[str] = Column(Text)
+    season_number: Mapped[int] = Column(Integer)
+    episode_number: Mapped[int] = Column(Integer)
+    description: Mapped[str] = Column(Text)
+    duration: Mapped[float] = Column(Float)
+    source_url: Mapped[str] = Column(Text)
 
     # Relationships
     series = relationship("Series", back_populates="episodes", lazy="selectin")
@@ -78,30 +78,49 @@ class Schedule(Base):
     __tablename__ = 'schedule'
 
     #ID's    
-    id = Column(Integer, primary_key=True)
-    episode_id = Column(Integer, ForeignKey('episodes.id'))
-    movie_id = Column(Integer, ForeignKey('movies.id'))
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    episode_id: Mapped[int] = Column(Integer, ForeignKey('episodes.id'))
+    movie_id: Mapped[int] = Column(Integer, ForeignKey('movies.id'))
 
-    title = Column(Text, nullable=False)
+    title: Mapped[str] = Column(Text, nullable=False)
 
     #schedule info
-    original_start = Column(DateTime)
-    start = Column(DateTime, nullable=False)
-    end = Column(DateTime, nullable=False)
-    rerun = Column(Boolean, default=False, nullable=False)
-    channel = Column(Text)
+    original_start: Mapped[datetime] = Column(DateTime)
+    start: Mapped[datetime] = Column(DateTime, nullable=False)
+    end: Mapped[datetime] = Column(DateTime, nullable=False)
+    rerun: Mapped[bool] = Column(Boolean, default=False, nullable=False)
+    channel: Mapped[str] = Column(Text)
     
-    filepath = Column(Text)
-    download_date = Column(Date)
-    file_size = Column(Integer)
-    status = Column(Text, default=STATUS_PENDING, nullable=False)
-    last_aired = Column(Date)
-    views = Column(Integer)
+    filepath: Mapped[str] = Column(Text)
+    download_date: Mapped[date] = Column(Date)
+    file_size: Mapped[int] = Column(Integer)
+    status: Mapped[str] = Column(Text, default=STATUS_PENDING, nullable=False)
+    last_aired: Mapped[date] = Column(Date)
+    views: Mapped[int] = Column(Integer)
     
     # Relationships
     episode = relationship("Episode", back_populates="schedule_entries", lazy="selectin")
     movie = relationship("Movie", back_populates="schedule_entries", lazy="selectin")
+
+
+Media = Union[Series, Episode, Movie, Schedule]
   
+class Channels(Base):
+    __tablename__ = 'channels'
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    name: Mapped[str] = Column(Text, nullable=False)
+    display_name: Mapped[str] = Column(Text, nullable=False)
+
+class Genres(Base):
+    __tablename__ = 'genres'
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    name: Mapped[str] = Column(Text, nullable=False)
+    display_name: Mapped[str] = Column(Text, nullable=False)
+
+
+
 class TVDatabase:
     def __init__(self, test_time=None, db_path=""):
         if db_path:
@@ -159,7 +178,7 @@ class TVDatabase:
 
     #GENERAL CRUD OPERATIONS
 
-    def _to_model(self, obj: Series | Movie | Schedule | Episode) -> tuple[type, dict]:
+    def _to_model(self, obj: Media) -> tuple[type, dict]:
         model = type(obj)
         data = {k: v for k, v in obj.__dict__.items() if not k.startswith('_') and v is not None}
         
@@ -189,7 +208,7 @@ class TVDatabase:
 
             return validated
         
-    def get(self, obj: Series | Movie | Schedule | Episode) -> Series | Movie | Schedule | Episode:
+    def get(self, obj: Media) -> Media:
         with self.get_session() as session:
 
             model, data = self._to_model
@@ -201,7 +220,7 @@ class TVDatabase:
             stmt = self._to_model(obj)
             return session.execute(stmt).scalars().first()
 
-    def add(self, obj: Series | Movie | Schedule | Episode, unique_on: list[str] = None):
+    def add(self, obj: Media, unique_on: list[str] = None):
 
         with self.get_session() as session:
             if unique_on:
@@ -223,13 +242,13 @@ class TVDatabase:
             #session.execute(stmt)
             session.commit()
         
-    def upsert(self, obj: Series | Movie | Schedule):
+    def upsert(self, obj: Media):
         """Adds or updates an entry in the database based on the presence of a primary ID."""
         with self.get_session() as session:
             session.merge(obj)
             session.commit()
 
-    def upsert_on_column(self, obj: Series | Movie | Schedule, index_elements):
+    def upsert_on_column(self, obj: Media, index_elements):
         """Adds or updates an entry in the database based on the presence of a primary ID."""
         with self.get_session() as session:
             model, data = self._to_model(obj)
@@ -240,7 +259,7 @@ class TVDatabase:
             session.execute(stmt)
             session.commit()
 
-    def delete(self, obj: Series | Movie | Schedule | Episode):
+    def delete(self, obj: Media):
         """
         Deletes an entry from any table 
         
@@ -258,9 +277,25 @@ class TVDatabase:
 
                 return True
             return False
-        
 
-    def delete2(self, obj: Series | Movie | Schedule | Episode):
+    def delete_bulk(self, deletion_list):
+        """
+        Deletes an entry from any table 
+        
+        Args:
+            obj: ---- 
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.get_session() as session:
+            for obj in deletion_list:
+                db_obj  = session.get(type(obj), obj.id)
+                if db_obj :
+                    session.delete(db_obj)
+                    session.commit()        
+
+    def delete2(self, obj: Media):
         """
         Deletes an entry from any table 
         
@@ -280,7 +315,7 @@ class TVDatabase:
     # MEDIA CRUD OPERATIONS
         
     
-    def get_series(self, missing=False, series_id=None) -> List[SeriesOutput]:
+    def get_series(self, missing=False, series_id=None) -> List[Series]:
         """Returns series from the series-table. Defaults to all"""
         q = select(
             Series
@@ -301,10 +336,14 @@ class TVDatabase:
             q = q.where(Series.id == series_id)
             return self._execute(q, SeriesOutput, first=True)
 
-        return self._execute(q, SeriesOutput)
+        return self._execute(q)
         
-    def get_episodes(self, missing=False, episode_id=None, series_id=None) -> List[EpisodeOutput]:
-        """Returns episodes from the series-table. Defaults to all"""
+    def get_episodes(self, episode_id=None, series_id=None, missing=False) -> List[EpisodeOutput]:
+        """
+        Returns episodes from the series-table. Defaults to all
+        
+        missing: Returns entries where important data is missing. For metadata-fetching methods. 
+        """
         
         q = select(
             Episode
@@ -323,14 +362,14 @@ class TVDatabase:
 
         if episode_id:
             q = q.where(Episode.id == episode_id)
-            return self._execute(q, EpisodeOutput)
+            return self._execute(q, EpisodeOutput, first=True)
 
         if series_id:
             q = q.where(Episode.series_id == series_id)
 
         return self._execute(q, EpisodeOutput)
     
-    def get_movies(self, missing=False, movie_id=None) -> List[MovieOutput]:
+    def get_movies(self, movie_id=None, missing=False) -> List[MovieOutput]:
         """Returns movies from the movies-table. Defaults to all. """
         q = select(
             Movie
@@ -353,17 +392,7 @@ class TVDatabase:
         return self._execute(q, MovieOutput)
     
     # SCHEDULE OPERATIONS
-                
-    def get_scheduled_programs(self, date: datetime = None) -> List[ScheduleOutput]:
-        q = select(
-            Schedule
-        )
-
-        if date:
-            q = q.where(func.date(Schedule.start) == date)
-
-        return self._execute(q, ScheduleOutput)
-        
+                        
     def get_pending_programs(self, strict:bool = False, date:date = None) -> List[ScheduleOutput]:
         """
         Return pending episodes from the episodes table.
@@ -471,15 +500,37 @@ class TVDatabase:
         
         return self._execute(q, ScheduleOutput)
             
-    def get_schedule(self) -> List[ScheduleOutput]:
-        """Get all series that are in the weekly schedule"""
+    def get_schedule(self, schedule_id = None, date: datetime = None, channel: str = None) -> List[ScheduleOutput]:
+        """Get all programs that are in the weekly schedule"""
         q = select(
             Schedule
         ).order_by(
             Schedule.start
         )
+
+        if schedule_id:
+            q = q.where(Schedule.id == schedule_id)
+            return self._execute(q, ScheduleOutput, first=True)
+
+        if date:
+            q = q.where(func.date(Schedule.start) == date)
+
+        if channel:
+            q = q.where(Schedule.channel == channel)
         
         return self._execute(q, ScheduleOutput)
+    
+    def get_schedule_conflict(self, channel: str, start: datetime) -> List[ScheduleOutput]:
+        """Get all programs that are in the weekly schedule"""
+        q = select(
+            Schedule
+        ).where(
+            Schedule.channel == channel,
+            Schedule.start <= start,
+            Schedule.end >= start
+        )
+        
+        return self._execute(q, ScheduleOutput, first=True)
     
     def get_current_program_by_channel(self, channel: str, time=None) -> list[dict]:
         if time is None:
@@ -553,50 +604,13 @@ class TVDatabase:
                 return dict(result)
             else:
                 return None
-
             
     # AIRING OPERATIONS
-
-    def get_air_schedule(self) -> List[ScheduleOutput]:
-        q = select(Schedule).options(
-            joinedload(Schedule.movie),
-            joinedload(Schedule.episode).joinedload(Episode.series)
-        )
-
-        return self._execute(q, ScheduleOutput)
-    
-    def get_new_series_in_current_week(self):
-        from .helper import get_iso_week_span
-
-        now = datetime.now()
-
-        start, end = get_iso_week_span(now)
-        
-        n = now - timedelta(days=7)
-        s, e = get_iso_week_span(n-timedelta(weeks=3),n)
-
-
-        with self.get_session() as session:
-
-            q_in = select(
-                    Series
-                ).where(
-                    Schedule.start.between(s, e)
-                ).correlate()
-            
-            q = select(
-                    Series
-                ).where(
-                    Schedule.start.between(start, end),
-                    Series.id.in_(q_in)
-                ).outerjoin(Episode).outerjoin(Schedule).distinct()
-            
-            return session.execute(q).scalars().all()
         
     def get_new_this_week(self, lookback_weeks: int = 3) -> list[ScheduleOutput]:
         """
         Returns programs that appear in this week's schedule but not in the
-        previous `lookback_weeks` weeks. Includes both series and movies.
+        previous `lookback_weeks` weeks. 
         """
         now = datetime.now()
         year, week, _ = now.isocalendar()
@@ -665,6 +679,14 @@ class TVDatabase:
                     schedule.end = schedule.start + timedelta(minutes=math.ceil(duration/60))
 
             session.commit()
+
+    #CHANNELS
+
+    def get_channels(self):
+        q = select(Schedule.channel.distinct())
+
+        return self._execute(q)
+    
     
     # UTILITY METHODS
     

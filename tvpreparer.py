@@ -201,7 +201,7 @@ class TVPreparer():
         scheduled_programs = [
             entry
             for day in range(buffer_days)
-            for entry in self.database.get_scheduled_programs(date=now + timedelta(days=day))
+            for entry in self.database.get_schedule(date=now + timedelta(days=day))
         ]
 
         if not scheduled_programs:
@@ -240,6 +240,7 @@ class TVPreparer():
             self.handler.update_file_info(entry.id, file_path)
 
 def _status_helper(status, level, succes, failure, file_path):
+    #Depleted?
     if status == STATUS_AVAILABLE:
         print(Fore.GREEN + "File found: " + Style.RESET_ALL, file_path)
     else:

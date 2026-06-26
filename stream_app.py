@@ -1,26 +1,26 @@
-from flask import Flask, jsonify, render_template, send_from_directory, flash, request, Blueprint, Response
+from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint
 import os 
 from datetime import datetime
 
 try:
+    from .htmx_partials import htmx
     from .tvcore.tvdatabase import TVDatabase
     from .tvcore.programmanager import ProgramManager
     from .tvcore.mediapathmanager import MediaPathManager
     from .tvcore.metadatafetcher import MetaDataFetcher
     from .tvcore.broadcastmonitor import BroadcastMonitor
     from .templates.stream_html import *
-    from .templates.admin_schedule import AdminPanel, base_schedule, SeriesForm, MovieForm
+    from .templates.html_base import base
+    from .templates.admin_schedule import admin_schedule_body, form_status
 except ImportError:
     from tvcore.tvdatabase import TVDatabase
     from tvcore.programmanager import ProgramManager
     from tvcore.mediapathmanager import MediaPathManager
     from tvcore.metadatafetcher import MetaDataFetcher
     from tvcore.broadcastmonitor import BroadcastMonitor
+    from templates.html_base import base
     from templates.stream_html import *
-    from tvstreamer.templates.admin_schedule import AdminPanel, base_schedule, SeriesForm, MovieForm
-
-
-# ============ STREAMING PAGES ============
+    from templates.admin_schedule import admin_schedule_body, form_status
 
 stream_app = Blueprint(
     'streaming', 
@@ -29,6 +29,8 @@ stream_app = Blueprint(
     static_folder='static',
     static_url_path='/tvstreamer/static'      
 )
+
+stream_app.register_blueprint(htmx)
 
 tv_db = TVDatabase()
 program_manager = ProgramManager()
@@ -42,6 +44,22 @@ broadcast_monitor = BroadcastMonitor()
 def tvstream():
     return render_template("tvstream.html")
 
+
+# ============= ADMIN PAGES =============
+
+@stream_app.route('/admin/schedule')
+def schedule():
+    html = base("Admin", "Administrative panel for managing broadcasting schedule")
+    html.extend("body", admin_schedule_body())
+    return html.dump()
+
+@stream_app.route('/admin/preparer')
+def prepare():
+    return render_template("admin_preparer.html")
+
+
+# ============= FILE ROUTING =============
+
 @stream_app.route('/video/noprogram')
 def noprogram_video():
     return send_from_directory(path_manager.download_path / "ads", "PM5544.mp4")
@@ -50,66 +68,80 @@ def noprogram_video():
 def serve_video(content_type, directory, filename):
     return send_from_directory(path_manager.get_program_dir(content_type, directory), filename)
 
-# ============= ADMIN PAGES =============
 
-@stream_app.route('/admin/schedule')
-def admin():
-    return base_schedule().dump()
-
-@stream_app.route('/admin/preparer')
-def prepare():
-    return render_template("admin_preparer.html")
-
-#CRUD
-
-@stream_app.route('/admin/save/schedule', methods=['POST'])
-def save_schedule():
-    data = request.form
-    return return_status(*program_manager.save_schedule(data))
+# ============= ADMIN CRUD =============
     
-@stream_app.route('/admin/save/series', methods=['POST'])
+@stream_app.route('/admin/series/save', methods=['POST'])
 def save_series():
-    data = request.form
-    flash("test")
-    return return_status(*program_manager.save_series(data))
+    success, message, error = program_manager.save_series(request.form)
+    return form_status(message).dump()
 
-@stream_app.route('/admin/save/movie', methods=['POST'])
+@stream_app.route('/admin/series/delete', methods=['POST'])
+def delete_series():
+    data = request.form
+    series_id = data.get("program_id", None)
+
+    if series_id:
+        success, message, error = program_manager.delete_series(series_id)
+        return form_status(message).dump()
+    else:
+        return form_status("No series").dump()
+    
+
+@stream_app.route('/admin/movie/save', methods=['POST'])
 def save_movie():
+    success, message, error = program_manager.save_movie(request.form)
+    return form_status(message).dump()
+    
+@stream_app.route('/admin/movie/delete', methods=['POST'])
+def delete_movie():
     data = request.form
-    return return_status(*program_manager.save_movie(data))
+    movie_id = data.get("program_id", None)
 
-@stream_app.route('/admin/delete/program', methods=['POST'])
-def delete_program():
+    if movie_id:
+        success, message, error = program_manager.delete_movie(movie_id)
+        return form_status(message).dump()
+    else:
+        return form_status("No movie").dump()
+
+
+@stream_app.route('/admin/episode/save', methods=['POST'])
+def save_episode():
+    success, message, error = program_manager.save_episode(request.form)
+    return form_status(message).dump()
+    
+@stream_app.route('/admin/episode/delete', methods=['POST'])
+def delete_episode():
     data = request.form
-    print(data)
-    return ""
-    #return return_status(*program_manager.delete_program(data["program_id"], data["program_type"]))
+    episode_id = data.get("episode_id", None)
 
-@stream_app.route('/admin/delete/schedule', methods=['POST'])
+    if episode_id:
+        success, message, error = program_manager.delete_episode(episode_id)
+        return form_status(message).dump()
+    else:
+        return form_status("No movie").dump()
+
+@stream_app.route('/admin/schedule/save', methods=['POST'])
+def save_schedule():
+    success, message, error = program_manager.save_schedule(request.form)
+
+    return form_status(message).dump()
+
+@stream_app.route('/admin/schedule/update', methods=['POST'])
+def update_schedule():
+    success, message, error = program_manager.update_schedule(request.form)
+
+    return form_status(message).dump()
+
+@stream_app.route('/admin/schedule/delete', methods=['POST'])
 def delete_schedule():
     data = request.get_json()
-    return return_status(*program_manager.delete_schedule())
+    program_manager.delete_schedule()
+    return 
 
 # ============ API ROUTES ============
 
 #Stream
-
-#TODO: SSE doesn't work on deployment. 
-"""
-@stream_app.route('/stream/current')
-def current_program():
-    def current_stream():
-        last_id = None
-        while True:
-            current = broadcast_monitor.get_current_stream()
-            if current is not None and current.get("id") != last_id:
-                yield f"data: {json.dumps(current)}\n\n"
-                last_id = current["id"]
-                
-            time.sleep(1)
-
-    return Response(current_stream(), mimetype="text/event-stream")
-""" 
 
 @stream_app.route('/stream/<channel>')
 def current_program(channel):
@@ -131,7 +163,7 @@ def get_pending_episodes():
 
 @stream_app.route('/api/scheduled')
 def get_scheduled_episodes():
-    return jsonify([obj.model_dump() for obj in tv_db.get_scheduled_programs()])
+    return jsonify([obj.model_dump() for obj in tv_db.get_schedule()])
 
 @stream_app.route('/api/obsolete')
 def get_obsolete_episodes():
@@ -143,60 +175,8 @@ def get_obsolete_episodes():
 def fetch_metadata(program_type,tmdb_id):
     return jsonify(metadata_fetcher.fetch_tmdb_metadata(program_type, tmdb_id))
 
-#HTMX
 
-panel = AdminPanel()
-
-@stream_app.route("/admin/partials/program-form-open")
-def program_form_open():
-    panel.visible = True
-    series_data = tv_db.get_series()
-    return panel.program_form_panel(series_data, SeriesForm).dump()
-
-@stream_app.route("/admin/partials/program-form-close")
-def program_form_close():
-    panel.visible = False
-    return panel.program_form_panel([], SeriesForm).dump()
-
-@stream_app.route("/admin/partials/program-type-select")
-def program_type_select():
-    program_type = request.args.get("programType")
-    
-    if program_type == "series":
-        program_data = tv_db.get_series()
-        return panel.program_form_panel(program_data, SeriesForm).dump()
-    elif program_type == "movie":
-        program_data = tv_db.get_movies()
-        return panel.program_form_panel(program_data, MovieForm).dump()
-
-@stream_app.route("/admin/partials/program-select")
-def program_select():
-    program_id = request.args.get("program_id")
-    program_type = request.args.get("programType")
-
-    if program_type == "series":
-        program = tv_db.get_series(series_id=program_id) if program_id else None
-        return SeriesForm(program).render().dump()
-    elif program_type == "movie":
-        program = tv_db.get_movies(movie_id=program_id) if program_id else None
-        return MovieForm(program).render().dump()
-
-@stream_app.route("/admin/partials/schedule-form-open")
-def schedule_form_open():
-    panel.visible = True
-    series_data = tv_db.get_series()
-    return panel.schedule_form_panel(series_data).dump()
-
-def return_status(success, message, error_code = None, debug=False):
-    """Helper function for status"""
-    if debug:
-        print(message)
-
-    if success:
-        return jsonify({"status": "success", "message": message})
-    else:
-        return jsonify({"status": "error", "message": message}), error_code
-
+# ============= TEST RUN =============
 
 def test_run():
     app = Flask(__name__)

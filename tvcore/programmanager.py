@@ -1,11 +1,11 @@
-from .tvdatabase import Movie, TVDatabase, Series
+from .tvdatabase import TVDatabase, Series, Episode, Movie, Schedule
 from .metadatafetcher import MetaDataFetcher
 from .tvconstants import *
 from .helper import calculate_time_blocks, calculate_end_time
 from .tvconfig import TVConfig
 from slugify import slugify
 from hypermedia import *
-from .schemas import MovieInput, SeriesInput, ScheduleInput
+from .schemas import MovieInput, SeriesInput, EpisodeInput, ScheduleInput, ScheduleUpdate
 import logging
 from pydantic_core import ValidationError
 
@@ -35,7 +35,7 @@ class ProgramManager:
             series = SeriesInput(**data)
         except ValidationError as e:
             logging.error("Validation failed:\n%s", e)
-            return False, e.errors(), 400
+            return False, "Invalid data", 400
                 
         try:
             self.db.upsert(
@@ -45,12 +45,32 @@ class ProgramManager:
                 )
             )
             
-            return True, "Program saved successfully"
+            return True, "Program saved successfully", 200
         
         except Exception as e:
-            print(f"Error while saving: {e}")
-            return False, f"Database error: {str(e)}", 500
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
 
+    def delete_series(self, series_id):
+        try:
+            self.db.delete(
+                Series(id=series_id) 
+            )
+
+            episodes = self.db.get_episodes(series_id=series_id)
+
+            self.db.delete_bulk(
+                episodes
+            )
+
+            #TODO: Should also delete relevant files
+
+            return True, "Program deleted successfully", 200
+                    
+        except Exception as e:
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
+        
 
     def save_movie(self, data:dict):
         """
@@ -67,7 +87,7 @@ class ProgramManager:
             movie = MovieInput(**data)
         except ValidationError as e:
             logging.error("Validation failed:\n%s", e)
-            return False, e.errors(), 400
+            return False, "Invalid data", 400
         
         try:
             self.db.upsert(
@@ -77,28 +97,71 @@ class ProgramManager:
                 )
             )
             
-            return True, "Program saved successfully"
+            return True, "Program saved successfully", 200
         
         except Exception as e:
-            print(f"Error while saving: {e}")
-            return False, f"Database error: {str(e)}", 500
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
+
         
-    def delete_program(self, obj: Series | Movie):
+    def delete_movie(self, movie_id):
         try:
             success = self.db.delete(
-                #Obj(program_id) 
+                Movie(id=movie_id) 
+            )
+
+            #TODO: Should also delete relevant files
+
+            return True, "Program deleted successfully", 200
+                    
+        except Exception as e:
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
+
+    def save_episode(self, data:dict):
+        """
+        Args:
+            program_data: Dict with all program information from web form
+            
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+
+        try:
+            episode = EpisodeInput(**data)
+        except ValidationError as e:
+            logging.error("Validation failed:\n%s", e)
+            return False, "Invalid data", 400
+        
+        try:
+            self.db.upsert(
+                Episode(
+                    **episode.model_dump()
+                )
             )
             
-            if success:
-                return True, "Program deleted successfully"
-            
-            else:
-                return False, "Invalid program type"
+            return True, "Episode saved successfully", 200
         
         except Exception as e:
-            return False, f"Database error: {str(e)}", 500
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
         
+    def delete_episode(self, episode_id):
+        try:
+            self.db.delete(
+                Episode(id=episode_id) 
+            )
 
+            #TODO: Should also delete relevant files
+
+            return True, "Program deleted successfully", 200
+                    
+        except Exception as e:
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
+    
+
+    #Schedule
     def save_schedule(self, data:dict):
         """
         Save new entry in the weekly schedule
@@ -111,8 +174,28 @@ class ProgramManager:
             logging.error("Validation failed:\n%s", e)
             return False, e.errors(), 400
         
-
-        return
+    def update_schedule(self, data:dict):
+        """
+        Save new entry in the weekly schedule
+        """
+        try:
+            schedule = ScheduleUpdate(**data)
+        except ValidationError as e:
+            logging.error("Validation failed:\n%s", e)
+            return False, e.errors(), 400
+        
+        try:
+            self.db.upsert(
+                Schedule(
+                    **schedule.model_dump(exclude={"date","time"})
+                )
+            )
+            
+            return True, "Schedule saved successfully", 200
+        
+        except Exception as e:
+            logging.error(f"Error while saving: {e}")
+            return False, "Database error", 500
 
         try:
             existing = self.db.get_schedule_by_time(data["day_of_week"], data["start_time"])

@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@source "../../**/*.py";
+
+@source inline("hidden");
+@source inline("invisible");
+@source inline("opacity-0");
+
+@theme {
+  --color-cyan-pale: #bdfff4; 
+  --color-cyan-dark: #1d6875;
+  --color-cyan-dark-2: #008080;
+  --color-alice-blue: #f0f8ff;
+}
+
+@layer base {
+  h1 {
+    @apply text-3xl lg:text-5xl;
+  }
+  h2 {
+    @apply text-2xl lg:text-4xl;
+  }
+  h3 {
+    @apply text-xl lg:text-3xl;
+  }
+}
+

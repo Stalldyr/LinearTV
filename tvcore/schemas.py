@@ -82,13 +82,12 @@ class SeriesInput(HTMLFormModel):
 
     id: int | None = Field(alias="program_id")
     title: str
-    description: date
+    description: str | None
     genre: str | None
     release: date | None
     reverse_order: bool = False
     start_season: int | None = Field(default=1) 
     start_episode: int | None = Field(default=1)
-    source_url: str | None
     tmdb_id: int | None
 
 class MovieInput(HTMLFormModel):
@@ -106,7 +105,7 @@ class MovieInput(HTMLFormModel):
 class EpisodeInput(HTMLFormModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: int | None
+    id: int | None = Field(None, alias="episode_id")
     series_id: int | None
     program_id: str | None
     title: str
@@ -127,10 +126,21 @@ class ScheduleInput(HTMLFormModel):
     start: datetime | None
     end: datetime | None
     rerun: bool
-    channel: str 
+    channel: str
 
+class ScheduleUpdate(HTMLFormModel):
+    id: int = Field(alias="schedule_id")
+    title: str
+    date: date
+    time: time
+    channel: str
+    rerun: bool = False
+    start: datetime = None
 
-
+    @model_validator(mode="after")
+    def combine_date_and_time(self):
+        self.start = datetime.combine(self.date, self.time)
+        return self
 
 class SeriesOutput(BaseModel):
     model_config = {"from_attributes": True}
