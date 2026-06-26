@@ -67,7 +67,7 @@ def get_iso_week_span(start_date: datetime, end_date:datetime=None) -> tuple:
     return datetime.fromisocalendar(start_date.year, get_iso_week_number(start_date), 1), datetime.fromisocalendar(end_date.year, get_iso_week_number(end_date), 7)
 
 def get_iso_week_span_target_year(start_week: int, end_week: int, target_year: int):
-    return (datetime.fromisocalendar(target_year, start_week ,1), datetime.fromisocalendar(target_year, end_week, 1))
+    return (datetime.fromisocalendar(target_year, start_week ,1).date(), datetime.fromisocalendar(target_year, end_week, 1).date())
 
 def parse_aspnet_date(date_str):
     match = re.search(r'/Date\((\d+)([+-]\d{4})\)/', date_str)
