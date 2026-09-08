@@ -1,0 +1,13 @@
+venv/
+
+.claudesync/
+.vscode/
+__pycache__/
+.git/
+
+tvfiles/
+data/
+logs/
+
+.env
+.config.json

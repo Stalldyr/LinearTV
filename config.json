@@ -2,8 +2,7 @@
     "language": "en",
     "schedule": {
         "broadcast_start": "04:00",
-        "broadcast_end": "04:00",
-        "broadcast_steps": 30
+        "broadcast_end": "04:00"
     },
     "paths": {
         "download_path": "downloads",
