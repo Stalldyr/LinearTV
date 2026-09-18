@@ -8,7 +8,6 @@ requires-python = ">=3.12,<4.0"
 
 dependencies = [
     "colorama==0.4.6",
-    "dotenv==0.9.9",
     "Flask==3.1.1",
     "hypermedia==5.4.0",
     "isodate==0.7.2",
@@ -27,8 +26,14 @@ dependencies = [
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-py-modules = []
+[tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+lineartvstream = ["assets/*.mp4"]
 
 [project.scripts]
 tvstreamer-prep = "lineartvstream.tvpreparer:main"

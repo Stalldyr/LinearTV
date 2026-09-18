@@ -1,6 +1,5 @@
 from hypermedia import *
 from flask import url_for
-import json
 
 from lineartvstream.tvcore.tvdatabase import TVDatabase
 
@@ -26,7 +25,7 @@ def stream_head():
                 preloadWebComponents: true,
             };
         """),
-        Script(src=url_for('streaming.static', filename='scripts/stream.js')),
+        Script(src=url_for('static', filename='scripts/stream.js')),
         Script(
             src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.js",
             integrity="sha384-Q+Dky3iHVJOr6wUjQ4ulh6uQ76an/t+ak1+PjMVaxRjbZamFLAG+u9InkfjbsEQf",

@@ -1,3 +1,24 @@
+Metadata-Version: 2.4
+Name: lineartvstream
+Version: 0.2.0
+Summary: Streaming server that recreates linear TV experience
+Requires-Python: <4.0,>=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: colorama==0.4.6
+Requires-Dist: dotenv==0.9.9
+Requires-Dist: Flask==3.1.1
+Requires-Dist: hypermedia==5.4.0
+Requires-Dist: isodate==0.7.2
+Requires-Dist: MarkupSafe==3.0.2
+Requires-Dist: pydantic==2.12.5
+Requires-Dist: pydantic_core==2.41.5
+Requires-Dist: python-dotenv==1.2.1
+Requires-Dist: python-slugify==8.0.4
+Requires-Dist: requests==2.32.5
+Requires-Dist: SQLAlchemy==2.0.43
+Requires-Dist: tmdbsimple==2.9.1
+Requires-Dist: yt-dlp==2026.1.29.165626.dev0
+
 **Features**
 
 - Fixed weekly broadcast schedule for series and movies

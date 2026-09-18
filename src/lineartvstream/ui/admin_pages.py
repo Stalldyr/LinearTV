@@ -4,8 +4,14 @@ from flask import url_for
 def channels_body(channels):
     return Div(
         H1("Channels"),
-        channels_table(channels),
-
+        Button("New channel", hx_get=f"/admin/partials/channel/form", hx_target="#form_panel"),
+        Div(
+            channels_table(channels),
+            Hr(class_="solid"),
+            Div(
+                id="form_panel"
+            )
+        )
     )
 
 def channels_table(channels):
@@ -15,8 +21,8 @@ def channels_table(channels):
             Tr(
                 Td(c.channel_id),
                 Td(c.display_name),
-                Td(A("Edit", href=f"/admin/channels?edit={c.channel_id}")),
-            )
+                Td(A("Edit", hx_get=f"/admin/partials/channel/form?channel_id={c.id}", hx_target="#form_panel", href="")),
+            )   
             for c in channels
         ]
     )
@@ -24,6 +30,7 @@ def channels_table(channels):
 def genres_body(genres):
     return Div(
         H1("Genres"),
+        Button("New genre", hx_get=f"/admin/partials/genres/form", hx_target="#form_panel"),
         Div(
             genres_table(genres),
             Hr(class_="solid"),
@@ -40,13 +47,11 @@ def genres_table(genres):
             Tr(
                 Td(g.name),
                 Td(g.display_name),
-                Td(A("Edit", href=f"/admin/genres?edit={g.name}")),
+                Td(A("Edit", hx_get=f"/admin/partials/genres/form?genre_id={g.id}", hx_target="#form_panel", href="")),
             )
             for g in genres
         ]
     )
-
-
 
 def series_body(series):
     return Div(
@@ -67,9 +72,11 @@ def series_table(all_series):
         *[
             Tr(
                 Td(s.title),
-                Td(A("Edit", hx_get=f"/admin/partials/series/form?series_id={s.series_id}", hx_target="#form_panel", href="")), #   href=f"/admin/series?series_id={s.series_id}")),
+                Td(A("Edit", hx_get=f"/admin/partials/series/form?series_id={s.series_id}", hx_target="#form_panel", href="")),
                 Td(A("Episodes", href=f"/admin/episodes?series_id={s.series_id}")),
-                Td(A("New Episode", href=f"/admin/episodes?series_id={s.series_id}"))
+                Td(A("New Episode", hx_get=f"/admin/partials/episodes/form?series_id={s.series_id}", hx_target="#form_panel", href="")),
+                Td(A("Add season", hx_get=f"/admin/partials/season/form?series_id={s.series_id}", hx_target="#form_panel", href="")),
+                Td(A("Add season to schedule", hx_get=f"/admin/partials/season-schedule/form?series_id={s.series_id}", hx_target="#form_panel", href=""))
             )
             for s in all_series
         ]
@@ -177,4 +184,25 @@ def admin_panel():
                 )
             )
         )
+    )
+
+def form_status(message):
+    return Div(P(message), id="form-status")
+
+
+def season_schedule_results(results: list[dict]):
+    return Div(
+        H3("Results"),
+        Table(
+            Tr(Th("Episode"), Th("Tidspunkt"), Th("Status")),
+            *[
+                Tr(
+                    Td(r["title"]),
+                    Td(r["start"].strftime("%d.%m.%Y %H:%M")),
+                    Td("Lagt til" if r["status"] == "scheduled" else "Konflikt")
+                )
+                for r in results
+            ]
+        ),
+        id="form-status"
     )

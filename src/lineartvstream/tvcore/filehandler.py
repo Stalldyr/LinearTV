@@ -1,3 +1,5 @@
+import shutil
+
 from .tvdatabase import TVDatabase, Schedule
 from .tvconstants import *
 from .mediapathmanager import MediaPathManager
@@ -13,30 +15,69 @@ class TVFileHandler:
         self.paths = MediaPathManager()
         self.tv_db = TVDatabase()
 
-    def delete_media(self, schedule_id, file_path):
-        path = Path(file_path)
+    def _delete_file_if_exists(self, path) -> bool:
+        path = Path(path)
         if path.exists():
             path.unlink()
-            self.tv_db.upsert(
-                Schedule(
-                    id=schedule_id,
-                    status=STATUS_DELETED,
-                    file_size=None,
-                    download_date=None,
-                    filepath=None
-                )
-            )
+            return True
+        return False
 
+    def delete_media(self, schedule_id, file_path):
+        success = self._delete_file_if_exists(file_path)
+        if success:
+            self._clear_schedule_file_info(schedule_id, status=STATUS_DELETED)
         else:
-            self.tv_db.upsert(
-                Schedule(
-                    id=schedule_id,
-                    status=STATUS_MISSING,
-                    file_size=None,
-                    download_date=None,
-                    filepath=None
+            self._clear_schedule_file_info(schedule_id, status=STATUS_MISSING)
+
+    def delete_series_directory(self, slug) -> bool:
+        program_dir = self.paths.get_program_dir(TYPE_SERIES, slug)
+        if program_dir.exists():
+            shutil.rmtree(program_dir)
+            return True
+        return False
+
+    def delete_episode_files(self, episode) -> None:
+        slug = episode.series.slug
+        series_id = episode.series.series_id
+
+        filename = self.paths.create_episode_file_name(series_id, episode.episode_id)
+        video_path = self.paths.get_filepath(TYPE_SERIES, slug, filename)
+        self._delete_file_if_exists(video_path)
+
+        ytdlp_json = self.paths.get_metadata_path(
+            TYPE_SERIES, slug,
+            self.paths.create_ytdlp_episode_json_name(series_id, episode.episode_id)
+        )
+        self._delete_file_if_exists(ytdlp_json)
+
+        if episode.tmdb_id:
+            tmdb_json = self.paths.get_metadata_path(
+                TYPE_SERIES, slug,
+                self.paths.create_tmbd_episode_json_name(
+                    episode.tmdb_id, episode.season_number, episode.episode_number
                 )
             )
+            self._delete_file_if_exists(tmdb_json)
+
+    def delete_movie_files(self, movie) -> None:
+        slug = movie.slug
+
+        filename = self.paths.create_movie_file_name(movie.movie_id)
+        video_path = self.paths.get_filepath(TYPE_MOVIES, slug, filename)
+        self._delete_file_if_exists(video_path)
+
+        ytdlp_json = self.paths.get_metadata_path(
+            TYPE_MOVIES, slug,
+            self.paths.create_ytdlp_movie_json_name(movie.movie_id)
+        )
+        self._delete_file_if_exists(ytdlp_json)
+
+        if movie.tmdb_id:
+            tmdb_json = self.paths.get_metadata_path(
+                TYPE_MOVIES, slug,
+                self.paths.create_tmbd_movie_json_name(movie.tmdb_id)
+            )
+            self._delete_file_if_exists(tmdb_json)
 
     def update_file_info(self, schedule_id, file_path):
         file_info = self.get_file_info(file_path)
@@ -50,14 +91,6 @@ class TVFileHandler:
         else:
             self.tv_db.upsert(Schedule(id=schedule_id, status=STATUS_MISSING))
             return STATUS_MISSING
-
-    def _check_file_integrity(self, path):
-        #TODO: Unfinished
-        test = subprocess.run(
-            ["ffmpeg", "-v", "error", "-i", path, "-f", "null", "-"],
-            stderr=subprocess.PIPE,
-            text=True
-        )
 
     def get_file_info(self, input_path):
         path = Path(input_path)

@@ -1,11 +1,12 @@
 from lineartvstream.tvcore.tvdownloader import TVDownloader
 from lineartvstream.tvcore.metadatafetcher import MetaDataFetcher
-from lineartvstream.tvcore.tvdatabase import TVDatabase, Episode, Schedule, Channels
+from lineartvstream.tvcore.tvdatabase import Movie, TVDatabase, Episode, Schedule, Channels
 from lineartvstream.tvcore.filehandler import TVFileHandler
 from lineartvstream.tvcore.mediapathmanager import MediaPathManager
 from lineartvstream.tvcore.nrkmanager import NRKManager, check_for_duplicate_titles
 from lineartvstream.tvcore.helper import get_iso_week_span_target_year, get_iso_week_number
 from lineartvstream.tvcore.tvconstants import *
+from lineartvstream.tvcore.appdirs import get_config_dir
 
 from datetime import date, timedelta
 import sys
@@ -14,7 +15,7 @@ import logging
 from slugify import slugify
 from pathlib import Path
 
-log_path = Path(".") / "logs" / "preparer.log"
+log_path = Path(get_config_dir()) / "logs" / "preparer.log"
 log_path.parent.mkdir(exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -45,10 +46,13 @@ class TVPreparer():
             return
         
         for entry in obsolete_programs:
-            #TODO: Implement deletion of metadata
             try:
-                media_path = self.paths.get_full_media_path(entry.filepath)
-                self.handler.delete_media(entry.schedule_id, media_path)
+                if entry.episode_id:
+                    self.handler.delete_episode_files(entry.episode)
+                elif entry.movie_id:
+                    self.handler.delete_movie_files(entry.movie)
+
+                self.database.upsert(Schedule(id=entry.schedule_id, status=STATUS_DELETED, file_size=None, download_date=None, filepath=None))
                 logging.info("Deletion successful: %s", entry.filepath)
             
             except Exception as e:
@@ -101,27 +105,71 @@ class TVPreparer():
                     self.paths.create_ytdlp_episode_json_name(episode.series.series_id, episode.episode_id)
                 )
 
-                episode_data = self.metadata.get_ytdlp_data(episode.source_url, json_path = json_path)
-                relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
+                try: 
+                    episode_data = self.metadata.get_ytdlp_data(episode.source_url, json_path = json_path)
+                    relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
 
-                self.database.upsert(Episode(id=episode.episode_id,**relevant_data.model_dump()))
-
-                if relevant_data.duration:
-                    self.database.bulk_update_schedule(episode.episode_id,relevant_data.duration)
+                    self.database.upsert(Episode(id=episode.episode_id,**relevant_data.model_dump()))
+        
+                    if relevant_data.duration:
+                        self.database.bulk_update_schedule(episode.episode_id,relevant_data.duration)
+                except Exception as e:
+                    logging.error("Failed to fetch YTDLP metadata for episode %s: %s", episode.episode_id, e)
                 
             if episode.tmdb_id:
                 json_path = self.paths.get_metadata_path(
                     TYPE_SERIES, 
                     episode.series.slug, 
-                    self.paths.create_tmbd_episode_json_name(episode.series.series_id, episode.episode_id)
+                    self.paths.create_tmbd_episode_json_name(episode.tmdb_id,episode.series.series_id, episode.episode_id)
                 )
 
-                episode_data = self.metadata.get_tmdb_episode_data(tmdb_id=episode.tmdb_id, json_path = json_path)
-                relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
+                try:
+                    episode_data = self.metadata.get_tmdb_episode_data(tmdb_id=episode.tmdb_id, json_path = json_path)
+                    relevant_data = self.metadata.extract_episode_info_from_tmdb(episode_data)
 
-                self.database.upsert(Episode(id=episode.episode_id,**relevant_data.model_dump()))
+                    self.database.upsert(Episode(id=episode.episode_id,**relevant_data.model_dump()))
 
-    def resolve_duplicate_broadcasts(self, buffer_days=3, buffer_time=3):
+                except Exception as e:
+                    logging.error("Failed to fetch TMDB metadata for episode %s: %s", episode.episode_id, e)
+
+        movies = self.database.get_movies(missing=False)
+
+        for movie in movies:
+            if movie.source_url:
+                json_path = self.paths.get_metadata_path(
+                    TYPE_MOVIES, 
+                    movie.slug, 
+                    self.paths.create_ytdlp_movie_json_name(movie.movie_id)
+                )
+
+                try: 
+                    movie_data = self.metadata.get_ytdlp_data(movie.source_url, json_path = json_path)
+                    relevant_data = self.metadata.extract_movie_info_from_ytdlp(movie_data)
+
+                    self.database.upsert(Movie(id=movie.movie_id,**relevant_data.model_dump()))
+        
+                    if relevant_data.duration:
+                        self.database.bulk_update_schedule(movie.movie_id,relevant_data.duration)
+                except Exception as e:
+                    logging.error("Failed to fetch YTDLP metadata for movie %s: %s", movie.movie_id, e)
+                
+            if movie.tmdb_id:
+                json_path = self.paths.get_metadata_path(
+                    TYPE_MOVIES, 
+                    movie.slug, 
+                    self.paths.create_tmbd_movie_json_name(movie.tmdb_id)
+                )
+
+                try:
+                    movie_data = self.metadata.get_tmdb_movie_data(tmdb_id=movie.tmdb_id, json_path = json_path)
+                    relevant_data = self.metadata.extract_movie_info_from_tmdb(movie_data)
+
+                    self.database.upsert(Movie(id=movie.movie_id,**relevant_data.model_dump()))
+
+                except Exception as e:
+                    logging.error("Failed to fetch TMDB metadata for movie %s: %s", movie.movie_id, e)
+
+    def resolve_duplicate_broadcasts(self, buffer_days=3, buffer_time=3, delete_duplicates=False):
         now = date.today()
         channels = self.database.get_channels()
 
@@ -132,31 +180,28 @@ class TVPreparer():
                 for entry in self.database.get_schedule(channel=channel.channel_id, date = now + timedelta(days=day))
             ]
 
-            entries_by_channel = {}
-            for entry in schedule:
-                entries_by_channel.setdefault(entry.channel, []).append(entry)
+            schedule.sort(key=lambda e: e.start)
 
-            for channel, channel_entries in entries_by_channel.items():
-                channel_entries.sort(key=lambda e: e.start)
+            i = 0
+            while i < len(schedule):
+                s1 = schedule[i]
+                j = i + 1
+                while j < len(schedule):
+                    s2 = schedule[j]
 
-                i = 0
-                while i < len(schedule):
-                    s1 = schedule[i]
-                    j = i + 1
-                    while j < len(schedule):
-                        s2 = schedule[j]
+                    if s1.end <= s2.start + timedelta(minutes=buffer_time):
+                        break
 
-                        if s1.end <= s2.start + timedelta(minutes=buffer_time):
-                            break
+                    if delete_duplicates:
+                        self.database.delete(Schedule(id=s2.schedule_id))
 
-                        #self.database.delete(Schedule(id=s2.schedule_id))
-                        logging.info(
-                            "Overlapping broadcast: schedule %s %s (channel %s, start %s) overlaps with schedule %s %s",
-                            s2.schedule_id, s2.title, channel, s2.start, s1.schedule_id, s1.title
-                        )
-                        schedule.pop(j)
+                    logging.info(
+                        "Overlapping broadcast: schedule %s %s (channel %s, start %s) overlaps with schedule %s %s",
+                        s2.schedule_id, s2.title, channel, s2.start, s1.schedule_id, s1.title
+                    )
+                    schedule.pop(j)
 
-                    i += 1
+                i += 1
 
     def download_weekly_schedule(self, buffer_days=3):
         now = date.today()
@@ -251,16 +296,13 @@ class TVPreparer():
                 file_path = self.paths.get_filepath(TYPE_SERIES, entry.episode.series.slug, filename)
                         
             elif entry.movie_id: 
-                filename = self.paths.create_movie_file_name(entry.movie.slug)
+                filename = self.paths.create_movie_file_name(entry.movie_id)
                 file_path = self.paths.get_filepath(TYPE_MOVIES, entry.movie.slug, filename)
 
             try:
                 file_status = self.handler.verify_local_file(entry.schedule_id, file_path)
             except Exception as e:
                 logging.error("Error veryifing file %s: %s", file_path, e)
-
-
-            #TODO Check file integrity series_dl._check_file_integrity()
 
             if file_status == STATUS_AVAILABLE:
                 logging.info("File found: %s", file_path)
@@ -291,12 +333,12 @@ def main():
         elif operation == "verify":
             prep.verify_scheduled_programs()
 
-        elif operation == "daily":
+        elif operation == "sync":
             prep.cleanup_obsolete_episodes()
             prep.download_weekly_schedule()
             prep.verify_scheduled_programs()
 
-        elif operation == "weekly":
+        elif operation == "refresh":
             prep.fetch_nrk_data()
             prep.enrich_metadata()
             prep.resolve_duplicate_broadcasts()

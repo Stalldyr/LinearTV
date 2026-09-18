@@ -11,6 +11,7 @@ from pydantic_core import ValidationError
 from .tvconstants import *
 from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
 from .metadatafetcher import MetaDataFetcher
+from .appdirs import get_config_dir
 
 class Base(DeclarativeBase):
     pass
@@ -126,7 +127,7 @@ class TVDatabase:
         if db_path:
             self.db_path = Path(db_path)
         else:
-            self.db_path = Path(".")/"data"/ "tv.db"
+            self.db_path = Path(get_config_dir())/"data"/"tv.db"
         
         self.test_time = test_time
         
@@ -218,18 +219,6 @@ class TVDatabase:
 
             return validated
         
-    def get(self, obj: Media) -> Media:
-        with self.get_session() as session:
-
-            model, data = self._to_model
-            stmt = select(model)
-            for key, value in data.items():
-                stmt = stmt.where(getattr(model, key) == value)
-
-
-            stmt = self._to_model(obj)
-            return session.execute(stmt).scalars().first()
-
     def add(self, obj: Media, unique_on: list[str] = None):
 
         with self.get_session() as session:
@@ -252,8 +241,12 @@ class TVDatabase:
             session.merge(obj)
             session.commit()
 
-
-
+    def update(self, model_class, id, **fields):
+        with self.get_session() as session:
+            obj = session.get(model_class, id)
+            for key, value in fields.items():
+                setattr(obj, key, value)
+            session.commit()
 
     def upsert_on_column(self, obj: Media, index_elements: list):
         """Adds or updates an entry in the database based on existing column value."""
@@ -324,11 +317,10 @@ class TVDatabase:
 
         if series_id:
             q = q.where(Series.id == series_id)
-            return self._execute(q, SeriesOutput, first=True)
 
         return self._execute(q, SeriesOutput)
         
-    def get_episodes(self, episode_id=None, series_id=None, missing=False) -> List[EpisodeOutput]:
+    def get_episodes(self, episode_id:int=None, series_id:int=None,  season_number:int=None, missing:bool=False) -> List[EpisodeOutput]:
         """
         Returns episodes from the series-table. Defaults to all
         
@@ -338,7 +330,9 @@ class TVDatabase:
         q = select(
             Episode
         ).order_by(
-            Episode.id
+            Episode.series_id,
+            Episode.season_number,
+            Episode.episode_number
         )
 
         if missing:
@@ -357,9 +351,27 @@ class TVDatabase:
         if series_id:
             q = q.where(Episode.series_id == series_id)
 
+        if season_number is not None:
+            q = q.where(Episode.season_number == season_number)
+
         return self._execute(q, EpisodeOutput)
     
-    def get_movies(self, movie_id=None, missing=False) -> List[MovieOutput]:
+
+    def get_seasons(self, series_id: int) -> List[int]:
+        """Returns a sorted list of distinct season numbers for a given series."""
+        q = select(
+            Episode.season_number
+        ).where(
+            Episode.series_id == series_id,
+            Episode.season_number.isnot(None)
+        ).distinct().order_by(
+            Episode.season_number
+        )
+
+        with self.get_session() as session:
+            return [row[0] for row in session.execute(q).all()]
+
+    def get_movies(self, movie_id:int=None, missing:bool=False) -> List[MovieOutput]:
         """Returns movies from the movies-table. Defaults to all. """
         q = select(
             Movie
@@ -541,16 +553,8 @@ class TVDatabase:
             Schedule
         ).where(
             Schedule.channel == channel,
-            or_(
-                and_(
-                    Schedule.start <= start,
-                    Schedule.end >= start
-                ),
-                and_(
-                    Schedule.start <= end,
-                    Schedule.end >= end
-                )
-            )
+            Schedule.start < end,
+            Schedule.end > start
         )
         
         return self._execute(q, ScheduleOutput, first=True)
@@ -675,19 +679,18 @@ class TVDatabase:
 
     #CHANNELS
 
-    def get_channels(self) -> List[Channels]:
-        q = select(Channels).order_by(Channels.channel_id)
+    def get_channels(self, id=None) -> List[Channels]:
+        q = select(Channels)
+        if id is not None:
+            q = q.where(Channels.id == id)
         return self._execute(q)
-
-    def get_channel(self, channel_id: str) -> Channels:
-        q = select(Channels).where(Channels.channel_id == channel_id)
-        return self._execute(q, first=True)
-
 
     #GENRES
 
-    def get_genres(self) -> List[Genres]:
+    def get_genres(self, id=None) -> List[Genres]:
         q = select(Genres).order_by(Genres.display_name)
+        if id is not None:
+            q = q.where(Genres.id == id)
         return self._execute(q)
     
     # UTILITY METHODS

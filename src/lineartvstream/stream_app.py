@@ -6,7 +6,7 @@ from markupsafe import escape
 
 from hypermedia import Div, H2, P
 from lineartvstream.tvcore.helper import calculate_offset
-from lineartvstream.routes.htmx_partials import htmx
+from lineartvstream.routes.htmx_partials import htmx, htmx_admin
 from lineartvstream.routes.admin_crud import admin_crud
 from lineartvstream.tvcore.tvdatabase import TVDatabase
 from lineartvstream.tvcore.mediapathmanager import MediaPathManager
@@ -23,6 +23,7 @@ stream_app = Blueprint(
     static_url_path='/streaming/static'
 )
 
+stream_app.register_blueprint(htmx_admin)
 stream_app.register_blueprint(htmx)
 stream_app.register_blueprint(admin_crud)
 
@@ -140,8 +141,10 @@ def get_obsolete_episodes():
 
 @stream_app.route('/tmdb/<program_type>/<int:tmdb_id>', methods=['GET'])
 def fetch_metadata(program_type,tmdb_id):
-    return jsonify(metadata_fetcher.fetch_tmdb_metadata(program_type, tmdb_id))
-
+    data = metadata_fetcher.fetch_tmdb_metadata(program_type, tmdb_id)
+    if data is None:
+        return jsonify({"error": "Could not fetch TMDB metadata"}), 502
+    return jsonify(data)
 
 # ============= TEST RUN =============
 

@@ -3,15 +3,21 @@ from flask import Blueprint, Response, request
 from lineartvstream.tvcore.tvdatabase import TVDatabase
 from lineartvstream.tvcore.metadatafetcher import MetaDataFetcher
 from lineartvstream.ui.admin_forms import (
-    SeriesForm, MovieForm, ScheduleForm, EpisodesForm,
+    GenreForm, SeasonScheduleForm, SeriesForm, MovieForm, ScheduleForm, EpisodesForm,
     SeasonForm, ChannelForm
 )
 from lineartvstream.ui.stream_html import stream_channel_panel
 
+htmx_admin = Blueprint(
+    'htmx_admin',
+    __name__,
+    url_prefix="/admin/partials",
+)
+
 htmx = Blueprint(
     'htmx',
     __name__,
-    url_prefix="/admin/partials",
+    url_prefix="/partials",
 )
 
 tv_db = TVDatabase()
@@ -20,59 +26,68 @@ metadata_fetcher = MetaDataFetcher()
 
 # ============ CHANNEL ============
 
-@htmx.route("/channel/form", methods=['GET'])
+@htmx_admin.route("/channel/form", methods=['GET'])
 def channel_form_open():
     channel_id = request.args.get("channel_id")
-    channel = tv_db.get_channels(channel_id=channel_id)
+    channel = tv_db.get_channels(id=channel_id)[0] if channel_id else None
+
     return ChannelForm(channel).form().dump()
+
+# ============ GENRES ============
+
+@htmx_admin.route("/genres/form", methods=['GET'])
+def genres_form_open():
+    genre_id = request.args.get("genre_id")
+    genre = tv_db.get_genres(id=genre_id)[0] if genre_id else None
+
+    return GenreForm(genre).form().dump()
 
 # ============ SERIES ============
 
-@htmx.route("/series/form", methods=['GET'])
+@htmx_admin.route("/series/form", methods=['GET'])
 def series_form_open():
     series_id = request.args.get("series_id")
-    series = tv_db.get_series(series_id=series_id)
+    series = tv_db.get_series(series_id=series_id)[0] if series_id else None
     return SeriesForm(series).form().dump()
 
 # ============ MOVIE ============
 
-@htmx.route("/movies/form", methods=['GET'])
+@htmx_admin.route("/movies/form", methods=['GET'])
 def movie_form_open():
     movie_id = request.args.get("movie_id")
-    movie = tv_db.get_movies(movie_id=movie_id)
+    movie = tv_db.get_movies(movie_id=movie_id) if movie_id else None
     return MovieForm(movie).form().dump()
 
 # ============ EPISODES ============
 
-@htmx.route("/episodes/form", methods=['GET'])
+@htmx_admin.route("/episodes/form", methods=['GET'])
 def episodes_form_open():
     episode_id = request.args.get("episode_id")
-    episode = tv_db.get_episodes(episode_id=episode_id)
-    return EpisodesForm(episode).form().dump()
+    series_id = request.args.get("series_id")
+
+    episode = tv_db.get_episodes(episode_id=episode_id) if episode_id else None
+    return EpisodesForm(episode, series_id=series_id).form().dump()
 
 # ============ SEASON ============
-# TODO
 
-@htmx.route("/season/form")
+@htmx_admin.route("/season/form", methods=['GET'])
 def season_form_open():
-    pass
+    series_id = request.args.get("series_id")
+    return SeasonForm(series_id=series_id).form().dump()
 
+# ============ SEASON SCHEDULE ============
 
-# ============ ADS ============
-# TODO
-
-@htmx.route("/ads/form")
-def ad_form_open():
-    pass
-
+@htmx_admin.route("/season-schedule/form", methods=['GET'])
+def season_schedule_form_open():
+    series_id = request.args.get("series_id")
+    return SeasonScheduleForm(series_id=series_id).form().dump()
 
 # ============ SCHEDULE ============
 
-@htmx.route("/schedule/form", methods=['GET'])
+@htmx_admin.route("/schedule/form", methods=['GET'])
 def schedule_form_open():
     schedule_id = request.args.get("schedule_id")
     schedule = tv_db.get_schedule(schedule_id=schedule_id)
-    print(schedule)
     return ScheduleForm(schedule).form().dump()
 
 # ============ TMDB ============

@@ -1,6 +1,6 @@
 from .mediapathmanager import MediaPathManager
 from .tvconstants import *
-from .schemas import YTDLPInput, TMDBEpisodeInput, TMDBMovieInput, TMDBSeriesInput, MetadataInput
+from .schemas import YTDLPEpisodeInput, YTDLPMovieInput, TMDBEpisodeInput, TMDBMovieInput, TMDBSeriesInput, MetadataInput
 import yt_dlp
 import json
 import tmdbsimple as tmdb
@@ -46,11 +46,7 @@ class MetaDataFetcher:
         """ Fetch metadata from YTDLP without downloading."""
         
         with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-            try:
-                return ydl.extract_info(url, download=False)
-            except Exception as e:
-                print(f"Failed to fetch YTDLP metadata from {url}: {e}")
-                return {}
+            return ydl.extract_info(url, download=False)
 
     # ============ TMDB ============
     
@@ -140,7 +136,11 @@ class MetaDataFetcher:
 
     def extract_episode_info_from_ytdlp(self, episode_data: dict):
         """Extract relevant episode info from yt-dlp data"""
-        return self._validate_model(YTDLPInput, episode_data)
+        return self._validate_model(YTDLPEpisodeInput, episode_data)
+
+    def extract_movie_info_from_ytdlp(self, movie_data: dict):
+        """Extract relevant movie info from yt-dlp data"""
+        return self._validate_model(YTDLPMovieInput, movie_data)
         
     def extract_episode_info_from_tmdb(self, episode_data:dict):
         """Extract relevant episode info from TMDB data"""
@@ -167,7 +167,9 @@ class MetaDataFetcher:
                 return self.fetch_tmdb_series_data(tmdb_id)
             elif media_type == TYPE_MOVIES:
                 return self.fetch_tmdb_movie_data(tmdb_id)
+
+            return None
             
         except Exception as e:
             print(f"Error recieving tmdb metadata: {e}")
-            return True
+            return None

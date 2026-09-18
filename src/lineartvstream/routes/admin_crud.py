@@ -1,5 +1,9 @@
-from flask import Blueprint, request, redirect
+from flask import Blueprint, request
 from lineartvstream.tvcore.programCRUDmanager import ProgramManager
+from lineartvstream.ui.html_base import base
+from lineartvstream.ui.admin_pages import episodes_body, channels_body, series_body, movies_body, schedule_body, genres_body, form_status, season_schedule_results
+from lineartvstream.tvcore.tvdatabase import TVDatabase
+from datetime import datetime
 
 admin_crud = Blueprint(
     'admin_crud',
@@ -7,36 +11,29 @@ admin_crud = Blueprint(
 )
 
 program_manager = ProgramManager()
-
-from lineartvstream.ui.html_base import base
-from hypermedia import * 
-from lineartvstream.ui.admin_pages import episodes_body, channels_body, series_body, movies_body, schedule_body, genres_body
-from lineartvstream.tvcore.tvdatabase import TVDatabase
-
 tv_db = TVDatabase()
 
-@admin_crud.route('/admin/preparer')
-def prepare():
-    return ""
+def _handle_update(update_fn, form_data):
+    message, status_code = update_fn(form_data)
+    return form_status(message).dump(), status_code
+
 
 @admin_crud.route('/admin/series', methods=['GET', 'POST'])
 def series_page():
     if request.method == 'POST':
-        program_manager.update_series(request.form)
-        return redirect('/admin/series')
-
+        return _handle_update(program_manager.update_series, request.form)
+    
     series_id = request.args.get('series_id')
     series = tv_db.get_series(series_id=series_id)
 
-    html = base("Series", "Administrer serier")
+    html = base("Series", "Administrer series")
     html.extend("body", series_body(series))
     return html.dump()
 
 @admin_crud.route('/admin/movies', methods=['GET', 'POST'])
 def movies_page():
     if request.method == 'POST':
-        program_manager.update_movie(request.form)
-        return redirect('/admin/movies')
+        return _handle_update(program_manager.update_movie, request.form)
 
     movie_id = request.args.get('movie_id')
     movies = tv_db.get_movies(movie_id=movie_id)
@@ -48,8 +45,7 @@ def movies_page():
 @admin_crud.route('/admin/episodes', methods=['GET', 'POST'])
 def episodes_page():
     if request.method == 'POST':
-        program_manager.update_episode(request.form)
-        return redirect(f"/admin/episodes?series_id={series_id}")
+        return _handle_update(program_manager.update_episode, request.form)
 
     series_id = request.args.get('series_id')
     episode_id = request.args.get('episode_id')
@@ -68,8 +64,7 @@ def episodes_page():
 @admin_crud.route('/admin/schedule', methods=['GET', 'POST'])
 def schedule_page():
     if request.method == 'POST':
-        program_manager.update_schedule(request.form)
-        return redirect(f"/admin/schedule")
+        return _handle_update(program_manager.update_schedule, request.form)
 
     schedule_id = request.args.get("schedule_id")
     episode_id = request.args.get("episode_id")
@@ -92,34 +87,58 @@ def schedule_page():
 @admin_crud.route('/admin/channels', methods=['GET', 'POST'])
 def channels_page():
     if request.method == 'POST':
-        program_manager.update_channels(request.form)
-        return redirect(f"/admin/channels")
+        return _handle_update(program_manager.update_channels, request.form)
 
     channels = tv_db.get_channels()
 
-    edit_id = request.args.get('edit')
-    editing_channel = tv_db.get_channel(channel_id=edit_id) if edit_id else None
-
     html = base("Channels", "Administrate TV-channels")
-    html.extend("body", channels_body(channels, editing_channel))
+    html.extend("body", channels_body(channels))
     return html.dump()
+
 
 @admin_crud.route('/admin/genres', methods=['GET', 'POST'])
 def genres_page():
     if request.method == 'POST':
-        program_manager.update_genres(request.form)
-        return redirect(f"/admin/genres")
+        return _handle_update(program_manager.update_genres, request.form)
 
     genres = tv_db.get_genres()
 
-    edit_id = None #request.args.get('edit')
-    editing_channel = tv_db.get_channel(channel_id=edit_id) if edit_id else None
-
     html = base("Genres", "Administrate genres")
-    html.extend("body", genres_body(genres, editing_channel))
+    html.extend("body", genres_body(genres))
     return html.dump()
 
 
+@admin_crud.route('/admin/season', methods=['POST'])
+def save_season():
+    form = request.form
 
+    message, status_code = program_manager.add_season(
+        series_id=form.get("series_id"),
+        season_number=form.get("season_number"),
+        source_url=form.get("source_url")
+    )
+
+    return form_status(message).dump(), status_code
+
+@admin_crud.route('/admin/season-schedule', methods=['POST'])
+def schedule_season_page():
+    form = request.form
+
+    try:
+        start = datetime.fromisoformat(form.get("start"))
+    except (ValueError, TypeError):
+        return form_status("Invalid date/time").dump(), 400
+
+    success, results, status_code = program_manager.schedule_season(
+        series_id=form.get("series_id"),
+        season_number=form.get("season_number"),
+        channel=form.get("channel"),
+        start=start
+    )
+
+    if not success:
+        return form_status(results).dump(), status_code
+
+    return season_schedule_results(results).dump(), status_code
 
 

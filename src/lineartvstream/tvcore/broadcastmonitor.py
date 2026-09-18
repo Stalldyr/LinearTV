@@ -2,7 +2,7 @@
 from .tvdatabase import TVDatabase, Schedule
 from .schemas import ScheduleOutput
 from .tvconstants import *
-from datetime import datetime, time
+from datetime import datetime
 import threading
 import time
 
@@ -56,21 +56,18 @@ class BroadcastMonitor:
         Return either real time or simulated time. For testing purposes mainly
         """
 
-        if self.test_time is None and self.time_acceleration is None:
+        if self.test_time is None:
             return datetime.now()
-        
+
         if self.time_freeze:
             return self.test_time
-        
+
         if self.simulation_started is None:
             self.simulation_started = datetime.now()
-            if self.test_time is None:
-                self.test_time = datetime.now()
-                
+
         real_time_elapsed = datetime.now() - self.simulation_started
-        
         simulated_time_elapsed = real_time_elapsed * self.time_acceleration
-        
+
         return self.test_time + simulated_time_elapsed
 
     def update_air_date(self, program: ScheduleOutput):

@@ -4,7 +4,7 @@ from flask import url_for
 from lineartvstream.tvcore.tvdatabase import Series, Movie, Episode, TVDatabase
 from lineartvstream.ui.forms_style import (
     form_group, form_label, form_select, form_input,
-    form_input_with_button, form_text, form_column,
+    form_input_with_button, form_text, form_column
 )
 from lineartvstream.ui.buttons_style import button
 
@@ -140,7 +140,7 @@ class FormBase():
     def genre_id_field(self) -> Div:
         return form_group(
             form_label("Genre-ID:"),
-            form_input(type="text", name="name", value=self._value("channel_id"))
+            form_input(type="text", name="name", value=self._value("name"))
         )
 
     def genre_name_field(self) -> Div:
@@ -199,6 +199,7 @@ class FormBase():
     def end_time(self):
         return Input(type="hidden", name="end", value=self._value("end"))
 
+    
     def series_id_key(self):
         return Input(type="hidden", name="series_id", value=self._value("series_id"))
 
@@ -246,13 +247,18 @@ class FormBase():
     def render_form(
         self,
         fields: list,
+        post_endpoint: str,
+        target: str = "#form-status",
         **kwargs
     ) -> Form:
         return Form(
             *fields,
             self.buttons_field(),
-            method="POST",
+            Div(id="form-status"),
             id = "formData",
+            hx_post = url_for(post_endpoint),
+            hx_target = target,
+            hx_swap = "innerHTML",
             **kwargs
         )
 
@@ -265,6 +271,8 @@ class ChannelForm(FormBase):
         self.entry = entry
 
     def form(self) -> Form:
+        print(self.entry)
+
         fields = [  
             self.channel_id_field(),
             self.channel_name_field()
@@ -273,7 +281,7 @@ class ChannelForm(FormBase):
         if self.entry:
             fields.append(self.channel_key())
 
-        return self.render_form(fields)
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.channel_page")
 
 
 
@@ -292,7 +300,7 @@ class GenreForm(FormBase):
         if self.entry:
             fields.append(self.genre_id_key())
 
-        return self.render_form(fields)
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.genre_page")
 
 # ============ SERIES ============
 
@@ -312,13 +320,18 @@ class SeriesForm(FormBase):
         if self.entry:
             fields.append(self.series_id_key())
 
-        return self.render_form(fields)
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.series_page")
 
 # ============ EPISODES ============
 
 class EpisodesForm(FormBase):
-    def __init__(self, entry: Episode | None = None):
+    def __init__(self, entry: Episode | None = None, series_id: int | None = None):
         self.entry = entry
+        self.series_id = series_id
+
+    def series_id_key(self):
+        series_id = self.series_id or self._value("series_id")
+        return Input(type="hidden", name="series_id", value=series_id)
 
     def form(self) -> Form:
         fields = [   
@@ -335,7 +348,7 @@ class EpisodesForm(FormBase):
         if self.entry:
             fields.append(self.episode_id_key())
 
-        return self.render_form(fields)
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.episodes_page")
 
 
 # ============ MOVIE ============
@@ -356,6 +369,7 @@ class MovieForm(FormBase):
                 self.genre_select(),
                 self.duration_field(),
             ],
+            post_endpoint="streaming.admin_crud.movies_page"
         )
 
 # ============ SCHEDULE ============
@@ -370,29 +384,57 @@ class ScheduleForm(FormBase):
             self.channel_select(),
             self.datetime_select(),
             self.end_time(),
-            self.duration_field(),
             self.rerun_check(),
             self.episode_id_key(),
             self.movie_id_key(),
             self.schedule_id_key()
         ]
         
-        return self.render_form(fields)
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.schedule_page")
 
 # ============ SEASON ============
 
 class SeasonForm(FormBase):
-    def __init__(self, entry: Series | None = None):
-        self.entry = entry
+    def __init__(self, series_id: int | None = None):
+        self.series_id = series_id
+        self.entry = None
+
+    def series_id_key(self):
+        return Input(type="hidden", name="series_id", value=self.series_id)
 
     def form(self) -> Form:
-        return self.render_form(
-            fields=[
-                self.source_url_field(),
-                self.season_number_field(column=2),
-            ],
-            entry=self.entry,
-            post_endpoint="streaming.admin_crud.save_season",
-            hidden={"series_id": "series_id", "episode_id": "id"},
+        fields = [
+            self.series_id_key(),
+            self.source_url_field(),
+            self.season_number_field(),
+        ]
+
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.save_season")
+
+class SeasonScheduleForm(FormBase):
+    def __init__(self, series_id: int, entry=None):
+        self.entry = entry
+        self.series_id = series_id
+
+    def series_id_key(self):
+        return Input(type="hidden", name="series_id", value=self.series_id)
+
+    def season_select(self):
+        seasons = tv_db.get_seasons(self.series_id)
+        return form_group(
+            form_label("Sesong:"),
+            form_select(
+                *[Option(f"Sesong {s}", value=s) for s in seasons],
+                name="season_number"
+            )
         )
 
+    def form(self) -> Form:
+        fields = [
+            self.series_id_key(),
+            self.season_select(),
+            self.channel_select(),
+            self.datetime_select(),
+        ]
+
+        return self.render_form(fields, post_endpoint="streaming.admin_crud.schedule_season_page")

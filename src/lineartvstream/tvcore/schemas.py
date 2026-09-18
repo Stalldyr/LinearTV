@@ -1,13 +1,10 @@
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, AliasChoices, AliasPath
 from datetime import datetime, time, date, timedelta
-import json
 import isodate
-from pathlib import Path
 from .helper import parse_aspnet_date, same_iso_week_this_year
-import math
-
 from typing import Literal
+
 Channel = Literal["nrk1", "nrk2"]
 
 class NRKInputCategory(BaseModel):
@@ -123,7 +120,7 @@ class ScheduleInput(HTMLFormModel):
     movie_id: int | None = None
     title: str 
     start: datetime
-    end: datetime | None
+    end: datetime | None = None
     rerun: bool = False
     channel: str
 
@@ -132,11 +129,7 @@ class ScheduleInput(HTMLFormModel):
         if (self.episode_id is None) == (self.movie_id is None):
             raise ValueError("Either episode_id or movie_id must be set (but not both)")
 
-        self.end = (self.start + timedelta(seconds=self.duration)).replace(microsecond=0)
         return self
-
-
-
 
 
 
@@ -219,12 +212,18 @@ class ScheduleOutput(BaseModel):
 
 
 
-class YTDLPInput(BaseModel):
+class YTDLPEpisodeInput(BaseModel):
     program_id: str | None = Field(None, alias="id")
     season_number: int | None = Field(None)
     episode_number: int | None = Field(None, validation_alias = AliasChoices("episode_number", "playlist_index"))
     title: str | None
-    #"series_title": episode_data.get("series"),
+    description: str | None
+    duration: float | int | None
+    source_url: str | None = Field(alias="webpage_url")
+
+class YTDLPMovieInput(BaseModel):
+    program_id: str | None = Field(None, alias="id")
+    title: str | None
     description: str | None
     duration: float | int | None
     source_url: str | None = Field(alias="webpage_url")
@@ -270,38 +269,7 @@ class TMDBMovieInput(BaseModel):
 
 
 
-class MetadataInput(TMDBEpisodeInput, TMDBSeriesInput, TMDBMovieInput, YTDLPInput):
+class MetadataInput(TMDBEpisodeInput, TMDBSeriesInput, TMDBMovieInput, YTDLPEpisodeInput, YTDLPMovieInput):
     pass
 
 
-class ScheduleConfig(BaseModel):
-    broadcast_start: time
-    broadcast_end: time
-    broadcast_steps: int
-
-class PathsConfig(BaseModel):
-    download_path: str | Path
-    series_path: str | Path
-    movies_path: str | Path
-
-class UpdateConfig(BaseModel):
-    frequency: str
-
-class VideoConfig(BaseModel):
-    quality: str | int
-
-class TVConfig(BaseModel):
-    language: str = "en"
-    schedule: ScheduleConfig
-    paths: PathsConfig
-    updates: UpdateConfig
-    video: VideoConfig
-    genres: list[str]
-    
-    @classmethod
-    def from_file(cls, path: str | Path = "") -> "TVConfig":
-        if not path:
-            path = Path(__file__).parent.parent.absolute()/"config.json"
-        
-        with open(path) as f:
-            return cls(**json.load(f))

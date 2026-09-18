@@ -5,6 +5,7 @@
         "broadcast_end": "04:00"
     },
     "paths": {
+        "base_path": "/opt/ftv",
         "download_path": "downloads",
         "series_path": "downloads/series",
         "movies_path": "downloads/movies"

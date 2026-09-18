@@ -1,9 +1,14 @@
 from .tvconstants import *
+from .appdirs import get_config_dir
+
 from pathlib import Path
+import shutil
+from importlib.resources import files as resource_files
+
 
 class MediaPathManager:
     def __init__(self, download_path=None, media_path=None, ad_path=None, series_subdir=TYPE_SERIES, movies_subdir=TYPE_MOVIES, **kwargs):
-        self.base_dir = Path(".")/"tvfiles"
+        self.base_dir = Path(get_config_dir())/"tvfiles"
 
         if download_path:
             self.download_path = Path(download_path)
@@ -29,11 +34,26 @@ class MediaPathManager:
 
         self._ensure_base_paths()
 
+    def _ensure_default_ad(self):
+        """Copy the bundled placeholder ad into ad_path if it's empty."""
+        if any(self.ad_path.iterdir()):
+            return  
+        
+        try:
+            source = resource_files("lineartvstream.assets").joinpath("PM5544.mp4")
+            with source.open("rb") as src:
+                with open(self.ad_path / "PM5544.mp4", "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        except (FileNotFoundError, ModuleNotFoundError) as e:
+            print("Could not install default ad file: %s", e)
+
     def _ensure_base_paths(self):
         """Create base slug structure if it doesn't exist"""
 
         for path in [self.base_dir, self.download_path, self.media_path, self.series_path, self.movies_path, self.ad_path]:
             Path(path).mkdir(exist_ok=True)
+
+        self._ensure_default_ad()
 
     def get_program_dir(self, media_type:Path, slug:str) -> Path:
         """Get the full path to a program's slug"""
@@ -93,11 +113,11 @@ class MediaPathManager:
         
     #TMDB
 
-    def create_tmbd_season_json_name(self, tmdbid:int , season:int, language:str) -> str:
+    def create_tmbd_season_json_name(self, tmdbid:int , season:int, language:str="en") -> str:
         return f'tmdb_tv_id{tmdbid}s{season}_{language}.json'
     
-    def create_tmbd_episode_json_name(self, tmdbid, season, episode, language) -> str:
+    def create_tmbd_episode_json_name(self, tmdbid:int, season:int, episode:int, language:str="en") -> str:
         return f'tmdb_tv_id{tmdbid}s{season}e{episode}_{language}.json'
     
-    def create_tmbd_movie_json_name(self, tmdbid, language) -> str:
+    def create_tmbd_movie_json_name(self, tmdbid:int, language:str="en") -> str:
         return f'tmdb_film_{tmdbid}_{language}.json'
