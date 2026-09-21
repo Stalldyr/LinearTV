@@ -264,3 +264,21 @@ class ProgramManager:
             added.append(episode_id)
 
         return f"{len(added)} episodes added", 200
+
+
+    # ============ DATABASE ENRICHMENT ============
+
+    def enrich_ytdlp_episode_metadata(self, url, slug, series_id, episode_id):
+        json_path = self.paths.get_metadata_path(
+            TYPE_SERIES, 
+            slug, 
+            self.paths.create_ytdlp_episode_json_name(series_id, episode_id)
+        )
+
+        episode_data = self.metadata.get_ytdlp_data(url, json_path = json_path)
+        relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
+
+        self.database.upsert(Episode(id=episode_id,**relevant_data.model_dump()))
+
+        if relevant_data.duration:
+            self.database.bulk_update_schedule(episode_id,relevant_data.duration)

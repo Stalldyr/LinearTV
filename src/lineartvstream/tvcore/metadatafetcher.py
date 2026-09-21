@@ -1,3 +1,4 @@
+from .tvdatabase import Episode
 from .mediapathmanager import MediaPathManager
 from .tvconstants import *
 from .schemas import YTDLPEpisodeInput, YTDLPMovieInput, TMDBEpisodeInput, TMDBMovieInput, TMDBSeriesInput, MetadataInput
@@ -77,7 +78,7 @@ class MetaDataFetcher:
         
         return data
     
-    def get_tmdb_episode_data(self, tmdb_id:int=None, season=None, episode=None, json_path:Path=None, write_to_json = True, validate=False) -> dict:
+    def get_tmdb_episode_data(self, tmdb_id:int=None, season:int=None, episode:int=None, json_path:Path=None, write_to_json = True, validate=False) -> dict:
         if json_path and json_path.exists():
             with open(json_path) as f:
                 return json.load(f)

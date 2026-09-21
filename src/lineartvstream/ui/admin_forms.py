@@ -95,7 +95,7 @@ class FormBase():
                     color="cyan",
                     size="mini",
                     hx_get=url_for(endpoint),
-                    hx_include="#tmdb_id",
+                    hx_include="#formData",
                     hx_target="#formData"
                 )
             )
@@ -111,6 +111,23 @@ class FormBase():
         return form_group(
             form_label("URL:"),
             form_input(type="text", name="source_url", value=self._value("source_url"))
+        )
+
+    def ytdlp_url_field(self, endpoint):
+        return form_group(
+            form_label("URL:"),
+            form_input_with_button(
+                form_input(type="text", name="source_url", id="source_url", value=self._value("source_url")),
+                button(
+                    "Fetch",
+                    color="cyan",
+                    size="mini",
+                    hx_get=url_for(endpoint),
+                    hx_include="#formData",
+                    hx_target="#formData",
+                    hx_swap="outerHTML"
+                )
+            )
         )
 
     def season_field(self) -> Div:
@@ -325,28 +342,32 @@ class SeriesForm(FormBase):
 # ============ EPISODES ============
 
 class EpisodesForm(FormBase):
-    def __init__(self, entry: Episode | None = None, series_id: int | None = None):
+    def __init__(self, entry: Episode | None = None, series_id: int | None = None, episode_id: int | None = None):
         self.entry = entry
         self.series_id = series_id
+        self.episode_id = episode_id
 
     def series_id_key(self):
         series_id = self.series_id or self._value("series_id")
         return Input(type="hidden", name="series_id", value=series_id)
 
+    def episode_id_key(self):
+        episode_id = self.episode_id or self._value("episode_id")
+        return Input(type="hidden", name="episode_id", value=episode_id)
+
     def form(self) -> Form:
-        fields = [   
+        fields = [
+            self.episode_id_key(),
             self.series_id_key(),
+            self.tmdb_field("streaming.htmx.tmdb_fetch_episode"),
+            self.ytdlp_url_field("streaming.htmx.ytdlp_fetch_episode"),
             self.title_field(),
             self.program_id_field(),
-            self.source_url_field(),
             self.description_field(),
             self.season_number_field(),
             self.episode_number_field(),
             self.duration_field(),
         ]
-
-        if self.entry:
-            fields.append(self.episode_id_key())
 
         return self.render_form(fields, post_endpoint="streaming.admin_crud.episodes_page")
 
@@ -354,17 +375,22 @@ class EpisodesForm(FormBase):
 # ============ MOVIE ============
 
 class MovieForm(FormBase):
-    def __init__(self, entry: Movie | None = None):
+    def __init__(self, entry: Movie | None = None, movie_id: int | None = None):
         self.entry = entry
+        self.movie_id = movie_id
+
+    def movie_id_key(self):
+        movie_id = self.movie_id or self._value("movie_id")
+        return Input(type="hidden", name="movie_id", value=movie_id)
 
     def form(self) -> Form:
         return self.render_form(
             [
                 self.movie_id_key(),
                 self.tmdb_field("streaming.htmx.tmdb_fetch_movie"),
+                self.ytdlp_url_field("streaming.htmx.ytdlp_fetch_movie"),
                 self.title_field(),
                 self.description_field(),
-                self.source_url_field(),
                 self.release_field(),
                 self.genre_select(),
                 self.duration_field(),

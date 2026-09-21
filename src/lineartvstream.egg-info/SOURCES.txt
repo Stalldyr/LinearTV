@@ -13,6 +13,7 @@ src/lineartvstream/assets/PM5544.mp4
 src/lineartvstream/routes/admin_crud.py
 src/lineartvstream/routes/htmx_partials.py
 src/lineartvstream/tvcore/__init__.py
+src/lineartvstream/tvcore/appdirs.py
 src/lineartvstream/tvcore/broadcastmonitor.py
 src/lineartvstream/tvcore/filehandler.py
 src/lineartvstream/tvcore/helper.py

@@ -1,4 +1,4 @@
-from hypermedia import Html, Head, Link, Script, Meta, Title, Body
+from hypermedia import Html, Head, Script, Meta, Title, Body
 
 def base(title, description) -> Html:
   return Html(

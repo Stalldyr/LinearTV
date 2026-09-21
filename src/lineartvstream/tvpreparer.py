@@ -1,5 +1,6 @@
 from lineartvstream.tvcore.tvdownloader import TVDownloader
 from lineartvstream.tvcore.metadatafetcher import MetaDataFetcher
+from lineartvstream.tvcore.metadataenricher import MetadataEnricher
 from lineartvstream.tvcore.tvdatabase import Movie, TVDatabase, Episode, Schedule, Channels
 from lineartvstream.tvcore.filehandler import TVFileHandler
 from lineartvstream.tvcore.mediapathmanager import MediaPathManager
@@ -37,6 +38,7 @@ class TVPreparer():
         self.downloader = TVDownloader()
         self.handler = TVFileHandler()
         self.metadata = MetaDataFetcher()
+        self.enricher = MetadataEnricher()
 
     def cleanup_obsolete_episodes(self):
         obsolete_programs = self.database.get_obsolete_programs()
@@ -99,35 +101,24 @@ class TVPreparer():
         
         for episode in episodes:
             if episode.source_url:
-                json_path = self.paths.get_metadata_path(
-                    TYPE_SERIES, 
-                    episode.series.slug, 
-                    self.paths.create_ytdlp_episode_json_name(episode.series.series_id, episode.episode_id)
-                )
-
                 try: 
-                    episode_data = self.metadata.get_ytdlp_data(episode.source_url, json_path = json_path)
-                    relevant_data = self.metadata.extract_episode_info_from_ytdlp(episode_data)
-
-                    self.database.upsert(Episode(id=episode.episode_id,**relevant_data.model_dump()))
-        
-                    if relevant_data.duration:
-                        self.database.bulk_update_schedule(episode.episode_id,relevant_data.duration)
+                    self.enricher.enrich_ytdlp_episode_metadata(
+                        episode.source_url,
+                        episode.series.slug,
+                        episode.series.series_id,
+                        episode.episode_id
+                    )
                 except Exception as e:
                     logging.error("Failed to fetch YTDLP metadata for episode %s: %s", episode.episode_id, e)
                 
             if episode.tmdb_id:
-                json_path = self.paths.get_metadata_path(
-                    TYPE_SERIES, 
-                    episode.series.slug, 
-                    self.paths.create_tmbd_episode_json_name(episode.tmdb_id,episode.series.series_id, episode.episode_id)
-                )
-
                 try:
-                    episode_data = self.metadata.get_tmdb_episode_data(tmdb_id=episode.tmdb_id, json_path = json_path)
-                    relevant_data = self.metadata.extract_episode_info_from_tmdb(episode_data)
-
-                    self.database.upsert(Episode(id=episode.episode_id,**relevant_data.model_dump()))
+                    self.enricher.enrich_tmdb_episode_metadata(
+                        episode.series.slug,
+                        episode.tmdb_id,
+                        episode.series.series_id,
+                        episode.episode_id
+                    )
 
                 except Exception as e:
                     logging.error("Failed to fetch TMDB metadata for episode %s: %s", episode.episode_id, e)
@@ -136,20 +127,13 @@ class TVPreparer():
 
         for movie in movies:
             if movie.source_url:
-                json_path = self.paths.get_metadata_path(
-                    TYPE_MOVIES, 
-                    movie.slug, 
-                    self.paths.create_ytdlp_movie_json_name(movie.movie_id)
-                )
-
                 try: 
-                    movie_data = self.metadata.get_ytdlp_data(movie.source_url, json_path = json_path)
-                    relevant_data = self.metadata.extract_movie_info_from_ytdlp(movie_data)
-
-                    self.database.upsert(Movie(id=movie.movie_id,**relevant_data.model_dump()))
-        
-                    if relevant_data.duration:
-                        self.database.bulk_update_schedule(movie.movie_id,relevant_data.duration)
+                    self.enricher.enrich_ytdlp_movie_metadata(
+                        movie.source_url,
+                        movie.slug,
+                        movie.movie_id
+                    )
+    
                 except Exception as e:
                     logging.error("Failed to fetch YTDLP metadata for movie %s: %s", movie.movie_id, e)
                 

@@ -10,7 +10,6 @@ from pydantic_core import ValidationError
 
 from .tvconstants import *
 from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
-from .metadatafetcher import MetaDataFetcher
 from .appdirs import get_config_dir
 
 class Base(DeclarativeBase):
@@ -134,8 +133,6 @@ class TVDatabase:
         # Create engine and session factory
         self.engine = create_engine(f'sqlite:///{self.db_path}', echo=False)
         self.SessionLocal = sessionmaker(bind=self.engine)
-        
-        self.metadatafetcher = MetaDataFetcher()
         
         # Setup database if it doesn't exist
         if not self.db_path.exists():

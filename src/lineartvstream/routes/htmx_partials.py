@@ -6,6 +6,7 @@ from lineartvstream.ui.admin_forms import (
     GenreForm, SeasonScheduleForm, SeriesForm, MovieForm, ScheduleForm, EpisodesForm,
     SeasonForm, ChannelForm
 )
+from lineartvstream.ui.admin_pages import form_status
 from lineartvstream.ui.stream_html import stream_channel_panel
 
 htmx_admin = Blueprint(
@@ -103,6 +104,19 @@ def tmdb_fetch_series():
     program = metadata_fetcher.extract_series_info_from_tmdb(data)
     return SeriesForm(program).form().dump()
 
+@htmx.route("/tmdb-fetch/episode")
+def tmdb_fetch_episode():
+    tmdb_id = request.args.get("tmdb_id")
+    season = request.args.get("season_number")
+    episode = request.args.get("episode_number")
+
+    if not tmdb_id or not season or not episode:
+        return Response(status=204, headers={"HX-Reswap": "none"})
+
+    data = metadata_fetcher.get_tmdb_episode_data(tmdb_id=int(tmdb_id), season=season, episode=episode)
+    program = metadata_fetcher.extract_episode_info_from_tmdb(data)
+    return EpisodesForm(program).form().dump()
+
 @htmx.route("/tmdb-fetch/movie")
 def tmdb_fetch_movie():
     tmdb_id = request.args.get("tmdb_id")
@@ -113,6 +127,51 @@ def tmdb_fetch_movie():
     data = metadata_fetcher.get_tmdb_movie_data(tmdb_id=int(tmdb_id))
     program = metadata_fetcher.extract_movie_info_from_tmdb(data)
     return MovieForm(program).form().dump()
+
+# ============ YTDLP ============
+
+@htmx.route("/ytdlp-fetch/episode")
+def ytdlp_fetch_episode():
+    source_url = request.args.get("source_url")
+    series_id = request.args.get("series_id")
+    episode_id = request.args.get("episode_id")
+
+    if not source_url:
+        return Response(status=204, headers={"HX-Reswap": "none"})
+
+    try:
+        data = metadata_fetcher.fetch_ytdlp_data(source_url)
+        program = metadata_fetcher.extract_episode_info_from_ytdlp(data)
+    except Exception as e:
+        return Response(
+            form_status("Could not fetch metadata from URL").dump(),
+            status=200,
+            headers={"HX-Retarget": "#form-status", "HX-Reswap": "innerHTML"}
+        )
+
+    return EpisodesForm(program, series_id=series_id, episode_id=episode_id).form().dump()
+
+
+@htmx.route("/ytdlp-fetch/movie")
+def ytdlp_fetch_movie():
+    source_url = request.args.get("source_url")
+    movie_id = request.args.get("movie_id")
+
+    if not source_url:
+        return Response(status=204, headers={"HX-Reswap": "none"})
+
+    try:
+        data = metadata_fetcher.fetch_ytdlp_data(source_url)
+        program = metadata_fetcher.extract_movie_info_from_ytdlp(data)
+    except Exception as e:
+        return Response(
+            form_status("Could not fetch metadata from URL").dump(),
+            status=200,
+            headers={"HX-Retarget": "#form-status", "HX-Reswap": "innerHTML"}
+        )
+
+    return MovieForm(program, movie_id=movie_id).form().dump()
+
 
 # ============ STREAM ============
 
