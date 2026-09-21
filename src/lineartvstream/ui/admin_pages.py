@@ -106,7 +106,7 @@ def movies_table(movies):
             Tr(
                 Td(m.title),
                 Td(A("Edit", hx_get=f"/admin/partials/movies/form?movie_id={m.movie_id}", hx_target="#form_panel", href="")),
-                Td(A("Add to schedule", href=f"/admin/schedule?movie_id={m.movie_id}")),
+                Td(A("Add to schedule", hx_get=f"/admin/partials/schedule/form?movie_id={m.movie_id}", hx_target="#form_panel", href="")),
             )
             for m in movies
         ]
@@ -134,7 +134,7 @@ def episodes_table(episodes):
                 Td(e.episode_number),
                 Td(e.title),
                 Td(A("Edit", hx_get=f"/admin/partials/episodes/form?episode_id={e.episode_id}", hx_target="#form_panel", href="")),
-                Td(A("Add to schedule", href=f"/admin/schedule?episode_id={e.episode_id}")),
+                Td(A("Add to schedule", hx_get=f"/admin/partials/schedule/form?episode_id={e.episode_id}", hx_target="#form_panel", href="")),
             )
             for e in episodes
         ]

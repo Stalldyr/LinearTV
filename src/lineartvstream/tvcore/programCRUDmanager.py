@@ -193,7 +193,7 @@ class ProgramManager:
 
         return result
 
-    def schedule_season(self, series_id: int, season_number: int, channel: str, start: datetime):
+    def schedule_season(self, series_id: int, season_number: int, channel: str, start: datetime, rerun: bool = False):
         episodes = self.db.get_episodes(series_id=series_id, season_number=season_number)
 
         if not episodes:
@@ -220,7 +220,8 @@ class ProgramManager:
                     title=episode.title,
                     channel=channel,
                     start=ep_start,
-                    end=ep_end
+                    end=ep_end,
+                    rerun=rerun
                 )
             )
 

@@ -133,7 +133,8 @@ def schedule_season_page():
         series_id=form.get("series_id"),
         season_number=form.get("season_number"),
         channel=form.get("channel"),
-        start=start
+        start=start,
+        rerun=form.get("rerun") == 'on'
     )
 
     if not success:

@@ -401,11 +401,38 @@ class MovieForm(FormBase):
 # ============ SCHEDULE ============
 
 class ScheduleForm(FormBase):
-    def __init__(self, entry=None):
+    def __init__(self, entry=None, episode=None, movie=None):
         self.entry = entry
+        self.episode = episode
+        self.movie = movie
+
+    def title_field(self):
+        title = self._value("title")
+        if not title:
+            program = self.episode or self.movie
+            title = program.title if program else ""
+
+        return form_group(
+            form_label("Title*:"),
+            form_input(type="text", name="title", value=title)
+        )
+
+    def episode_id_key(self):
+        episode_id = self._value("episode_id")
+        if episode_id is None and self.episode:
+            episode_id = self.episode.episode_id
+
+        return Input(type="hidden", name="episode_id", value=episode_id if episode_id is not None else "")
+
+    def movie_id_key(self):
+        movie_id = self._value("movie_id")
+        if movie_id is None and self.movie:
+            movie_id = self.movie.movie_id
+
+        return Input(type="hidden", name="movie_id", value=movie_id if movie_id is not None else "")
 
     def form(self) -> Form:
-        fields = [   
+        fields = [
             self.title_field(),
             self.channel_select(),
             self.datetime_select(),
@@ -415,7 +442,7 @@ class ScheduleForm(FormBase):
             self.movie_id_key(),
             self.schedule_id_key()
         ]
-        
+
         return self.render_form(fields, post_endpoint="streaming.admin_crud.schedule_page")
 
 # ============ SEASON ============
@@ -461,6 +488,7 @@ class SeasonScheduleForm(FormBase):
             self.season_select(),
             self.channel_select(),
             self.datetime_select(),
+            self.rerun_check(),
         ]
 
         return self.render_form(fields, post_endpoint="streaming.admin_crud.schedule_season_page")

@@ -88,9 +88,14 @@ def season_schedule_form_open():
 @htmx_admin.route("/schedule/form", methods=['GET'])
 def schedule_form_open():
     schedule_id = request.args.get("schedule_id")
-    schedule = tv_db.get_schedule(schedule_id=schedule_id)
-    return ScheduleForm(schedule).form().dump()
+    episode_id = request.args.get("episode_id")
+    movie_id = request.args.get("movie_id")
 
+    schedule = tv_db.get_schedule(schedule_id=schedule_id) if schedule_id else None
+    episode = tv_db.get_episodes(episode_id=episode_id) if episode_id else None
+    movie = tv_db.get_movies(movie_id=movie_id) if movie_id else None
+
+    return ScheduleForm(schedule, episode=episode, movie=movie).form().dump()
 # ============ TMDB ============
 
 @htmx.route("/tmdb-fetch/series")
