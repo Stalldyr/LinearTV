@@ -1,6 +1,7 @@
 from .tvconstants import *
 from .tvdatabase import TVDatabase, Schedule
 import yt_dlp
+from .tvconfig import get_config_dict
 
 class TVDownloader:
     def __init__(self):
@@ -10,7 +11,6 @@ class TVDownloader:
         self.downloader = Downloader()
         self.database = TVDatabase()
         
-
     def download_from_playlist(self, schedule_id:int, output_path, download_url, episode, total_episodes=0, reverse_order=False):
         """
         Download a TV episode
@@ -75,10 +75,11 @@ class TVDownloader:
     
 class Downloader:
     def __init__(self, custom_options={}):
-        self.default_quality = 480
+        video_settings = get_config_dict()["video"]
 
-        #ytdlp options
-        #Highly customizable. Check yt_dlp.YoutubeDL.__doc__
+        self.default_quality = video_settings["quality"]
+
+        #ytdlp options, highly customizable. Check yt_dlp.YoutubeDL.__doc__
         self.ydl_opts = custom_options
          
     def download(self, url, output_path, index=1, quality=None, **kwargs):

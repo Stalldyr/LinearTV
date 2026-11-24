@@ -206,3 +206,13 @@ def season_schedule_results(results: list[dict]):
         ),
         id="form-status"
     )
+
+
+
+def settings_body():
+    return Div(
+        H1(f"Settings"),
+        Div(
+            id="form_panel"
+        )
+    )

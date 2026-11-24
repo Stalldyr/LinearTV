@@ -1,5 +1,5 @@
 from .tvconstants import *
-from .appdirs import get_config_dir
+from .tvconfig import get_config_dict
 
 from pathlib import Path
 import shutil
@@ -7,30 +7,16 @@ from importlib.resources import files as resource_files
 
 
 class MediaPathManager:
-    def __init__(self, download_path=None, media_path=None, ad_path=None, series_subdir=TYPE_SERIES, movies_subdir=TYPE_MOVIES, **kwargs):
-        self.base_dir = Path(get_config_dir())/"tvfiles"
+    def __init__(self):
 
-        if download_path:
-            self.download_path = Path(download_path)
-        else:
-            self.download_path = self.base_dir / "downloads"
-
-        if media_path:
-            self.media_path = Path(media_path)
-        else:
-            self.media_path = self.base_dir / "media"
-
-        if ad_path:
-            self.ad_path = Path(ad_path)
-        else:
-            self.ad_path = self.media_path / "ads"
-            
-        self.series_path = self.media_path / series_subdir
-        self.movies_path = self.media_path / movies_subdir
-
-        self.paths = []
-        for path in kwargs:
-            self.paths.append(Path(download_path)/path)
+        self.base_dir = Path(get_config_dict()["paths"]["media"])
+        
+        self.download_path = self.base_dir / "downloads"
+        self.media_path = self.base_dir / "media"
+        
+        self.ad_path = self.media_path / "ads"    
+        self.series_path = self.media_path / "series"
+        self.movies_path = self.media_path / "movies"
 
         self._ensure_base_paths()
 
@@ -66,7 +52,6 @@ class MediaPathManager:
             raise ValueError(f"Invalid media type: {media_type}")
         
         program_dir = media_dir / slug
-        
         program_dir.mkdir(exist_ok = True)
         
         return program_dir

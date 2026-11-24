@@ -1,16 +1,12 @@
 from hypermedia import H3, Div, Form, Input, Option, Hr
 from flask import url_for
 
-from lineartvstream.tvcore.tvdatabase import Series, Movie, Episode, TVDatabase
-from lineartvstream.ui.forms_style import (
+from lineartvstream.tvcore.tvdatabase import Series, Movie, Episode
+from lineartvstream.ui.style_forms import (
     form_group, form_label, form_select, form_input,
-    form_input_with_button, form_text, form_column
+    form_input_with_button, form_text
 )
-from lineartvstream.ui.buttons_style import button
-
-
-tv_db = TVDatabase()
-
+from lineartvstream.ui.style_buttons import button
 
 def form_panel(title: str, header, form_fields) -> Div:
     return Div(
@@ -54,9 +50,49 @@ class FormBase():
             **kwargs
         )
 
+    def buttons_field(self):
+        buttons = [
+            button(
+                "Save",
+                color="cyan2", 
+                size="form",
+                type="submit"
+            ),
+        ]
+
+        if self.entry:
+            buttons.insert(
+                1, 
+                button(
+                    "Delete",
+                    size="form",
+                    type="submit",
+                    value="true"
+                )
+            )
+
+        return Div(*buttons, class_="mt-3.75 text-right")
+
+    def render_form(
+        self,
+        fields: list,
+        post_endpoint: str,
+        target: str = "#form-status",
+        **kwargs
+    ) -> Form:
+        return Form(
+            *fields,
+            self.buttons_field(),
+            Div(id="form-status"),
+            id = "formData",
+            hx_post = url_for(post_endpoint),
+            hx_target = target,
+            hx_swap = "innerHTML",
+            **kwargs
+        )
 
 
-    
+class MediaFormBase(FormBase):
     def title_field(self):
         return form_group(
             form_label("Title*:"),
@@ -75,8 +111,7 @@ class FormBase():
             form_text(self._value("description"), name="description", rows="4")
         )
 
-    def genre_select(self):
-        genres = tv_db.get_genres()
+    def genre_select(self, genres):
         return form_group(
             form_label("Genre:"),
             form_select(
@@ -191,8 +226,7 @@ class FormBase():
             form_input(type="checkbox", name="rerun", id="rerun", checked=self._value("rerun"))
         )
 
-    def channel_select(self):
-        channels = tv_db.get_channels()
+    def channel_select(self, channels):
         return form_group(
             form_label("Channel:"),
             form_select(
@@ -206,7 +240,7 @@ class FormBase():
             form_label("Date"),
             form_input(
                 type="datetime-local",
-                value=self._value("start"),#datetime.now().isoformat(timespec="minutes"),
+                value=self._value("start"),
                 name="start",
                 id="date-select",
                 **kwargs
@@ -238,52 +272,12 @@ class FormBase():
 
     
     
-    def buttons_field(self):
-        buttons = [
-            button(
-                "Save",
-                color="cyan2", 
-                size="form",
-                type="submit"
-            ),
-        ]
-
-        if self.entry:
-            buttons.insert(
-                1, 
-                button(
-                    "Delete",
-                    size="form",
-                    type="submit",
-                    value="true"
-                )
-            )
-
-        return Div(*buttons, class_="mt-3.75 text-right")
-
-    def render_form(
-        self,
-        fields: list,
-        post_endpoint: str,
-        target: str = "#form-status",
-        **kwargs
-    ) -> Form:
-        return Form(
-            *fields,
-            self.buttons_field(),
-            Div(id="form-status"),
-            id = "formData",
-            hx_post = url_for(post_endpoint),
-            hx_target = target,
-            hx_swap = "innerHTML",
-            **kwargs
-        )
 
 
 
 # ============ CHANNEL ============
 
-class ChannelForm(FormBase):
+class ChannelForm(MediaFormBase):
     def __init__(self, entry=None):
         self.entry = entry
 
@@ -304,7 +298,7 @@ class ChannelForm(FormBase):
 
 # ============ GENRES ============
 
-class GenreForm(FormBase):
+class GenreForm(MediaFormBase):
     def __init__(self, entry=None):
         self.entry = entry
 
@@ -321,17 +315,17 @@ class GenreForm(FormBase):
 
 # ============ SERIES ============
 
-class SeriesForm(FormBase):
+class SeriesForm(MediaFormBase):
     def __init__(self, entry: Series | None = None):
         self.entry = entry
 
-    def form(self) -> Form:
+    def form(self, genres) -> Form:
         fields = [
             self.tmdb_field("streaming.htmx.tmdb_fetch_series"),
             self.title_field(),
             self.description_field(),
             self.release_field(),
-            self.genre_select()
+            self.genre_select(genres)
         ]
 
         if self.entry:
@@ -341,7 +335,7 @@ class SeriesForm(FormBase):
 
 # ============ EPISODES ============
 
-class EpisodesForm(FormBase):
+class EpisodesForm(MediaFormBase):
     def __init__(self, entry: Episode | None = None, series_id: int | None = None, episode_id: int | None = None):
         self.entry = entry
         self.series_id = series_id
@@ -374,7 +368,7 @@ class EpisodesForm(FormBase):
 
 # ============ MOVIE ============
 
-class MovieForm(FormBase):
+class MovieForm(MediaFormBase):
     def __init__(self, entry: Movie | None = None, movie_id: int | None = None):
         self.entry = entry
         self.movie_id = movie_id
@@ -400,7 +394,7 @@ class MovieForm(FormBase):
 
 # ============ SCHEDULE ============
 
-class ScheduleForm(FormBase):
+class ScheduleForm(MediaFormBase):
     def __init__(self, entry=None, episode=None, movie=None):
         self.entry = entry
         self.episode = episode
@@ -431,10 +425,10 @@ class ScheduleForm(FormBase):
 
         return Input(type="hidden", name="movie_id", value=movie_id if movie_id is not None else "")
 
-    def form(self) -> Form:
+    def form(self, channels) -> Form:
         fields = [
             self.title_field(),
-            self.channel_select(),
+            self.channel_select(channels),
             self.datetime_select(),
             self.end_time(),
             self.rerun_check(),
@@ -447,7 +441,7 @@ class ScheduleForm(FormBase):
 
 # ============ SEASON ============
 
-class SeasonForm(FormBase):
+class SeasonForm(MediaFormBase):
     def __init__(self, series_id: int | None = None):
         self.series_id = series_id
         self.entry = None
@@ -464,7 +458,7 @@ class SeasonForm(FormBase):
 
         return self.render_form(fields, post_endpoint="streaming.admin_crud.save_season")
 
-class SeasonScheduleForm(FormBase):
+class SeasonScheduleForm(MediaFormBase):
     def __init__(self, series_id: int, entry=None):
         self.entry = entry
         self.series_id = series_id
@@ -472,8 +466,7 @@ class SeasonScheduleForm(FormBase):
     def series_id_key(self):
         return Input(type="hidden", name="series_id", value=self.series_id)
 
-    def season_select(self):
-        seasons = tv_db.get_seasons(self.series_id)
+    def season_select(self, seasons):
         return form_group(
             form_label("Sesong:"),
             form_select(
@@ -482,13 +475,40 @@ class SeasonScheduleForm(FormBase):
             )
         )
 
-    def form(self) -> Form:
+    def form(self, seasons, channels) -> Form:
         fields = [
             self.series_id_key(),
-            self.season_select(),
-            self.channel_select(),
+            self.season_select(seasons),
+            self.channel_select(channels),
             self.datetime_select(),
             self.rerun_check(),
         ]
 
         return self.render_form(fields, post_endpoint="streaming.admin_crud.schedule_season_page")
+
+
+# ============ SETTINGS ============
+
+class SettingsForm(FormBase):
+    def __init__(self, entry=None):
+        self.entry = entry
+
+    def broadcast_start(self):
+        return form_group(
+            form_label("Broadcast start:"),
+            form_input(type="text", name="broadcast_start", value=self._value("broadcast_start"))
+        )
+
+    def broadcast_end(self):
+        return form_group(
+            form_label("Broadcast end:"),
+            form_input(type="text", name="broadcast_end", value=self._value("broadcast_end"))
+        )
+    
+    def form(self) -> Form:
+        fields = [
+            self.broadcast_start(),
+            self.broadcast_end()
+        ]
+
+        return self.render_form(fields, post_endpoint="TODO:")

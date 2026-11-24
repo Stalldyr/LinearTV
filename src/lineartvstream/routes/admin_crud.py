@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from lineartvstream.tvcore.programCRUDmanager import ProgramManager
 from lineartvstream.ui.html_base import base
-from lineartvstream.ui.admin_pages import episodes_body, channels_body, series_body, movies_body, schedule_body, genres_body, form_status, season_schedule_results
+from lineartvstream.ui.html_adminCRUD import episodes_body, channels_body, series_body, movies_body, schedule_body, genres_body, form_status, season_schedule_results
 from lineartvstream.tvcore.tvdatabase import TVDatabase
 from datetime import datetime
 
@@ -141,5 +141,4 @@ def schedule_season_page():
         return form_status(results).dump(), status_code
 
     return season_schedule_results(results).dump(), status_code
-
 

@@ -2,12 +2,12 @@ from flask import Blueprint, Response, request
 
 from lineartvstream.tvcore.tvdatabase import TVDatabase
 from lineartvstream.tvcore.metadatafetcher import MetaDataFetcher
-from lineartvstream.ui.admin_forms import (
+from lineartvstream.ui.html_adminforms import (
     GenreForm, SeasonScheduleForm, SeriesForm, MovieForm, ScheduleForm, EpisodesForm,
     SeasonForm, ChannelForm
 )
-from lineartvstream.ui.admin_pages import form_status
-from lineartvstream.ui.stream_html import stream_channel_panel
+from lineartvstream.ui.html_adminCRUD import form_status
+from lineartvstream.ui.html_stream import stream_channel_panel
 
 htmx_admin = Blueprint(
     'htmx_admin',
@@ -49,7 +49,8 @@ def genres_form_open():
 def series_form_open():
     series_id = request.args.get("series_id")
     series = tv_db.get_series(series_id=series_id)[0] if series_id else None
-    return SeriesForm(series).form().dump()
+    genres = tv_db.get_genres()
+    return SeriesForm(series).form(genres).dump()
 
 # ============ MOVIE ============
 
@@ -81,7 +82,10 @@ def season_form_open():
 @htmx_admin.route("/season-schedule/form", methods=['GET'])
 def season_schedule_form_open():
     series_id = request.args.get("series_id")
-    return SeasonScheduleForm(series_id=series_id).form().dump()
+
+    seasons = tv_db.get_seasons(series_id)
+    channels = tv_db.get_channels()
+    return SeasonScheduleForm(series_id=series_id).form(seasons, channels).dump()
 
 # ============ SCHEDULE ============
 
@@ -95,7 +99,9 @@ def schedule_form_open():
     episode = tv_db.get_episodes(episode_id=episode_id) if episode_id else None
     movie = tv_db.get_movies(movie_id=movie_id) if movie_id else None
 
-    return ScheduleForm(schedule, episode=episode, movie=movie).form().dump()
+    channels = tv_db.get_channels()
+
+    return ScheduleForm(schedule, episode=episode, movie=movie).form(channels).dump()
 # ============ TMDB ============
 
 @htmx.route("/tmdb-fetch/series")

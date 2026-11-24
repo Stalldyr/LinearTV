@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, send_from_directory, request, Blueprint, Response
+from flask import Flask, jsonify, send_from_directory, request, Blueprint, Response
 import os, random
 from datetime import datetime
 from time import sleep
@@ -12,8 +12,8 @@ from lineartvstream.tvcore.tvdatabase import TVDatabase
 from lineartvstream.tvcore.mediapathmanager import MediaPathManager
 from lineartvstream.tvcore.metadatafetcher import MetaDataFetcher
 from lineartvstream.tvcore.broadcastmonitor import BroadcastMonitor
-from lineartvstream.ui.admin_pages import admin_panel
-from lineartvstream.ui.stream_html import stream_html
+from lineartvstream.ui.html_adminCRUD import admin_panel
+from lineartvstream.ui.html_stream import stream_html
 
 stream_app = Blueprint(
     'streaming', 

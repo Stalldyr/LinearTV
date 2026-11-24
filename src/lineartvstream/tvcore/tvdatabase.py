@@ -10,7 +10,7 @@ from pydantic_core import ValidationError
 
 from .tvconstants import *
 from .schemas import ScheduleOutput, SeriesOutput, EpisodeOutput, MovieOutput
-from .appdirs import get_config_dir
+from .tvconfig import get_config_dict
 
 class Base(DeclarativeBase):
     pass
@@ -122,11 +122,8 @@ class Genres(Base):
 
 
 class TVDatabase:
-    def __init__(self, test_time=None, db_path=""):
-        if db_path:
-            self.db_path = Path(db_path)
-        else:
-            self.db_path = Path(get_config_dir())/"data"/"tv.db"
+    def __init__(self, test_time=None):
+        self.db_path = Path(get_config_dict()["paths"]["database"])/"tv.db"
         
         self.test_time = test_time
         

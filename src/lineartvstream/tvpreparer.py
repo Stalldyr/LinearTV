@@ -1,13 +1,13 @@
 from lineartvstream.tvcore.tvdownloader import TVDownloader
 from lineartvstream.tvcore.metadatafetcher import MetaDataFetcher
 from lineartvstream.tvcore.metadataenricher import MetadataEnricher
-from lineartvstream.tvcore.tvdatabase import Movie, TVDatabase, Episode, Schedule, Channels
+from lineartvstream.tvcore.tvdatabase import Movie, TVDatabase, Schedule, Channels
 from lineartvstream.tvcore.filehandler import TVFileHandler
 from lineartvstream.tvcore.mediapathmanager import MediaPathManager
 from lineartvstream.tvcore.nrkmanager import NRKManager, check_for_duplicate_titles
-from lineartvstream.tvcore.helper import get_iso_week_span_target_year, get_iso_week_number
+from lineartvstream.tvcore.helper import get_iso_week_span
 from lineartvstream.tvcore.tvconstants import *
-from lineartvstream.tvcore.appdirs import get_config_dir
+from lineartvstream.tvcore.tvconfig import get_config_dict
 
 from datetime import date, timedelta
 import sys
@@ -15,17 +15,6 @@ from time import sleep
 import logging
 from slugify import slugify
 from pathlib import Path
-
-log_path = Path(get_config_dir()) / "logs" / "preparer.log"
-log_path.parent.mkdir(exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    handlers=[
-        logging.FileHandler(log_path),
-        logging.StreamHandler()
-    ]
-)
 
 class TVPreparer():
     """
@@ -60,44 +49,42 @@ class TVPreparer():
             except Exception as e:
                 logging.error("Error deleting %s: %s", entry.filepath, e)
 
-    def fetch_nrk_data(self, buffer_weeks:int=4):
-        week_number = get_iso_week_number(date.today())
-        start_date, end_date = get_iso_week_span_target_year(week_number, week_number + buffer_weeks, 2001)
+    def fetch_nrk_data(self, years_back: int, buffer_weeks:int=4):
+        today = date.today()
+        diff = round(years_back * 365.25 / 7)
+        original_date = today - timedelta(weeks=diff)
         
-        nrk1 = NRKManager("nrk1")
-        nrk2 = NRKManager("nrk2")
+        start_date, end_date = get_iso_week_span(original_date, original_date + timedelta(weeks=buffer_weeks))
+        
+        nrk_manager = NRKManager(["nrk1", "nrk2"])
 
         self.database.upsert_on_column(Channels(channel_id="nrk1", display_name="NRK1"), [Channels.channel_id])
         self.database.upsert_on_column(Channels(channel_id="nrk2", display_name="NRK2"), [Channels.channel_id])
 
-        nrk1_programs = []
-        nrk2_programs = []
+        nrk_programs = []
         current_date = start_date
         while current_date <= end_date:
             try:
-                nrk1_programs += nrk1.fetch_programs_by_date(current_date)
+                nrk_programs += nrk_manager.fetch_programs_by_date(current_date)
             except Exception as e:
-                logging.error("Failed to fetch NRK1 programs for %s: %s", current_date, e)
+                logging.error("Failed to fetch NRK programs for %s: %s", current_date, e)
             sleep(1)
 
-            try:
-                nrk2_programs += nrk2.fetch_programs_by_date(current_date)
-            except Exception as e:
-                logging.error("Failed to fetch NRK2 programs for %s: %s", current_date, e)
-            sleep(1)
-            
             current_date += timedelta(days=1)
 
-        nrk1.insert_programs(nrk1_programs)
-        nrk2.insert_programs(nrk2_programs)
+        nrk_manager.insert_programs(nrk_programs)
 
-        duplicates = check_for_duplicate_titles(nrk1_programs + nrk2_programs)
+        duplicates = check_for_duplicate_titles(nrk_programs)
         logging.info("Duplicates between %s and %s:", start_date, end_date)
         for original, rerun in duplicates:
             logging.info("%s: %s %s -> %s %s", original.title, original.channel, original.start, rerun.channel, rerun.start)
 
-    def enrich_metadata(self):
-        episodes = self.database.get_episodes(missing=False)
+
+    def enrich_metadata(self, missing=False):
+        """
+        missing: Only replaces data that is missing from the database
+        """
+        episodes = self.database.get_episodes(missing=missing)
         
         for episode in episodes:
             if episode.source_url:
@@ -153,7 +140,7 @@ class TVPreparer():
                 except Exception as e:
                     logging.error("Failed to fetch TMDB metadata for movie %s: %s", movie.movie_id, e)
 
-    def resolve_duplicate_broadcasts(self, buffer_days=3, buffer_time=3, delete_duplicates=False):
+    def resolve_overlapping_broadcasts(self, buffer_days=3, buffer_time=3, delete_overlaps=False):
         now = date.today()
         channels = self.database.get_channels()
 
@@ -166,6 +153,7 @@ class TVPreparer():
 
             schedule.sort(key=lambda e: e.start)
 
+            overlaps = []
             i = 0
             while i < len(schedule):
                 s1 = schedule[i]
@@ -176,16 +164,25 @@ class TVPreparer():
                     if s1.end <= s2.start + timedelta(minutes=buffer_time):
                         break
 
-                    if delete_duplicates:
+                    overlaps.append((s1,s2))
+
+                    schedule.pop(j)
+
+                i += 1
+
+            if not overlaps:
+                logging.info("No overlaps found on channel %s", channel.display_name)
+
+            else:
+                for s1,s2 in overlaps:
+                    if delete_overlaps:
                         self.database.delete(Schedule(id=s2.schedule_id))
 
                     logging.info(
                         "Overlapping broadcast: schedule %s %s (channel %s, start %s) overlaps with schedule %s %s",
-                        s2.schedule_id, s2.title, channel, s2.start, s1.schedule_id, s1.title
+                        s2.schedule_id, s2.title, channel.display_name, s2.start, s1.schedule_id, s1.title
                     )
-                    schedule.pop(j)
 
-                i += 1
 
     def download_weekly_schedule(self, buffer_days=3):
         now = date.today()
@@ -202,7 +199,6 @@ class TVPreparer():
         for entry in pending_programs:
             slug = None
             file_path = None
-            status = None
             source_url = None
 
             if entry.episode_id and entry.episode.series.series_id and entry.episode.source_url:
@@ -240,7 +236,7 @@ class TVPreparer():
             else:
                 try:
                     download_path = self.paths.get_download_path(filename)
-                    status = self.downloader.download_single(entry.schedule_id, source_url, download_path)
+                    self.downloader.download_single(entry.schedule_id, source_url, download_path)
 
                     download_path.rename(file_path)
 
@@ -296,8 +292,42 @@ class TVPreparer():
 
             self.handler.update_file_info(entry.schedule_id, file_path)
 
+def preparer_logging(log_dir):
+    log_dir = Path(log_dir)
+
+    log_path = log_dir / "preparer.log"
+    log_path.parent.mkdir(exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        handlers=[
+            logging.FileHandler(log_path),
+            logging.StreamHandler()
+        ]
+    )
+
 def main():
     prep = TVPreparer()
+
+    config = get_config_dict()
+
+    refresh_config = config["refresh"]
+    refresh_buffer = refresh_config["buffer_weeks"]
+    missing = refresh_config["missing"]
+    #target_week = config["schedule"]["target_week"]
+    years_back = config["schedule"]["years_back"]
+
+    sync_config = config["sync"]
+    download_buffer = sync_config["download_buffer"]
+    verify_buffer = sync_config["verify_buffer"]
+    overlap = sync_config["overlap_minutes"]
+    delete_overlaps = sync_config["delete_overlaps"]
+
+    log_bool = config["logging"]
+
+    if log_bool:
+        log_dir = config["paths"]["logs"]
+        preparer_logging(log_dir)
 
     if len(sys.argv)>1:
         operation = sys.argv[1]
@@ -305,27 +335,30 @@ def main():
         if operation == "delete":
             prep.cleanup_obsolete_episodes()
 
-        elif operation == "fetch":
-            prep.fetch_nrk_data()
-        
-        elif operation == "metadata":
-            prep.enrich_metadata()
-
         elif operation == "download":
-            prep.download_weekly_schedule()
+            prep.download_weekly_schedule(buffer_days=download_buffer)
 
         elif operation == "verify":
-            prep.verify_scheduled_programs()
+            prep.verify_scheduled_programs(buffer_days=verify_buffer)
+
+        elif operation == "overlaps":
+            prep.resolve_overlapping_broadcasts(buffer_days=verify_buffer, buffer_time=overlap, delete_overlaps=delete_overlaps)
+
+        elif operation == "fetch":
+            prep.fetch_nrk_data(years_back, buffer_weeks=refresh_buffer)
+        
+        elif operation == "metadata":
+            prep.enrich_metadata(missing=missing)
 
         elif operation == "sync":
             prep.cleanup_obsolete_episodes()
-            prep.download_weekly_schedule()
-            prep.verify_scheduled_programs()
+            prep.download_weekly_schedule(buffer_days=download_buffer)
+            prep.verify_scheduled_programs(buffer_days=verify_buffer)
+            prep.resolve_overlapping_broadcasts(buffer_days=verify_buffer, buffer_time=overlap, delete_overlaps=delete_overlaps)
 
         elif operation == "refresh":
-            prep.fetch_nrk_data()
-            prep.enrich_metadata()
-            prep.resolve_duplicate_broadcasts()
+            prep.fetch_nrk_data(years_back, buffer_weeks=refresh_buffer)
+            prep.enrich_metadata(missing=missing)
 
         else:
             print("Not a valid operation")
